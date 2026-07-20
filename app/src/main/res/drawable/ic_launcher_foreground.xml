@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Shield shape -->
+    <path
+        android:pathData="M54,20 L82,32 L82,58 C82,74 70,86 54,92 C38,86 26,74 26,58 L26,32 Z"
+        android:fillColor="#00000000"
+        android:strokeColor="#00FFFF"
+        android:strokeWidth="2.5" />
+
+    <!-- Shield inner fill -->
+    <path
+        android:pathData="M54,24 L79,35 L79,58 C79,72 68,83 54,89 C40,83 29,72 29,58 L29,35 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="29"
+                android:startY="24"
+                android:endX="79"
+                android:endY="89"
+                android:type="linear">
+                <item android:color="#3300FFFF" android:offset="0.0" />
+                <item android:color="#1A00FFFF" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Heartbeat/pulse line -->
+    <path
+        android:pathData="M36,56 L44,56 L48,44 L52,68 L56,48 L60,56 L72,56"
+        android:fillColor="#00000000"
+        android:strokeColor="#00FFFF"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- Small heart at top -->
+    <path
+        android:pathData="M54,38 C54,35 50,32 48,35 C46,32 42,35 42,38 C42,44 48,48 48,48 C48,48 54,44 54,38 Z"
+        android:fillColor="#00FFFF"
+        android:fillAlpha="0.6" />
+</vector>

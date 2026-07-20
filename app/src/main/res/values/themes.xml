@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.BioGuardMovil" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">#FF0A1628</item>
+        <item name="android:navigationBarColor">#FF0A1628</item>
+    </style>
+
+    <style name="Theme.BioGuardSplash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/bio_dark_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/bio_guard</item>
+        <item name="windowSplashScreenIconBackgroundColor">@color/bio_dark_background</item>
+        <item name="postSplashScreenTheme">@style/Theme.BioGuardMovil</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowActionBar">false</item>
+    </style>
+</resources>

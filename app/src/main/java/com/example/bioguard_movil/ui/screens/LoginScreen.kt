@@ -59,10 +59,14 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
-
+import androidx.compose.foundation.text.BasicTextField
 @Composable
 fun LoginScreen(
-    onLoginSuccess: () -> Unit = {}
+    authViewModel: com.example.bioguard_movil.ui.viewmodel.AuthViewModel,
+    onLoginSuccess: () -> Unit = {},
+    onNavigateToRegister: () -> Unit = {},
+    onNavigateToPasswordRecovery: () -> Unit = {},
+    onNavigateToQr: () -> Unit = {}
 ) {
     var codigo by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
@@ -108,15 +112,6 @@ fun LoginScreen(
             .fillMaxSize()
             .background(DarkBackground)
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    brush = Brush.radialGradient(
-                        colors = listOf(CyanNeon.copy(alpha = glowAlpha * 0.05f), Color.Transparent)
-                    )
-                )
-        )
 
         Column(
             modifier = Modifier
@@ -162,23 +157,43 @@ fun LoginScreen(
                         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
                     )
 
-                    OutlinedTextField(
+                    BasicTextField(
                         value = codigo,
-                        onValueChange = { codigo = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("Ingresa tu c\u00f3digo de 6 caracteres", color = TextTertiary) },
+                        onValueChange = { if (it.length <= 8) codigo = it.uppercase() },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
-                        singleLine = true,
-                        shape = RoundedCornerShape(10.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = CyanNeon,
-                            unfocusedBorderColor = GlassBorder,
-                            focusedContainerColor = InputBackground,
-                            unfocusedContainerColor = InputBackground,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary,
-                            cursorColor = CyanNeon
-                        )
+                        modifier = Modifier.fillMaxWidth(),
+                        decorationBox = { innerTextField ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                repeat(8) { index ->
+                                    val char = codigo.getOrNull(index)
+                                    val isFocused = codigo.length == index
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .padding(horizontal = 2.dp)
+                                            .height(45.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(InputBackground)
+                                            .border(
+                                                width = 1.dp,
+                                                color = if (isFocused) CyanNeon else GlassBorder,
+                                                shape = RoundedCornerShape(8.dp)
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = char?.toString() ?: "",
+                                            color = TextPrimary,
+                                            fontSize = 18.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     )
 
                     Spacer(modifier = Modifier.height(28.dp))

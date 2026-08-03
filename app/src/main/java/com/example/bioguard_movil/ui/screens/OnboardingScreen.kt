@@ -1,5 +1,6 @@
 package com.example.bioguard_movil.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -23,34 +24,45 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.bioguard_movil.data.Formatters
+import com.example.bioguard_movil.data.Resource
+import com.example.bioguard_movil.data.repository.PacienteRepository
+import com.example.bioguard_movil.datastore.UserPreferences
 import com.example.bioguard_movil.ui.theme.GreenNeon
 import com.example.bioguard_movil.ui.theme.RedNeon
 import com.example.bioguard_movil.ui.theme.AppTheme
 import com.example.bioguard_movil.ui.theme.ThemeState
 import com.example.bioguard_movil.ui.theme.YellowNeon
+import com.example.bioguard_movil.ui.components.CheckCard
+import com.example.bioguard_movil.ui.components.tfColors
 import com.example.bioguard_movil.ui.theme.LocalThemeState
 import com.example.bioguard_movil.ui.theme.colorPalette
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,7 +72,7 @@ fun OnboardingScreen(
     onThemeChange: (ThemeState) -> Unit = {}
 ) {
     val p = LocalThemeState.current.colorPalette()
-    var step by remember { mutableStateOf(1) }
+    var step by remember { mutableIntStateOf(1) }
 
     when (step) {
         1 -> BiometricProfileStep(
@@ -91,9 +103,65 @@ fun BiometricProfileStep(
     var selectedActivity by remember { mutableStateOf("Sedentario") }
     var isDiabetic by remember { mutableStateOf(false) }
     var hasFamilyDiabetes by remember { mutableStateOf(false) }
+    var isSaving by remember { mutableStateOf(false) }
 
     val p = LocalThemeState.current.colorPalette()
     val activityLevels = listOf("Sedentario", "Ligero", "Moderado", "Intenso", "Muy intenso")
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val prefs = remember { UserPreferences(context) }
+    val pacienteRepository = remember { PacienteRepository() }
+
+    fun crearPaciente() {
+        scope.launch {
+            isSaving = true
+            val isoDate = Formatters.toIsoDate(birthDate)
+            if (isoDate == null) {
+                isSaving = false
+                Toast.makeText(context, "Fecha de nacimiento invalida (dd/mm/aaaa)", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            val peso = weight.toDoubleOrNull()
+            val estatura = height.toDoubleOrNull()
+            if (peso == null || estatura == null || peso !in 1.0..300.0 || estatura !in 30.0..250.0) {
+                isSaving = false
+                Toast.makeText(context, "Indica un peso y una estatura validos", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            when (val result = pacienteRepository.crearPaciente(nombre.trim(), isDiabetic)) {
+                is Resource.Success -> {
+                    val pacienteId = result.data.pacienteId
+                    prefs.savePatientId(pacienteId)
+                    when (val bio = pacienteRepository.updateBiometria(
+                        id = pacienteId,
+                        fechaNacimiento = isoDate,
+                        sexo = Formatters.toSexoCode(selectedSex),
+                        pesoKg = peso,
+                        estaturaCm = estatura,
+                        esDiabetico = isDiabetic,
+                        familiaresDiabetes = hasFamilyDiabetes,
+                        actividadFisica = selectedActivity
+                    )) {
+                        is Resource.Success -> {
+                            isSaving = false
+                            onNext()
+                        }
+                        is Resource.Error -> {
+                            isSaving = false
+                            Toast.makeText(context, bio.message, Toast.LENGTH_LONG).show()
+                            onNext()
+                        }
+                        is Resource.Loading -> {}
+                    }
+                }
+                is Resource.Error -> {
+                    isSaving = false
+                    Toast.makeText(context, result.message, Toast.LENGTH_SHORT).show()
+                }
+                is Resource.Loading -> {}
+            }
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -176,7 +244,7 @@ fun BiometricProfileStep(
 
             Text(text = "NIVEL DE ACTIVIDAD FÍSICA", fontSize = 10.sp, color = p.accent, letterSpacing = 2.sp, modifier = Modifier.padding(bottom = 6.dp))
             ExposedDropdownMenuBox(expanded = activityExpanded, onExpandedChange = { activityExpanded = it }) {
-                OutlinedTextField(value = selectedActivity, onValueChange = {}, modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable), readOnly = true, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = activityExpanded) }, shape = RoundedCornerShape(10.dp), colors = tfColors())
+                OutlinedTextField(value = selectedActivity, onValueChange = {}, modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable), readOnly = true, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = activityExpanded) }, shape = RoundedCornerShape(10.dp), colors = tfColors())
                 ExposedDropdownMenu(expanded = activityExpanded, onDismissRequest = { activityExpanded = false }, containerColor = p.surface) {
                     activityLevels.forEach { level -> DropdownMenuItem(text = { Text(level, color = p.textPrimary) }, onClick = { selectedActivity = level; activityExpanded = false }) }
                 }
@@ -191,8 +259,18 @@ fun BiometricProfileStep(
 
             Spacer(modifier = Modifier.height(28.dp))
 
-            Button(onClick = onNext, modifier = Modifier.fillMaxWidth().height(50.dp).clip(RoundedCornerShape(10.dp)), shape = RoundedCornerShape(10.dp), colors = ButtonDefaults.buttonColors(containerColor = p.accent)) {
-                Text(text = "CONTINUAR", color = p.background, fontWeight = FontWeight.Bold, letterSpacing = 2.sp, fontSize = 14.sp)
+            Button(
+                onClick = { crearPaciente() },
+                enabled = nombre.isNotBlank() && !isSaving,
+                modifier = Modifier.fillMaxWidth().height(50.dp).clip(RoundedCornerShape(10.dp)),
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = p.accent, disabledContainerColor = p.accent.copy(alpha = 0.3f))
+            ) {
+                if (isSaving) {
+                    CircularProgressIndicator(modifier = Modifier.size(22.dp), color = p.background, strokeWidth = 2.dp)
+                } else {
+                    Text(text = "CONTINUAR", color = p.background, fontWeight = FontWeight.Bold, letterSpacing = 2.sp, fontSize = 14.sp)
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -207,7 +285,14 @@ fun AppearanceThemeStep(
     onThemeChange: (ThemeState) -> Unit = {}
 ) {
     val p = LocalThemeState.current.colorPalette()
-    var selectedTheme by remember { mutableStateOf("Oscuro") }
+    var selectedTheme by remember { mutableStateOf(
+        when (themeState.theme) {
+            AppTheme.CLARO -> "Claro"
+            AppTheme.CYBERPUNK -> "Cyberpunk"
+            AppTheme.SALUD -> "Salud"
+            else -> "Oscuro"
+        }
+    ) }
     val themes = listOf("Oscuro", "Claro", "Cyberpunk", "Salud")
 
     Box(
@@ -323,12 +408,7 @@ fun BluetoothPairingStep(
     onComplete: () -> Unit = {}
 ) {
     val p = LocalThemeState.current.colorPalette()
-    val discoveredDevices = listOf(
-        "Galaxy Watch 6",
-        "Galaxy Watch 5",
-        "BioGuard Sensor v2"
-    )
-    var selectedDevice by remember { mutableStateOf("") }
+    var isScanning by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
@@ -403,37 +483,34 @@ fun BluetoothPairingStep(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            Text(text = "DISPOSITIVOS ENCONTRADOS", fontSize = 10.sp, color = p.accent, letterSpacing = 2.sp, modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp))
+            Text(text = "VINCULAR DISPOSITIVO", fontSize = 10.sp, color = p.accent, letterSpacing = 2.sp, modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp))
 
-            discoveredDevices.forEach { device ->
-                val isSelected = selectedDevice == device
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(if (isSelected) p.accent.copy(alpha = 0.1f) else p.surface)
-                        .border(width = 1.dp, color = if (isSelected) p.accent else p.border, shape = RoundedCornerShape(10.dp))
-                        .clickable { selectedDevice = device }
-                        .padding(horizontal = 14.dp),
-                    contentAlignment = Alignment.CenterStart
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(text = "⌚", fontSize = 18.sp, color = p.accent)
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(text = device, fontSize = 14.sp, color = p.textPrimary, fontWeight = FontWeight.Medium)
-                        }
-                        if (isSelected) {
-                            Text(text = "✓", color = p.accent, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        }
-                    }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(p.surface)
+                    .border(width = 1.dp, color = p.border, shape = RoundedCornerShape(10.dp))
+                    .clickable { isScanning = !isScanning }
+                    .padding(20.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(text = if (isScanning) "\u231B" else "\uD83D\uDCF1", fontSize = 32.sp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = if (isScanning) "Buscando dispositivos..." else "Toca para buscar dispositivos",
+                        fontSize = 14.sp,
+                        color = p.textPrimary,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Aseg\u00farate de que tu dispositivo wearable est\u00e9 encendido y cerca",
+                        fontSize = 11.sp,
+                        color = p.textSecondary
+                    )
                 }
-                Spacer(modifier = Modifier.height(8.dp))
             }
 
             Spacer(modifier = Modifier.height(28.dp))
@@ -441,11 +518,10 @@ fun BluetoothPairingStep(
             Button(
                 onClick = onComplete,
                 modifier = Modifier.fillMaxWidth().height(50.dp).clip(RoundedCornerShape(10.dp)),
-                enabled = selectedDevice.isNotEmpty(),
                 shape = RoundedCornerShape(10.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = p.accent, disabledContainerColor = p.accent.copy(alpha = 0.3f))
+                colors = ButtonDefaults.buttonColors(containerColor = p.accent)
             ) {
-                Text(text = "FINALIZAR Y VINCULAR", color = p.background, fontWeight = FontWeight.Bold, letterSpacing = 2.sp, fontSize = 14.sp)
+                Text(text = "FINALIZAR", color = p.background, fontWeight = FontWeight.Bold, letterSpacing = 2.sp, fontSize = 14.sp)
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -453,32 +529,4 @@ fun BluetoothPairingStep(
     }
 }
 
-@Composable
-fun CheckCard(text: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    val p = LocalThemeState.current.colorPalette()
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(p.surface)
-            .border(width = 1.dp, color = p.border, shape = RoundedCornerShape(10.dp))
-            .padding(12.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Checkbox(checked = checked, onCheckedChange = onCheckedChange, colors = CheckboxDefaults.colors(checkedColor = p.accent, uncheckedColor = p.border))
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(text = text, fontSize = 13.sp, color = p.textPrimary)
-        }
-    }
-}
 
-@Composable
-fun tfColors() = OutlinedTextFieldDefaults.colors(
-    focusedBorderColor = LocalThemeState.current.colorPalette().accent,
-    unfocusedBorderColor = LocalThemeState.current.colorPalette().border,
-    focusedContainerColor = LocalThemeState.current.colorPalette().inputBackground,
-    unfocusedContainerColor = LocalThemeState.current.colorPalette().inputBackground,
-    focusedTextColor = LocalThemeState.current.colorPalette().textPrimary,
-    unfocusedTextColor = LocalThemeState.current.colorPalette().textPrimary,
-    cursorColor = LocalThemeState.current.colorPalette().accent
-)

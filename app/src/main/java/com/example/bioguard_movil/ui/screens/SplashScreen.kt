@@ -18,6 +18,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -36,7 +39,8 @@ import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun SplashScreen(
-    onFinished: () -> Unit = {}
+    isAuthenticated: Boolean = false,
+    onFinished: (authenticated: Boolean) -> Unit = {}
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "splash")
     val glowAlpha by infiniteTransition.animateFloat(
@@ -58,9 +62,21 @@ fun SplashScreen(
         label = "pulse"
     )
 
+    var finished by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) {
         delay(3000.milliseconds)
-        onFinished()
+        if (!finished) {
+            finished = true
+            onFinished(isAuthenticated)
+        }
+    }
+
+    LaunchedEffect(isAuthenticated) {
+        if (isAuthenticated && !finished) {
+            finished = true
+            onFinished(true)
+        }
     }
 
     Box(

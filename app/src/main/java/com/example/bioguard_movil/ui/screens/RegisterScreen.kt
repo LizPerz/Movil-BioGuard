@@ -56,31 +56,55 @@ import com.example.bioguard_movil.ui.theme.GlassBorder
 import com.example.bioguard_movil.ui.theme.GreenNeon
 import com.example.bioguard_movil.ui.theme.InputBackground
 import com.example.bioguard_movil.ui.theme.InputBorder
+import com.example.bioguard_movil.ui.theme.RedNeon
 import com.example.bioguard_movil.ui.theme.TextPrimary
 import com.example.bioguard_movil.ui.theme.TextSecondary
 import com.example.bioguard_movil.ui.theme.TextTertiary
-import kotlin.time.Duration.Companion.milliseconds
+import androidx.compose.runtime.collectAsState
+import com.example.bioguard_movil.ui.viewmodel.AuthViewModel
+import com.example.bioguard_movil.ui.components.SystemNotificationDialog
 
 @Composable
 fun RegisterScreen(
+    authViewModel: AuthViewModel,
     onRegisterSuccess: () -> Unit = {},
     onBackToLogin: () -> Unit = {}
 ) {
     var name by remember { mutableStateOf("") }
+    var apellidoPaterno by remember { mutableStateOf("") }
+    var apellidoMaterno by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
-    var triggerRegister by remember { mutableStateOf(false) }
 
-    LaunchedEffect(triggerRegister) {
-        if (triggerRegister) {
-            kotlinx.coroutines.delay(2000.milliseconds)
+    val uiState by authViewModel.uiState.collectAsState()
+
+    val emailValid = android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()
+    val passwordValid = password.length >= 6
+    val passwordsMatch = password == confirmPassword
+
+    var errorDialogMessage by remember { mutableStateOf<String?>(null) }
+    var successDialogMessage by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(uiState.successMessage) {
+        uiState.successMessage?.let {
             isLoading = false
-            triggerRegister = false
-            onRegisterSuccess()
+            successDialogMessage = it
+            authViewModel.clearSuccess()
+            if (!uiState.requiresVerification) {
+                onRegisterSuccess()
+            }
+        }
+    }
+
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let {
+            isLoading = false
+            errorDialogMessage = it
+            authViewModel.clearError()
         }
     }
 
@@ -154,7 +178,7 @@ fun RegisterScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "NOMBRE COMPLETO",
+                        text = "NOMBRE",
                         fontSize = 10.sp,
                         color = CyanNeon,
                         letterSpacing = 2.sp,
@@ -165,9 +189,9 @@ fun RegisterScreen(
                         value = name,
                         onValueChange = { name = it },
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("Tu nombre", color = TextTertiary) },
+                        placeholder = { Text("Tu primer y segundo nombre", color = TextTertiary) },
                         leadingIcon = {
-                            Text(text = "👤", color = TextTertiary, fontSize = 16.sp)
+                            Text(text = "\uD83D\uDC64", color = TextTertiary, fontSize = 16.sp)
                         },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                         singleLine = true,
@@ -186,7 +210,7 @@ fun RegisterScreen(
                     Spacer(modifier = Modifier.height(14.dp))
 
                     Text(
-                        text = "CORREO ELECTRÓNICO",
+                        text = "APELLIDO PATERNO",
                         fontSize = 10.sp,
                         color = CyanNeon,
                         letterSpacing = 2.sp,
@@ -194,14 +218,14 @@ fun RegisterScreen(
                     )
 
                     OutlinedTextField(
-                        value = email,
-                        onValueChange = { email = it },
+                        value = apellidoPaterno,
+                        onValueChange = { apellidoPaterno = it },
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("correo@ejemplo.com", color = TextTertiary) },
+                        placeholder = { Text("Tu apellido paterno", color = TextTertiary) },
                         leadingIcon = {
-                            Text(text = "✉", color = TextTertiary, fontSize = 16.sp)
+                            Text(text = "\uD83D\uDC64", color = TextTertiary, fontSize = 16.sp)
                         },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                         singleLine = true,
                         shape = RoundedCornerShape(10.dp),
                         colors = OutlinedTextFieldDefaults.colors(
@@ -218,7 +242,76 @@ fun RegisterScreen(
                     Spacer(modifier = Modifier.height(14.dp))
 
                     Text(
-                        text = "CONTRASEÑA",
+                        text = "APELLIDO MATERNO (OPCIONAL)",
+                        fontSize = 10.sp,
+                        color = CyanNeon,
+                        letterSpacing = 2.sp,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = apellidoMaterno,
+                        onValueChange = { apellidoMaterno = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Tu apellido materno", color = TextTertiary) },
+                        leadingIcon = {
+                            Text(text = "\uD83D\uDC64", color = TextTertiary, fontSize = 16.sp)
+                        },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                        singleLine = true,
+                        shape = RoundedCornerShape(10.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = CyanNeon,
+                            unfocusedBorderColor = GlassBorder,
+                            focusedContainerColor = InputBackground,
+                            unfocusedContainerColor = InputBackground,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
+                            cursorColor = CyanNeon
+                        )
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Text(
+                        text = "CORREO ELECTR\u00d3NICO",
+                        fontSize = 10.sp,
+                        color = CyanNeon,
+                        letterSpacing = 2.sp,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = email,
+                        onValueChange = { email = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("correo@ejemplo.com", color = TextTertiary) },
+                        leadingIcon = {
+                            Text(text = "\u2709", color = TextTertiary, fontSize = 16.sp)
+                        },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                        singleLine = true,
+                        shape = RoundedCornerShape(10.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = CyanNeon,
+                            unfocusedBorderColor = GlassBorder,
+                            focusedContainerColor = InputBackground,
+                            unfocusedContainerColor = InputBackground,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
+                            cursorColor = CyanNeon
+                        )
+                    )
+
+                    if (email.isNotEmpty() && !emailValid) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(text = "Ingresa un correo electr\u00f3nico v\u00e1lido", fontSize = 11.sp, color = RedNeon, modifier = Modifier.fillMaxWidth())
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Text(
+                        text = "CONTRASE\u00d1A",
                         fontSize = 10.sp,
                         color = CyanNeon,
                         letterSpacing = 2.sp,
@@ -229,9 +322,9 @@ fun RegisterScreen(
                         value = password,
                         onValueChange = { password = it },
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("••••••••", color = TextTertiary) },
+                        placeholder = { Text("\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022", color = TextTertiary) },
                         leadingIcon = {
-                            Text(text = "🔒", color = TextTertiary, fontSize = 16.sp)
+                            Text(text = "\uD83D\uDD12", color = TextTertiary, fontSize = 16.sp)
                         },
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -246,17 +339,22 @@ fun RegisterScreen(
                             unfocusedTextColor = TextPrimary,
                             cursorColor = CyanNeon
                         ),
-                        trailingIcon = {
-                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                Text(text = if (passwordVisible) "👁" else "👁‍🗨", color = CyanNeon, fontSize = 14.sp)
+                            trailingIcon = {
+                                IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                    Text(text = if (passwordVisible) "\uD83D\uDC41" else "\uD83D\uDC41\u200D\uD83D\uDDE3", color = CyanNeon, fontSize = 14.sp)
+                                }
                             }
-                        }
-                    )
+                        )
+
+                    if (password.isNotEmpty() && !passwordValid) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(text = "La contrase\u00f1a debe tener al menos 6 caracteres", fontSize = 11.sp, color = RedNeon, modifier = Modifier.fillMaxWidth())
+                    }
 
                     Spacer(modifier = Modifier.height(14.dp))
 
                     Text(
-                        text = "CONFIRMAR CONTRASEÑA",
+                        text = "CONFIRMAR CONTRASE\u00d1A",
                         fontSize = 10.sp,
                         color = CyanNeon,
                         letterSpacing = 2.sp,
@@ -267,9 +365,9 @@ fun RegisterScreen(
                         value = confirmPassword,
                         onValueChange = { confirmPassword = it },
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("••••••••", color = TextTertiary) },
+                        placeholder = { Text("\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022", color = TextTertiary) },
                         leadingIcon = {
-                            Text(text = "🔒", color = TextTertiary, fontSize = 16.sp)
+                            Text(text = "\uD83D\uDD12", color = TextTertiary, fontSize = 16.sp)
                         },
                         visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -286,23 +384,30 @@ fun RegisterScreen(
                         ),
                         trailingIcon = {
                             IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
-                                Text(text = if (confirmPasswordVisible) "👁" else "👁‍🗨", color = CyanNeon, fontSize = 14.sp)
+                                Text(text = if (confirmPasswordVisible) "\uD83D\uDC41" else "\uD83D\uDC41\u200D\uD83D\uDDE3", color = CyanNeon, fontSize = 14.sp)
                             }
                         }
                     )
+
+                    if (confirmPassword.isNotEmpty() && !passwordsMatch) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(text = "Las contrase\u00f1as no coinciden", fontSize = 11.sp, color = RedNeon, modifier = Modifier.fillMaxWidth())
+                    }
 
                     Spacer(modifier = Modifier.height(28.dp))
 
                     Button(
                         onClick = {
-                            isLoading = true
-                            triggerRegister = true
+                            if (emailValid && passwordValid && passwordsMatch && name.isNotEmpty() && apellidoPaterno.isNotEmpty()) {
+                                isLoading = true
+                                authViewModel.register(name, apellidoPaterno, apellidoMaterno, email, password)
+                            }
                         },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp)
                             .clip(RoundedCornerShape(10.dp)),
-                        enabled = !isLoading && name.isNotEmpty() && email.isNotEmpty() && password.isNotEmpty() && confirmPassword.isNotEmpty() && password == confirmPassword,
+                        enabled = !isLoading && name.isNotEmpty() && apellidoPaterno.isNotEmpty() && emailValid && passwordValid && passwordsMatch,
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = CyanNeon,
@@ -330,7 +435,7 @@ fun RegisterScreen(
 
                     TextButton(onClick = onBackToLogin) {
                         Text(
-                            text = "¿Ya tienes cuenta? Iniciar sesión",
+                            text = "\u00bfYa tienes cuenta? Iniciar sesi\u00f3n",
                             color = CyanNeon,
                             fontSize = 12.sp
                         )
@@ -362,6 +467,127 @@ fun RegisterScreen(
                     letterSpacing = 1.sp
                 )
             }
+        }
+
+        if (uiState.requiresVerification) {
+            androidx.compose.ui.window.Dialog(
+                onDismissRequest = { authViewModel.clearVerificationState() }
+            ) {
+                var verificationCode by remember { mutableStateOf("") }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(DarkSurface)
+                        .border(width = 1.dp, color = GlassBorder, shape = RoundedCornerShape(16.dp))
+                        .padding(24.dp)
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "VERIFICAR CUENTA",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = CyanNeon,
+                            letterSpacing = 3.sp,
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+
+                        Text(
+                            text = "Introduce el código OTP enviado a tu correo:\n${uiState.pendingEmail}",
+                            fontSize = 12.sp,
+                            color = TextSecondary,
+                            modifier = Modifier.padding(bottom = 20.dp),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+
+                        OutlinedTextField(
+                            value = verificationCode,
+                            onValueChange = { verificationCode = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = { Text("Código de 6 dígitos", color = TextTertiary) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            shape = RoundedCornerShape(10.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = CyanNeon,
+                                unfocusedBorderColor = GlassBorder,
+                                focusedContainerColor = InputBackground,
+                                unfocusedContainerColor = InputBackground,
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary,
+                                cursorColor = CyanNeon
+                            )
+                        )
+
+                        if (uiState.error != null) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = uiState.error ?: "",
+                                color = RedNeon,
+                                fontSize = 11.sp,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            TextButton(
+                                onClick = { authViewModel.clearVerificationState() }
+                            ) {
+                                Text("CANCELAR", color = TextSecondary, fontSize = 12.sp)
+                            }
+
+                            Button(
+                                onClick = {
+                                    if (verificationCode.isNotEmpty()) {
+                                        authViewModel.verificarOtp(uiState.pendingEmail ?: "", verificationCode)
+                                    }
+                                },
+                                enabled = verificationCode.isNotEmpty() && !uiState.isLoading,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = CyanNeon,
+                                    disabledContainerColor = CyanNeon.copy(alpha = 0.3f)
+                                ),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                if (uiState.isLoading) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        color = DarkBackground,
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Text("VERIFICAR", color = DarkBackground, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (errorDialogMessage != null) {
+            SystemNotificationDialog(
+                title = "AVISO DE ERROR",
+                message = errorDialogMessage ?: "",
+                isError = true,
+                onDismiss = { errorDialogMessage = null }
+            )
+        }
+
+        if (successDialogMessage != null) {
+            SystemNotificationDialog(
+                title = "OPERACIÓN EXITOSA",
+                message = successDialogMessage ?: "",
+                isError = false,
+                onDismiss = { successDialogMessage = null }
+            )
         }
     }
 }

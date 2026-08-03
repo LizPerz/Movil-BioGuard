@@ -1,0 +1,23 @@
+package com.example.bioguard_movil.navigation
+
+object Screen {
+    const val SPLASH = "splash"
+    const val LOGIN = "login"
+    const val REGISTER = "register"
+    const val PASSWORD_RECOVERY = "password_recovery"
+    const val ONBOARDING = "onboarding"
+    const val DASHBOARD = "dashboard"
+    const val ANALYSIS = "analysis"
+    const val REPORTS = "reports"
+    const val DEVICE = "device"
+    const val PROFILE = "profile"
+    const val ALERT = "alert"
+    const val HISTORY = "history"
+    const val QR_SCANNER = "qr_scanner"
+    const val NOTIFICATIONS = "notifications"
+    const val MEDICATIONS = "medications"
+    const val CUIDADORES = "cuidadores"
+    const val SUPPORT = "support"
+
+    val bottomBarRoutes = listOf(DASHBOARD, ANALYSIS, REPORTS, DEVICE, PROFILE)
+}

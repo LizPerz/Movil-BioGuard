@@ -26,8 +26,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,32 +39,30 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.bioguard_movil.ui.components.ErrorRetryBox
 import com.example.bioguard_movil.ui.theme.GreenNeon
 import com.example.bioguard_movil.ui.theme.LocalThemeState
 import com.example.bioguard_movil.ui.theme.RedNeon
 import com.example.bioguard_movil.ui.theme.YellowNeon
 import com.example.bioguard_movil.ui.theme.colorPalette
-
-data class VitalSign(
-    val name: String,
-    val value: String,
-    val unit: String,
-    val icon: String,
-    val color: Color,
-    val status: String,
-    val statusColor: Color
-)
-
-data class HistoryItem(
-    val time: String,
-    val pulse: String,
-    val temp: String,
-    val status: String
-)
+import com.example.bioguard_movil.ui.model.HistoryItem
+import com.example.bioguard_movil.ui.model.VitalSign
+import com.example.bioguard_movil.ui.viewmodel.DashboardViewModel
 
 @Composable
-fun DashboardScreen() {
+fun DashboardScreen(
+    dashboardViewModel: DashboardViewModel,
+    onPendingAlert: () -> Unit = {}
+) {
     val p = LocalThemeState.current.colorPalette()
+    val uiState by dashboardViewModel.uiState.collectAsState()
+
+    LaunchedEffect(uiState.summary?.alertasPendientesCount) {
+        if ((uiState.summary?.alertasPendientesCount ?: 0) > 0) {
+            onPendingAlert()
+        }
+    }
+
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseAlpha by infiniteTransition.animateFloat(
         initialValue = 0.6f,
@@ -73,173 +74,247 @@ fun DashboardScreen() {
         label = "pulse"
     )
 
-    val vitalSigns = listOf(
-        VitalSign("RITMO CARDÍACO", "78", "BPM", "♥", p.accent, "NORMAL", GreenNeon),
-        VitalSign("TEMPERATURA", "36.5", "°C", "🌡", p.accentSecondary, "NORMAL", GreenNeon),
-        VitalSign("CONDUCTIVIDAD", "1.2", "µS", "⚡", YellowNeon, "ELEVADA", YellowNeon)
-    )
+    val ultimaLectura = uiState.summary?.ultimaLectura
+    val lastTemp = ultimaLectura?.temperaturaC
+    val lastGsr = ultimaLectura?.sudoracionGsr
+    val lastPulse = ultimaLectura?.pulsoBpm
 
-    val metabolicStatus = "ESTABLE"
-    val metabolicColor = GreenNeon
-    val suggestion = when (metabolicStatus) {
-        "CRÍTICO" -> "⚠ Atención médica inmediata requerida. Consulta a tu especialista."
-        "ALERTA" -> "⚠ Niveles metabólicos alterados. Revisa tu alimentación e hidratación."
-        "ELEVADO" -> "📈 Monitoreo continuo recomendado. Evita esfuerzos intensos."
-        "BAJO" -> "📉 Se recomienda ingesta de carbohidratos y descanso."
-        else -> "✅ Estado metabólico óptimo. Mantén tu rutina saludable."
+    val tempStatus = when {
+        lastTemp == null -> "SIN DATOS"
+        lastTemp > 38.5 -> "ALERTA"
+        lastTemp > 37.5 -> "ELEVADA"
+        lastTemp < 35.0 -> "BAJA"
+        else -> "NORMAL"
+    }
+    val tempStatusColor = when (tempStatus) {
+        "ALERTA" -> RedNeon
+        "ELEVADA", "BAJA" -> YellowNeon
+        else -> GreenNeon
     }
 
-    val historyItems = listOf(
-        HistoryItem("14:30", "75 BPM", "36.4°C", "Normal"),
-        HistoryItem("14:00", "72 BPM", "36.3°C", "Normal"),
-        HistoryItem("13:30", "80 BPM", "36.6°C", "Normal"),
-        HistoryItem("13:00", "78 BPM", "36.5°C", "Normal"),
-        HistoryItem("12:30", "82 BPM", "36.7°C", "Normal")
+    val gsrStatus = when {
+        lastGsr == null -> "SIN DATOS"
+        lastGsr >= 8.0 -> "ELEVADA"
+        else -> "NORMAL"
+    }
+    val gsrStatusColor = when (gsrStatus) {
+        "ELEVADA" -> YellowNeon
+        else -> GreenNeon
+    }
+
+    val pulseStatus = when {
+        lastPulse == null -> "SIN DATOS"
+        lastPulse > 120 -> "ALERTA"
+        lastPulse > 100 -> "ELEVADO"
+        lastPulse < 50 -> "BAJO"
+        else -> "NORMAL"
+    }
+
+    val vitalSigns = listOf(
+        VitalSign("RITMO CARD\u00cdACO", "${lastPulse?.toInt() ?: 0}", "BPM", "\u2665", p.accent, pulseStatus, if (pulseStatus == "NORMAL") GreenNeon else if (pulseStatus == "ALERTA") RedNeon else YellowNeon),
+        VitalSign("TEMPERATURA", "${lastTemp ?: 0.0}", "\u00b0C", "\uD83C\uDF21", p.accentSecondary, tempStatus, tempStatusColor),
+        VitalSign("CONDUCTIVIDAD", "${lastGsr ?: 0.0}", "\u00b5S", "\u26a1", YellowNeon, gsrStatus, gsrStatusColor)
     )
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(p.background)
-    ) {
-        Column(
+    val metabolicStatus = when {
+        lastPulse == null && lastTemp == null -> "CARGANDO..."
+        (lastPulse ?: 0.0) > 120 || (lastTemp ?: 0.0) > 38.5 -> "CR\u00cdTICO"
+        (lastPulse ?: 0.0) > 100 || (lastTemp ?: 0.0) > 37.5 -> "ALERTA"
+        else -> "NORMAL"
+    }
+    val metabolicColor = when (metabolicStatus) {
+        "CR\u00cdTICO" -> RedNeon
+        "ALERTA" -> YellowNeon
+        "ELEVADO" -> YellowNeon
+        else -> GreenNeon
+    }
+
+    val suggestion = when (metabolicStatus) {
+        "CR\u00cdTICO" -> "\u26a0 Atenci\u00f3n m\u00e9dica inmediata requerida. Consulta a tu especialista."
+        "ALERTA" -> "\u26a0 Niveles metab\u00f3licos alterados. Revisa tu alimentaci\u00f3n e hidrataci\u00f3n."
+        "ELEVADO" -> "\uD83D\uDCC8 Monitoreo continuo recomendado. Evita esfuerzos intensos."
+        "BAJO" -> "\uD83D\uDCC9 Se recomienda ingesta de carbohidratos y descanso."
+        "Normal" -> "\u2705 Estado metab\u00f3lico \u00f3ptimo. Mant\u00e9n tu rutina saludable."
+        else -> "Cargando datos..."
+    }
+
+    val historyItems = uiState.lecturasRecientes.map { lectura ->
+        HistoryItem(
+            time = lectura.timestamp.substringAfter("T", "").substringBefore("."),
+            pulse = "${lectura.pulsoBpm.toInt()} BPM",
+            temp = "${lectura.temperaturaC}\u00b0C",
+            status = if ((lectura.probabilidadPico ?: 0.0) < 0.5) "Normal" else "Elevado"
+        )
+    }
+
+    if (uiState.isLoading) {
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp)
+                .background(p.background),
+            contentAlignment = Alignment.Center
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "BIOGUARD",
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = p.accent,
-                        letterSpacing = 4.sp
-                    )
-                    Text(
-                        text = "MONITOREO EN VIVO",
-                        fontSize = 10.sp,
-                        color = p.textSecondary,
-                        letterSpacing = 2.sp
-                    )
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(p.surface)
-                            .border(width = 1.dp, color = p.border, shape = RoundedCornerShape(16.dp))
-                            .padding(horizontal = 10.dp, vertical = 5.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier.size(7.dp).clip(CircleShape).background(GreenNeon)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(text = "ONLINE", fontSize = 9.sp, color = GreenNeon, letterSpacing = 1.sp, fontWeight = FontWeight.Medium)
-                    }
-                }
-            }
-
-            Box(
+            CircularProgressIndicator(color = p.accent)
+        }
+    } else if (uiState.error != null && uiState.summary == null) {
+        ErrorRetryBox(
+            message = uiState.error,
+            onRetry = { dashboardViewModel.loadDashboard() }
+        )
+    } else {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(p.background)
+        ) {
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(p.surface)
-                    .border(width = 1.dp, color = p.border, shape = RoundedCornerShape(12.dp))
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
                     .padding(16.dp)
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text(text = "ESTADO METABÓLICO", fontSize = 10.sp, color = p.textSecondary, letterSpacing = 2.sp)
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(text = metabolicStatus, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = metabolicColor, letterSpacing = 2.sp)
+                        Text(
+                            text = "BIOGUARD",
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = p.accent,
+                            letterSpacing = 4.sp
+                        )
+                        Text(
+                            text = "MONITOREO EN VIVO",
+                            fontSize = 10.sp,
+                            color = p.textSecondary,
+                            letterSpacing = 2.sp
+                        )
                     }
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(metabolicColor.copy(alpha = 0.1f))
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Text(text = if (metabolicStatus == "CRÍTICO") "⚠" else "✓", fontSize = 18.sp, color = metabolicColor, fontWeight = FontWeight.Bold)
+                        val hasLiveData = uiState.summary?.ultimaLectura != null
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(p.surface)
+                                .border(width = 1.dp, color = p.border, shape = RoundedCornerShape(16.dp))
+                                .padding(horizontal = 10.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier.size(7.dp).clip(CircleShape).background(if (hasLiveData) GreenNeon else p.textSecondary)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(text = if (hasLiveData) "ONLINE" else "SIN DATOS", fontSize = 9.sp, color = if (hasLiveData) GreenNeon else p.textSecondary, letterSpacing = 1.sp, fontWeight = FontWeight.Medium)
+                        }
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(16.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(p.surface)
+                        .border(width = 1.dp, color = p.border, shape = RoundedCornerShape(12.dp))
+                        .padding(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(text = "ESTADO METAB\u00d3LICO", fontSize = 10.sp, color = p.textSecondary, letterSpacing = 2.sp)
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(text = metabolicStatus, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = metabolicColor, letterSpacing = 2.sp)
+                        }
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(metabolicColor.copy(alpha = 0.1f))
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text(text = if (metabolicStatus == "CR\u00cdTICO") "\u26a0" else "\u2713", fontSize = 18.sp, color = metabolicColor, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
 
-            vitalSigns.forEach { vital ->
-                VitalSignCard(vital = vital, pulseAlpha = pulseAlpha)
-                Spacer(modifier = Modifier.height(10.dp))
-            }
+                Spacer(modifier = Modifier.height(16.dp))
 
-            Spacer(modifier = Modifier.height(16.dp))
+                vitalSigns.forEach { vital ->
+                    VitalSignCard(vital = vital, pulseAlpha = pulseAlpha)
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
 
-            Text(
-                text = "SUGERENCIA DINÁMICA",
-                fontSize = 11.sp,
-                color = p.accent,
-                letterSpacing = 2.sp,
-                modifier = Modifier.padding(bottom = 10.dp)
-            )
+                Spacer(modifier = Modifier.height(16.dp))
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(p.surface)
-                    .border(width = 1.dp, color = p.border, shape = RoundedCornerShape(12.dp))
-                    .padding(14.dp)
-            ) {
-                Row(verticalAlignment = Alignment.Top) {
+                Text(
+                    text = "SUGERENCIA DIN\u00c1MICA",
+                    fontSize = 11.sp,
+                    color = p.accent,
+                    letterSpacing = 2.sp,
+                    modifier = Modifier.padding(bottom = 10.dp)
+                )
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(p.surface)
+                        .border(width = 1.dp, color = p.border, shape = RoundedCornerShape(12.dp))
+                        .padding(14.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.Top) {
+                        Text(
+                            text = if (metabolicStatus == "CR\u00cdTICO") "\uD83D\uDEA8" else if (metabolicStatus == "ALERTA" || metabolicStatus == "ELEVADO") "\u26a0" else "\uD83D\uDCA1",
+                            fontSize = 18.sp,
+                            modifier = Modifier.padding(end = 8.dp)
+                        )
+                        Text(
+                            text = suggestion,
+                            fontSize = 13.sp,
+                            color = p.textSecondary,
+                            lineHeight = 20.sp
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "HISTORIAL RECIENTE",
+                    fontSize = 11.sp,
+                    color = p.accent,
+                    letterSpacing = 2.sp,
+                    modifier = Modifier.padding(bottom = 10.dp)
+                )
+
+                if (historyItems.isNotEmpty()) {
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(horizontal = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(historyItems) { item ->
+                            HistoryCard(item = item)
+                        }
+                    }
+                } else {
                     Text(
-                        text = if (metabolicStatus == "CRÍTICO") "🚨" else if (metabolicStatus == "ALERTA" || metabolicStatus == "ELEVADO") "⚠" else "💡",
-                        fontSize = 18.sp,
-                        modifier = Modifier.padding(end = 8.dp)
-                    )
-                    Text(
-                        text = suggestion,
-                        fontSize = 13.sp,
-                        color = p.textSecondary,
-                        lineHeight = 20.sp
+                        text = "Sin datos recientes",
+                        fontSize = 12.sp,
+                        color = p.textSecondary
                     )
                 }
+
+                Spacer(modifier = Modifier.height(80.dp))
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = "HISTORIAL RECIENTE",
-                fontSize = 11.sp,
-                color = p.accent,
-                letterSpacing = 2.sp,
-                modifier = Modifier.padding(bottom = 10.dp)
-            )
-
-            LazyRow(
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                items(historyItems) { item ->
-                    HistoryCard(item = item)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(80.dp))
         }
     }
 }
@@ -311,7 +386,7 @@ fun HistoryCard(item: HistoryItem) {
             Spacer(modifier = Modifier.height(10.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = "♥", fontSize = 11.sp, color = p.accent)
+                Text(text = "\u2665", fontSize = 11.sp, color = p.accent)
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(text = item.pulse, fontSize = 11.sp, color = p.textPrimary)
             }
@@ -319,7 +394,7 @@ fun HistoryCard(item: HistoryItem) {
             Spacer(modifier = Modifier.height(4.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = "🌡", fontSize = 11.sp, color = p.accentSecondary)
+                Text(text = "\uD83C\uDF21", fontSize = 11.sp, color = p.accentSecondary)
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(text = item.temp, fontSize = 11.sp, color = p.textPrimary)
             }

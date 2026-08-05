@@ -1,3 +1,373 @@
 <resources>
+    <!-- App -->
     <string name="app_name">BioGuard-Movil</string>
+    <string name="app_title">BIOGUARD</string>
+
+    <!-- Register Screen -->
+    <string name="register_title">CREAR CUENTA</string>
+    <string name="register_name_label">NOMBRE</string>
+    <string name="register_name_hint">Tu primer y segundo nombre</string>
+    <string name="register_lastname_p_label">APELLIDO PATERNO</string>
+    <string name="register_lastname_p_hint">Tu apellido paterno</string>
+    <string name="register_lastname_m_label">APELLIDO MATERNO (OPCIONAL)</string>
+    <string name="register_lastname_m_hint">Tu apellido materno</string>
+    <string name="register_email_label">CORREO ELECTRÓNICO</string>
+    <string name="register_email_hint">correo@ejemplo.com</string>
+    <string name="register_email_invalid">Ingresa un correo electrónico válido</string>
+    <string name="register_password_label">CONTRASEÑA</string>
+    <string name="register_password_hint">••••••••</string>
+    <string name="register_password_invalid">La contraseña debe tener al menos 6 caracteres</string>
+    <string name="register_password_confirm_label">CONFIRMAR CONTRASEÑA</string>
+    <string name="register_password_mismatch">Las contraseñas no coinciden</string>
+    <string name="register_button">CREAR CUENTA</string>
+    <string name="register_login_link">¿Ya tienes cuenta? Iniciar sesión</string>
+    <string name="register_secure_badge">REGISTRO SEGURO Y CIFRADO</string>
+    <string name="register_verify_title">VERIFICAR CUENTA</string>
+    <string name="register_verify_message">Introduce el código OTP enviado a tu correo:\n%1$s</string>
+    <string name="register_cancel">CANCELAR</string>
+    <string name="register_verify_button">VERIFICAR</string>
+
+    <!-- Login Screen -->
+    <string name="login_subtitle">SISTEMA DE MONITOREO MEDICO</string>
+    <string name="login_mode_code">CODIGO</string>
+    <string name="login_mode_email">CORREO</string>
+    <string name="login_code_access">CODIGO DE ACCESO</string>
+    <string name="login_email_password">CORREO Y CONTRASEÑA</string>
+    <string name="login_email_hint">correo@ejemplo.com</string>
+    <string name="login_password_hint">Contraseña</string>
+    <string name="login_code_hint">Ingresa el codigo de 8 caracteres</string>
+    <string name="login_button">ACCEDER</string>
+    <string name="login_scan_qr">ESCANEAR CODIGO QR</string>
+    <string name="login_recover_account">Recuperar cuenta</string>
+    <string name="login_create_account">Crear cuenta</string>
+    <string name="login_device_active">DISPOSITIVO BIOMETRICO ACTIVO</string>
+
+    <!-- Error/Success Dialogs -->
+    <string name="dialog_error_title">AVISO DE ERROR</string>
+    <string name="dialog_success_title">OPERACIÓN EXITOSA</string>
+
+    <!-- Onboarding Screen -->
+    <string name="onboarding_bio_title">Perfil Biométrico</string>
+    <string name="onboarding_bio_desc">Completa tu información para un análisis preciso</string>
+    <string name="onboarding_name_label">NOMBRE COMPLETO</string>
+    <string name="onboarding_name_hint">Tu nombre</string>
+    <string name="onboarding_birth_label">FECHA DE NACIMIENTO</string>
+    <string name="onboarding_birth_hint">dd/mm/aaaa</string>
+    <string name="onboarding_sex_label">SEXO</string>
+    <string name="onboarding_sex_m">M</string>
+    <string name="onboarding_sex_f">F</string>
+    <string name="onboarding_weight_label">PESO (KG)</string>
+    <string name="onboarding_weight_hint">70</string>
+    <string name="onboarding_height_label">ESTATURA (CM)</string>
+    <string name="onboarding_height_hint">175</string>
+    <string name="onboarding_activity_label">NIVEL DE ACTIVIDAD FÍSICA</string>
+    <string name="onboarding_history_label">ANTECEDENTES</string>
+    <string name="onboarding_diabetic">¿Es diabético diagnosticado?</string>
+    <string name="onboarding_family_diabetes">¿Tiene familiares con diabetes?</string>
+    <string name="onboarding_continue">CONTINUAR</string>
+    
+    <string name="onboarding_theme_title">Selección de Apariencia</string>
+    <string name="onboarding_theme_desc">Elige el tema visual de la aplicación</string>
+    <string name="onboarding_theme_dark">Oscuro</string>
+    <string name="onboarding_theme_light">Claro</string>
+    <string name="onboarding_theme_cyberpunk">Cyberpunk</string>
+    <string name="onboarding_theme_health">Salud</string>
+
+    <string name="onboarding_bluetooth_title">Vinculación Bluetooth</string>
+    <string name="onboarding_bluetooth_desc">Selecciona tu dispositivo wearable</string>
+    <string name="onboarding_bluetooth_link">VINCULAR DISPOSITIVO</string>
+    <string name="onboarding_bluetooth_searching">Buscando dispositivos...</string>
+    <string name="onboarding_bluetooth_search_hint">Toca para buscar dispositivos</string>
+    <string name="onboarding_bluetooth_search_desc">Asegúrate de que tu dispositivo wearable esté encendido y cerca</string>
+    <string name="onboarding_finish">FINALIZAR</string>
+
+    <!-- Password Recovery Screen -->
+    <string name="password_recovery_title">RECUPERAR CONTRASEÑA</string>
+    <string name="password_recovery_step1">Paso 1 de 3</string>
+    <string name="password_recovery_enter_email">Ingresa tu correo electrónico</string>
+    <string name="password_recovery_desc">Te enviaremos un código de verificación de 8 caracteres a tu correo</string>
+    <string name="password_recovery_email_label">CORREO ELECTRÓNICO</string>
+    <string name="password_recovery_email_hint">correo@ejemplo.com</string>
+    <string name="password_recovery_send_code">ENVIAR CÓDIGO</string>
+    <string name="password_recovery_verify_title">VERIFICAR CÓDIGO</string>
+    <string name="password_recovery_step2">Paso 2 de 3</string>
+    <string name="password_recovery_verify_code">Código de verificación</string>
+    <string name="password_recovery_verify_desc">Ingresa el código de 8 dígitos enviado a</string>
+    <string name="password_recovery_verify_hint">Letras y números (8 caracteres)</string>
+    <string name="password_recovery_verify_btn">VERIFICAR</string>
+    <string name="password_recovery_resend_prompt">No recibiste el código? </string>
+    <string name="password_recovery_resend_link">Reenviar</string>
+    <string name="password_recovery_new_title">NUEVA CONTRASEÑA</string>
+    <string name="password_recovery_step3">Paso 3 de 3</string>
+    <string name="password_recovery_new_desc">Crea tu nueva contraseña</string>
+    <string name="password_recovery_new_label">NUEVA CONTRASEÑA</string>
+    <string name="password_recovery_new_hint">Mínimo 6 caracteres</string>
+    <string name="password_recovery_confirm_label">CONFIRMAR CONTRASEÑA</string>
+    <string name="password_recovery_confirm_hint">Repite tu contraseña</string>
+    <string name="password_recovery_mismatch">Las contraseñas no coinciden</string>
+    <string name="password_recovery_reset_btn">RESTABLECER CONTRASEÑA</string>
+    <string name="password_recovery_back_login">← Volver al inicio de sesión</string>
+    <string name="dialog_understood">ENTENDIDO</string>
+
+    <!-- Dashboard Screen -->
+    <string name="dashboard_no_data">SIN DATOS</string>
+    <string name="dashboard_alert">ALERTA</string>
+    <string name="dashboard_elevated">ELEVADA</string>
+    <string name="dashboard_low">BAJA</string>
+    <string name="dashboard_normal">NORMAL</string>
+    <string name="dashboard_elevated_m">ELEVADO</string>
+    <string name="dashboard_low_m">BAJO</string>
+    <string name="dashboard_heart_rate">RITMO CARDÍACO</string>
+    <string name="dashboard_temperature">TEMPERATURA</string>
+    <string name="dashboard_conductivity">CONDUCTIVIDAD</string>
+    <string name="dashboard_loading">CARGANDO...</string>
+    <string name="dashboard_critical">CRÍTICO</string>
+    <string name="dashboard_sug_critical">⚠ Atención médica inmediata requerida. Consulta a tu especialista.</string>
+    <string name="dashboard_sug_alert">⚠ Niveles metabólicos alterados. Revisa tu alimentación e hidratación.</string>
+    <string name="dashboard_sug_elevated">📈 Monitoreo continuo recomendado. Evita esfuerzos intensos.</string>
+    <string name="dashboard_sug_low">📉 Se recomienda ingesta de carbohidratos y descanso.</string>
+    <string name="dashboard_sug_normal">✅ Estado metabólico óptimo. Mantén tu rutina saludable.</string>
+    <string name="dashboard_sug_loading">Cargando datos...</string>
+    <string name="dashboard_history_normal">Normal</string>
+    <string name="dashboard_history_elevated">Elevado</string>
+    <string name="dashboard_live_monitoring">MONITOREO EN VIVO</string>
+    <string name="dashboard_online">ONLINE</string>
+    <string name="dashboard_metabolic_state">ESTADO METABÓLICO</string>
+    <string name="dashboard_dynamic_suggestion">SUGERENCIA DINÁMICA</string>
+    <string name="dashboard_recent_history">HISTORIAL RECIENTE</string>
+    <string name="dashboard_no_recent_data">Sin datos recientes</string>
+
+    <!-- Support Screen -->
+    <string name="support_title">SOPORTE TÉCNICO</string>
+    <string name="support_create_ticket">CREAR NUEVO TICKET</string>
+    <string name="support_subject_label">Asunto</string>
+    <string name="support_category_label">Categoría</string>
+    <string name="support_cat_general">General</string>
+    <string name="support_cat_device">Reloj</string>
+    <string name="support_cat_payments">Pagos</string>
+    <string name="support_priority_label">Prioridad</string>
+    <string name="support_detail_label">Detalle del problema</string>
+    <string name="support_error_empty">Por favor, completa todos los campos</string>
+    <string name="support_send_btn">ENVIAR TICKET</string>
+    <string name="support_history_title">HISTORIAL DE TICKETS</string>
+    <string name="support_no_tickets">No tienes tickets registrados.</string>
+
+    <!-- History Screen -->
+    <string name="history_status_alert">Alerta</string>
+    <string name="history_status_elevated">Elevado</string>
+    <string name="history_status_normal">Normal</string>
+    <string name="history_filter_today">Hoy</string>
+    <string name="history_filter_7days">7 días</string>
+    <string name="history_title">HISTORIAL CLÍNICO</string>
+    <string name="history_subtitle">Tendencia de signos vitales</string>
+    <string name="history_heart_rate_title">FRECUENCIA CARDÍACA</string>
+    <string name="history_average">PROMEDIO</string>
+    <string name="history_bpm_format">%1$s BPM</string>
+    <string name="history_no_data">Sin datos disponibles</string>
+    <string name="history_events_title">HISTORIAL DE EVENTOS</string>
+    <string name="history_no_events">No hay eventos registrados</string>
+    <string name="history_event_default">Evento metabolico</string>
+    <string name="history_readings_title">REGISTRO DE LECTURAS</string>
+    <string name="history_no_readings">No hay lecturas disponibles</string>
+
+    <!-- Profile Screen -->
+    <string name="profile_title">MI PERFIL</string>
+    <string name="profile_default_user">Usuario BioGuard</string>
+    <string name="profile_default_email">correo@bioguard.med</string>
+    <string name="profile_active">ACTIVO</string>
+    <string name="profile_biometric_data">DATOS BIOMÉTRICOS</string>
+    <string name="profile_name">NOMBRE</string>
+    <string name="profile_email">CORREO</string>
+    <string name="profile_register_date">FECHA REGISTRO</string>
+    <string name="profile_plan">PLAN</string>
+    <string name="profile_my_plan">MI PLAN</string>
+    <string name="profile_limit_patients">LÍMITE PACIENTES</string>
+    <string name="profile_limit_caregivers">LÍMITE CUIDADORES</string>
+    <string name="profile_history">HISTORIAL</string>
+    <string name="profile_days_format">%1$s días</string>
+    <string name="profile_gps_continuous">GPS CONTINUO</string>
+    <string name="profile_yes">Sí</string>
+    <string name="profile_no">No</string>
+    <string name="profile_ai_console">CONSOLA AI</string>
+    <string name="profile_settings_title">CONFIGURACIÓN</string>
+    <string name="profile_dark_mode">Modo Oscuro</string>
+    <string name="profile_activated">Activado</string>
+    <string name="profile_deactivated">Desactivado</string>
+    <string name="profile_notifications">Notificaciones</string>
+    <string name="profile_notifications_desc">Gestionar alertas</string>
+    <string name="profile_sync_settings">Ajustes de Sincronizacion</string>
+    <string name="profile_sync_settings_desc">Frecuencia de datos y Guardian Nocturno</string>
+    <string name="profile_medications">Medicamentos</string>
+    <string name="profile_medications_desc">Gestionar dosis y tomas</string>
+    <string name="profile_caregivers">Cuidadores</string>
+    <string name="profile_caregivers_desc">Gestionar acceso de cuidadores</string>
+    <string name="profile_premium">Suscripción Premium</string>
+    <string name="profile_premium_desc">Plan activo - Toque para gestionar</string>
+    <string name="profile_support">Soporte Técnico</string>
+    <string name="profile_support_desc">Reportar un problema / Crear ticket</string>
+    <string name="profile_privacy">Privacidad</string>
+    <string name="profile_privacy_desc">Datos y seguridad</string>
+    <string name="profile_about">Acerca de</string>
+    <string name="profile_logout">CERRAR SESIÓN</string>
+    <string name="profile_logout_confirm_msg">¿Estás seguro de que deseas cerrar tu sesión en BioGuard?</string>
+
+    <!-- Batch 2 Screens & Components -->
+    <!-- Common / Errors -->
+    <string name="error_generic">Ocurrió un error. Intenta de nuevo.</string>
+    <string name="error_network">Sin conexión a internet</string>
+    <string name="error_session_expired">Tu sesión ha expirado</string>
+    <string name="error_permission_denied">Tu nivel de acceso no permite ver esto</string>
+    <string name="common_retry">Reintentar</string>
+    <string name="common_cancel">Cancelar</string>
+    <string name="common_accept">Aceptar</string>
+    <string name="common_save">Guardar</string>
+    <string name="common_delete">Eliminar</string>
+    <string name="common_edit">Editar</string>
+    <string name="common_loading">Cargando...</string>
+    <string name="common_no_data">No hay datos disponibles</string>
+
+    <!-- SettingsScreen -->
+    <string name="settings_save_success">Configuración guardada exitosamente</string>
+    <string name="settings_title">Ajustes de Sincronización</string>
+    <string name="settings_description">Configura los intervalos y ventanas horarias de transmisión de datos al servidor</string>
+    <string name="settings_auto_sync_title">Envío automático</string>
+    <string name="settings_auto_sync_desc">Sincronizar telemetría al detectar red</string>
+    <string name="settings_sync_freq">Frecuencia de sincronización: %1$s minutos</string>
+    <string name="settings_batch_title">Ventana de Transmisión en Lotes</string>
+    <string name="settings_batch_desc">Subida pesada de historiales acumulados offline</string>
+    <string name="settings_start_hour">Hora de inicio</string>
+    <string name="settings_end_hour">Hora de fin</string>
+    <string name="settings_night_guardian_title">Guardián Nocturno</string>
+    <string name="settings_night_guardian_desc">Monitoreo más sensible y alarmas durante el sueño</string>
+    <string name="settings_sleep_range">Rango de sueño</string>
+    <string name="settings_saving">Guardando...</string>
+    <string name="settings_save_btn">Guardar Ajustes</string>
+    <string name="settings_cancel_btn">Cancelar y volver</string>
+    
+    <!-- MedicationScreen -->
+    <string name="medication_title">MEDICAMENTOS</string>
+    <string name="medication_add_btn">+ AGREGAR MEDICAMENTO</string>
+    <string name="medication_empty">Sin medicamentos registrados</string>
+    <string name="medication_last_dose">Ultima toma: %1$s</string>
+    <string name="medication_delete">ELIMINAR</string>
+    <string name="medication_taken">TOMADA</string>
+    <string name="medication_new_title">Nuevo medicamento</string>
+    <string name="medication_name">Nombre</string>
+    <string name="medication_dose">Dosis</string>
+    <string name="medication_freq">Frecuencia</string>
+    <string name="medication_notes">Notas</string>
+    <string name="medication_save">GUARDAR</string>
+    <string name="medication_cancel">CANCELAR</string>
+    <string name="medication_delete_title">ELIMINAR MEDICAMENTO</string>
+    <string name="medication_delete_msg">¿Estás seguro de que deseas eliminar este medicamento?</string>
+    <string name="medication_error">AVISO DE ERROR</string>
+    <string name="medication_success">OPERACIÓN EXITOSA</string>
+    
+    <!-- ErrorRetryBox -->
+    <string name="error_retry_title">NO SE PUDIERON CARGAR LOS DATOS</string>
+    <string name="error_retry_unknown">Error desconocido</string>
+    <string name="error_retry_btn">REINTENTAR</string>
+    
+    <!-- CuidadorScreen -->
+    <string name="cuidador_title">CUIDADORES</string>
+    <string name="cuidador_add_btn">+ AGREGAR CUIDADOR</string>
+    <string name="cuidador_empty">Sin cuidadores registrados</string>
+    <string name="cuidador_no_name">Sin nombre</string>
+    <string name="cuidador_code">Codigo: %1$s</string>
+    <string name="cuidador_delete">ELIMINAR</string>
+    <string name="cuidador_delete_title">ELIMINAR CUIDADOR</string>
+    <string name="cuidador_delete_msg">¿Estás seguro de que deseas revocar el acceso a este cuidador de forma permanente?</string>
+    <string name="cuidador_new_title">Nuevo cuidador</string>
+    <string name="cuidador_name">Nombre</string>
+    <string name="cuidador_relationship">Parentesco</string>
+    <string name="cuidador_phone">Telefono</string>
+    <string name="cuidador_email">Correo</string>
+    <string name="cuidador_access_level">Nivel de acceso</string>
+    <string name="cuidador_no_patient">No hay un paciente vinculado</string>
+    <string name="cuidador_save">GUARDAR</string>
+    <string name="cuidador_cancel">CANCELAR</string>
+    <string name="cuidador_error">AVISO DE ERROR</string>
+    <string name="cuidador_success">OPERACIÓN EXITOSA</string>
+
+    <!-- AlertScreen -->
+    <string name="alert_title">ALERTA</string>
+    <string name="alert_active">ALERTA ACTIVA</string>
+    <string name="alert_pending">PENDIENTE</string>
+    <string name="alert_requires_attention">Requiere atención inmediata</string>
+    <string name="alert_default_desc">Se detectó una alerta en el paciente.</string>
+    <string name="alert_emergency_call">LLAMADA DE EMERGENCIA</string>
+    <string name="alert_cancel">CANCELAR ALERTA</string>
+    <string name="alert_generated">Alerta generada: %1$s %2$s</string>
+    <string name="alert_none">SIN ALERTAS</string>
+    <string name="alert_none_desc">No hay alertas pendientes en este momento.</string>
+    <string name="alert_back">VOLVER</string>
+
+    <!-- AnalysisScreen -->
+    <string name="analysis_title">ANÁLISIS DE DATOS</string>
+    <string name="analysis_desc">Historial metabólico interactivo</string>
+    <string name="analysis_metrics">MÉTRICAS</string>
+    <string name="analysis_summary">RESUMEN</string>
+    <string name="analysis_average">PROMEDIO</string>
+    <string name="analysis_current">ACTUAL</string>
+
+    <!-- ReportsScreen -->
+    <string name="reports_title">REPORTES E HISTORIAL</string>
+    <string name="reports_desc">Incidentes y descargas</string>
+    <string name="reports_summary">RESUMEN GENERAL</string>
+    <string name="reports_summary_desc">Datos consolidados</string>
+    <string name="reports_lecturas">LECTURAS</string>
+    <string name="reports_eventos">EVENTOS</string>
+    <string name="reports_alertas">ALERTAS</string>
+    <string name="reports_medicamentos">MEDICAMENTOS</string>
+    <string name="reports_criticos">CRÍTICOS</string>
+    <string name="reports_pendientes">PENDIENTES</string>
+    <string name="reports_history">HISTORIAL DE EVENTOS</string>
+    <string name="reports_date">FECHA</string>
+    <string name="reports_risk">RIESGO</string>
+    <string name="reports_prob">PROB.</string>
+    <string name="reports_status">ESTADO</string>
+    <string name="reports_attended">Atendido</string>
+    <string name="reports_pending">Pendiente</string>
+    <string name="reports_empty">Sin eventos registrados</string>
+    <string name="reports_full_history">VER HISTORIAL COMPLETO</string>
+
+    <!-- DeviceScreen -->
+    <string name="device_no_device">Sin dispositivo</string>
+    <string name="device_title">DISPOSITIVO</string>
+    <string name="device_desc">Estado y configuración del wearable</string>
+    <string name="device_sensor_name">BioGuard Sensor v2.1</string>
+    <string name="device_connected">CONECTADO</string>
+    <string name="device_disconnected">DESCONECTADO</string>
+    <string name="device_info">INFORMACIÓN DEL DISPOSITIVO</string>
+    <string name="device_model">MODELO</string>
+    <string name="device_connection">CONEXIÓN</string>
+    <string name="device_active">Activa</string>
+    <string name="device_inactive">Inactiva</string>
+    <string name="device_battery">BATERÍA</string>
+    <string name="device_last_sync">ÚLTIMA SINCRONIZACIÓN</string>
+    <string name="device_sensors">SENSORES</string>
+    <string name="device_reconnect">RECONECTAR</string>
+
+    <!-- QrScannerScreen -->
+    <string name="qr_camera_error">No se pudo iniciar la camara</string>
+    <string name="qr_permission_required">Permiso de camara requerido</string>
+    <string name="qr_permission_desc">Necesitamos la camara para leer el codigo QR de acceso</string>
+    <string name="qr_request_permission">SOLICITAR PERMISO</string>
+    <string name="qr_cancel">✕ CANCELAR</string>
+    <string name="qr_point_code">Apunta al codigo QR</string>
+
+    <!-- NotificationsScreen -->
+    <string name="notifications_title">NOTIFICACIONES</string>
+    <string name="notifications_empty">Sin notificaciones</string>
+
+    <!-- SplashScreen -->
+    <string name="splash_bioguard">BIOGUARD</string>
+    <string name="splash_desc">SISTEMA DE MONITOREO MÉDICO</string>
+    <string name="splash_sub_desc">Cuidando tu salud en tiempo real</string>
+    <string name="splash_image_desc">BioGuard</string>
+
+    <!-- NotificationComponents -->
+    <string name="components_understood">ENTENDIDO</string>
+    <string name="components_confirm">CONFIRMAR</string>
+    <string name="components_cancel">CANCELAR</string>
 </resources>

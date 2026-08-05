@@ -1,0 +1,69 @@
+﻿package com.bioguard.movil.data.repository
+
+import com.bioguard.movil.data.Resource
+import com.bioguard.movil.data.toUserMessage
+import com.bioguard.movil.datastore.UserPreferences
+import com.bioguard.movil.network.ApiService
+import com.bioguard.movil.network.CrearPacienteRequest
+import com.bioguard.movil.network.CrearPacienteResponse
+import com.bioguard.movil.network.ActualizarBiometriaRequest
+import com.bioguard.movil.network.DashboardSummary
+import kotlinx.coroutines.flow.first
+
+import javax.inject.Inject
+import javax.inject.Singleton
+
+@Singleton
+class PacienteRepository @Inject constructor(
+    private val api: ApiService
+) {
+
+    suspend fun resolvePatientId(prefs: UserPreferences): String? {
+        return prefs.patientId.first()
+    }
+
+    suspend fun crearPaciente(nombre: String, esDiabetico: Boolean): Resource<CrearPacienteResponse> {
+        return try {
+            Resource.Success(api.crearPaciente(CrearPacienteRequest(nombre = nombre, esDiabetico = esDiabetico)))
+        } catch (e: Exception) {
+            Resource.Error(e.toUserMessage("Error al crear paciente"))
+        }
+    }
+
+    suspend fun getDashboardSummary(pacienteId: String): Resource<DashboardSummary> {
+        return try {
+            Resource.Success(api.getDashboardSummary(pacienteId))
+        } catch (e: Exception) {
+            Resource.Error(e.toUserMessage("Error al obtener resumen del paciente"))
+        }
+    }
+
+    suspend fun updateBiometria(
+        id: String,
+        fechaNacimiento: String,
+        sexo: String,
+        pesoKg: Double,
+        estaturaCm: Double,
+        esDiabetico: Boolean,
+        familiaresDiabetes: Boolean,
+        actividadFisica: String
+    ): Resource<String> {
+        return try {
+            val response = api.updateBiometria(
+                id,
+                ActualizarBiometriaRequest(
+                    fechaNacimiento = fechaNacimiento,
+                    sexo = sexo,
+                    pesoKg = pesoKg,
+                    estaturaCm = estaturaCm,
+                    esDiabetico = esDiabetico,
+                    familiaresDiabetes = familiaresDiabetes,
+                    actividadFisica = actividadFisica
+                )
+            )
+            Resource.Success(response.message)
+        } catch (e: Exception) {
+            Resource.Error(e.toUserMessage("Error al actualizar biometria"))
+        }
+    }
+}

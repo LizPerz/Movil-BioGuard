@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.hilt)
 }
 
 import java.util.Properties
@@ -18,11 +19,11 @@ val keystoreProperties = Properties().apply {
 }
 
 android {
-    namespace = "com.example.bioguard_movil"
+    namespace = "com.bioguard.movil"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.bioguard_movil"
+        applicationId = "com.bioguard.movil"
         minSdk = 28
         targetSdk = 36
         versionCode = 1
@@ -73,9 +74,9 @@ android {
     }
 }
 
-ksp {
-    arg("room.schemaLocation", "$projectDir/schemas")
-}
+// ksp {
+//     arg("room.schemaLocation", "$projectDir/schemas")
+// }
 
 kotlin {
     compilerOptions {
@@ -117,6 +118,16 @@ dependencies {
     
     // Play Services Wearable
     implementation(libs.play.services.wearable)
+
+    // Hilt Dependency Injection
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
+    implementation(libs.hilt.navigation.compose)
+
+    // WorkManager & Paging 3
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.androidx.paging.runtime)
+    implementation(libs.androidx.paging.compose)
 
     // Play Services Location (GPS real)
     implementation(libs.play.services.location)

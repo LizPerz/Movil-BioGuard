@@ -3,11 +3,11 @@
 -keepattributes Exceptions
 -keepattributes *Annotation*
 
--keep class com.example.bioguard_movil.network.** { *; }
--keep class com.example.bioguard_movil.data.** { *; }
+-keep class com.bioguard.movil.network.** { *; }
+-keep class com.bioguard.movil.data.** { *; }
 
 # BuildConfig (accessed via reflection / generated constants)
--keep class com.example.bioguard_movil.BuildConfig { *; }
+-keep class com.bioguard.movil.BuildConfig { *; }
 
 # Gson
 -keep class com.google.gson.** { *; }

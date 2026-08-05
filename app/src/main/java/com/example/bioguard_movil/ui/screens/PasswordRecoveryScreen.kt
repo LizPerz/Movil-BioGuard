@@ -1,10 +1,6 @@
 package com.example.bioguard_movil.ui.screens
 
-import android.Manifest
-import android.content.pm.PackageManager
 import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -24,9 +20,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -36,6 +34,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -58,57 +57,53 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import com.example.bioguard_movil.ui.theme.CyanNeon
 import com.example.bioguard_movil.ui.theme.DarkBackground
 import com.example.bioguard_movil.ui.theme.DarkSurface
 import com.example.bioguard_movil.ui.theme.GlassBorder
 import com.example.bioguard_movil.ui.theme.GreenNeon
+import com.example.bioguard_movil.ui.theme.RedNeon
 import com.example.bioguard_movil.ui.theme.InputBackground
 import com.example.bioguard_movil.ui.theme.TextPrimary
 import com.example.bioguard_movil.ui.theme.TextSecondary
 import com.example.bioguard_movil.ui.theme.TextTertiary
-import kotlin.time.Duration.Companion.milliseconds
+import com.example.bioguard_movil.ui.viewmodel.AuthViewModel
 
 @Composable
 fun PasswordRecoveryScreen(
+    authViewModel: AuthViewModel,
     onResetSuccess: () -> Unit = {},
     onBack: () -> Unit = {}
 ) {
+    val uiState by authViewModel.uiState.collectAsState()
     var step by remember { mutableIntStateOf(1) }
-    var contact by remember { mutableStateOf("") }
-    var isLoading by remember { mutableStateOf(false) }
-    var triggerAction by remember { mutableStateOf(false) }
+    var email by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var confirmPasswordVisible by remember { mutableStateOf(false) }
 
-    val otpCode = remember { mutableStateListOf("", "", "", "", "", "", "", "") }
+    val code = remember { mutableStateListOf("", "", "", "", "", "", "", "") }
     val focusRequesters = List(8) { remember { FocusRequester() } }
-    val context = LocalContext.current
-    var toastMessage by remember { mutableStateOf("") }
 
-    LaunchedEffect(toastMessage) {
-        if (toastMessage.isNotEmpty()) {
-            Toast.makeText(context.applicationContext, toastMessage, Toast.LENGTH_SHORT).show()
-            toastMessage = ""
+    val context = LocalContext.current
+
+    var errorDialogMessage by remember { mutableStateOf<String?>(null) }
+    var successDialogMessage by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let {
+            errorDialogMessage = it
+            authViewModel.clearError()
         }
     }
 
-    val cameraPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        toastMessage = if (isGranted) "Cámara activada. Escanea el código QR." else "Permiso de cámara denegado"
-    }
-
-    LaunchedEffect(triggerAction) {
-        if (triggerAction) {
-            kotlinx.coroutines.delay(1500.milliseconds)
-            isLoading = false
-            triggerAction = false
+    LaunchedEffect(uiState.successMessage) {
+        uiState.successMessage?.let {
+            successDialogMessage = it
+            authViewModel.clearSuccess()
             when (step) {
                 1 -> step = 2
-                2 -> step = 3
                 3 -> onResetSuccess()
             }
         }
@@ -143,7 +138,8 @@ fun PasswordRecoveryScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp),
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
@@ -157,9 +153,7 @@ fun PasswordRecoveryScreen(
                         modifier = Modifier
                             .size(10.dp)
                             .clip(RoundedCornerShape(5.dp))
-                            .background(
-                                if (s <= step) CyanNeon else GlassBorder
-                            )
+                            .background(if (s <= step) CyanNeon else GlassBorder)
                     )
                     if (index < 2) {
                         Spacer(modifier = Modifier.width(8.dp))
@@ -168,9 +162,7 @@ fun PasswordRecoveryScreen(
                                 .width(32.dp)
                                 .height(2.dp)
                                 .clip(RoundedCornerShape(1.dp))
-                                .background(
-                                    if (s < step) CyanNeon else GlassBorder
-                                )
+                                .background(if (s < step) CyanNeon else GlassBorder)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                     }
@@ -182,7 +174,7 @@ fun PasswordRecoveryScreen(
             when (step) {
                 1 -> {
                     Text(
-                        text = "RECUPERAR CONTRASEÑA",
+                        text = "RECUPERAR CONTRASE\u00d1A",
                         fontSize = 11.sp,
                         color = CyanNeon,
                         letterSpacing = 3.sp,
@@ -197,7 +189,7 @@ fun PasswordRecoveryScreen(
                     )
 
                     Text(
-                        text = "Ingresa tu correo o teléfono",
+                        text = "Ingresa tu correo electr\u00f3nico",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary,
@@ -205,19 +197,28 @@ fun PasswordRecoveryScreen(
                     )
 
                     Text(
-                        text = "Te enviaremos un código para verificar tu identidad",
+                        text = "Te enviaremos un c\u00f3digo de verificaci\u00f3n de 8 caracteres a tu correo",
                         fontSize = 13.sp,
                         color = TextSecondary,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.padding(bottom = 32.dp)
                     )
 
+                    Text(
+                        text = "CORREO ELECTR\u00d3NICO",
+                        fontSize = 10.sp,
+                        color = CyanNeon,
+                        letterSpacing = 2.sp,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                    )
+
                     OutlinedTextField(
-                        value = contact,
-                        onValueChange = { contact = it },
+                        value = email,
+                        onValueChange = { email = it },
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("Correo o teléfono", color = TextTertiary) },
-                        leadingIcon = { Text(text = "✉", color = TextTertiary, fontSize = 16.sp) },
+                        placeholder = { Text("correo@ejemplo.com", color = TextTertiary) },
+                        leadingIcon = { Text(text = "\u2709", color = TextTertiary, fontSize = 16.sp) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                         singleLine = true,
                         shape = RoundedCornerShape(10.dp),
                         colors = OutlinedTextFieldDefaults.colors(
@@ -234,32 +235,29 @@ fun PasswordRecoveryScreen(
                     Spacer(modifier = Modifier.height(28.dp))
 
                     Button(
-                        onClick = {
-                            isLoading = true
-                            triggerAction = true
-                        },
+                        onClick = { authViewModel.forgotPassword(email) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp)
                             .clip(RoundedCornerShape(10.dp)),
-                        enabled = !isLoading && contact.isNotEmpty(),
+                        enabled = !uiState.isLoading && email.isNotEmpty(),
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = CyanNeon,
                             disabledContainerColor = CyanNeon.copy(alpha = 0.3f)
                         )
                     ) {
-                        if (isLoading) {
+                        if (uiState.isLoading) {
                             CircularProgressIndicator(modifier = Modifier.size(22.dp), color = DarkBackground, strokeWidth = 2.dp)
                         } else {
-                            Text(text = "ENVIAR CÓDIGO", color = DarkBackground, fontWeight = FontWeight.Bold, letterSpacing = 2.sp, fontSize = 14.sp)
+                            Text(text = "ENVIAR C\u00d3DIGO", color = DarkBackground, fontWeight = FontWeight.Bold, letterSpacing = 2.sp, fontSize = 14.sp)
                         }
                     }
                 }
 
                 2 -> {
                     Text(
-                        text = "VERIFICAR CÓDIGO",
+                        text = "VERIFICAR C\u00d3DIGO",
                         fontSize = 11.sp,
                         color = CyanNeon,
                         letterSpacing = 3.sp,
@@ -274,7 +272,7 @@ fun PasswordRecoveryScreen(
                     )
 
                     Text(
-                        text = "Código de verificación",
+                        text = "C\u00f3digo de verificaci\u00f3n",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary,
@@ -282,17 +280,24 @@ fun PasswordRecoveryScreen(
                     )
 
                     Text(
-                        text = "Ingresa el código de 8 caracteres enviado a tu contacto",
+                        text = "Ingresa el c\u00f3digo de 8 d\u00edgitos enviado a",
                         fontSize = 13.sp,
                         color = TextSecondary,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(bottom = 24.dp)
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+
+                    Text(
+                        text = email,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = CyanNeon,
+                        modifier = Modifier.padding(bottom = 32.dp)
                     )
 
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally)
                     ) {
-                        otpCode.forEachIndexed { index, digit ->
+                        code.forEachIndexed { index, digit ->
                             Box(
                                 modifier = Modifier
                                     .size(40.dp)
@@ -310,13 +315,13 @@ fun PasswordRecoveryScreen(
                                     onValueChange = { value ->
                                         if (value.length <= 1) {
                                             val char = value.uppercase()
-                                            if (char.isNotEmpty() && (char[0].isLetter() || char[0].isDigit())) {
-                                                otpCode[index] = char
+                                            if (char.isNotEmpty() && char[0].isLetterOrDigit()) {
+                                                code[index] = char
                                                 if (index < 7) {
                                                     focusRequesters[index + 1].requestFocus()
                                                 }
                                             } else if (char.isEmpty()) {
-                                                otpCode[index] = ""
+                                                code[index] = ""
                                             }
                                         }
                                     },
@@ -344,78 +349,58 @@ fun PasswordRecoveryScreen(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Text(
-                        text = "Letras mayúsculas y números (8 caracteres)",
+                        text = "Letras y n\u00fameros (8 caracteres)",
                         fontSize = 10.sp,
                         color = TextTertiary,
                         modifier = Modifier.padding(bottom = 6.dp)
                     )
 
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(DarkSurface)
-                            .border(width = 1.dp, color = GlassBorder, shape = RoundedCornerShape(12.dp))
-                            .clickable {
-                                val permission = Manifest.permission.CAMERA
-                                val hasPermission = ContextCompat.checkSelfPermission(
-                                    context, permission
-                                ) == PackageManager.PERMISSION_GRANTED
-
-                                if (hasPermission) {
-                                    toastMessage = "Cámara activada. Escanea el código QR."
-                                } else {
-                                    cameraPermissionLauncher.launch(permission)
-                                }
-                            }
-                            .padding(12.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Text(text = "📷", fontSize = 18.sp, color = CyanNeon)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "ESCANEAR CÓDIGO QR",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = CyanNeon,
-                                letterSpacing = 2.sp
-                            )
-                        }
-                    }
-
                     Spacer(modifier = Modifier.height(24.dp))
 
                     Button(
                         onClick = {
-                            isLoading = true
-                            triggerAction = true
+                            step = 3
                         },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp)
                             .clip(RoundedCornerShape(10.dp)),
-                        enabled = !isLoading && otpCode.all { it.isNotEmpty() },
+                        enabled = code.all { it.isNotEmpty() },
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = CyanNeon,
                             disabledContainerColor = CyanNeon.copy(alpha = 0.3f)
                         )
                     ) {
-                        if (isLoading) {
-                            CircularProgressIndicator(modifier = Modifier.size(22.dp), color = DarkBackground, strokeWidth = 2.dp)
-                        } else {
-                            Text(text = "VERIFICAR", color = DarkBackground, fontWeight = FontWeight.Bold, letterSpacing = 2.sp, fontSize = 14.sp)
-                        }
+                        Text(text = "VERIFICAR", color = DarkBackground, fontWeight = FontWeight.Bold, letterSpacing = 2.sp, fontSize = 14.sp)
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = "No recibiste el c\u00f3digo? ",
+                            fontSize = 12.sp,
+                            color = TextSecondary
+                        )
+                        Text(
+                            text = "Reenviar",
+                            fontSize = 12.sp,
+                            color = CyanNeon,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.clickable {
+                                authViewModel.forgotPassword(email)
+                            }
+                        )
                     }
                 }
 
                 3 -> {
                     Text(
-                        text = "NUEVA CONTRASEÑA",
+                        text = "NUEVA CONTRASE\u00d1A",
                         fontSize = 11.sp,
                         color = CyanNeon,
                         letterSpacing = 3.sp,
@@ -430,20 +415,29 @@ fun PasswordRecoveryScreen(
                     )
 
                     Text(
-                        text = "Crea tu nueva contraseña",
+                        text = "Crea tu nueva contrase\u00f1a",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary,
                         modifier = Modifier.padding(bottom = 32.dp)
                     )
 
+                    Text(
+                        text = "NUEVA CONTRASE\u00d1A",
+                        fontSize = 10.sp,
+                        color = CyanNeon,
+                        letterSpacing = 2.sp,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                    )
+
                     OutlinedTextField(
                         value = newPassword,
                         onValueChange = { newPassword = it },
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("Nueva contraseña", color = TextTertiary) },
-                        leadingIcon = { Text(text = "🔒", color = TextTertiary, fontSize = 16.sp) },
+                        placeholder = { Text("M\u00ednimo 6 caracteres", color = TextTertiary) },
+                        leadingIcon = { Text(text = "\uD83D\uDD12", color = TextTertiary, fontSize = 16.sp) },
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         singleLine = true,
                         shape = RoundedCornerShape(10.dp),
                         colors = OutlinedTextFieldDefaults.colors(
@@ -457,20 +451,29 @@ fun PasswordRecoveryScreen(
                         ),
                         trailingIcon = {
                             IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                Text(text = if (passwordVisible) "👁" else "👁‍🗨", color = CyanNeon, fontSize = 14.sp)
+                                Text(text = if (passwordVisible) "\uD83D\uDC41" else "\uD83D\uDC41\u200D\uD83D\uDDE3", color = CyanNeon, fontSize = 14.sp)
                             }
                         }
                     )
 
                     Spacer(modifier = Modifier.height(12.dp))
 
+                    Text(
+                        text = "CONFIRMAR CONTRASE\u00d1A",
+                        fontSize = 10.sp,
+                        color = CyanNeon,
+                        letterSpacing = 2.sp,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                    )
+
                     OutlinedTextField(
                         value = confirmPassword,
                         onValueChange = { confirmPassword = it },
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("Confirmar contraseña", color = TextTertiary) },
-                        leadingIcon = { Text(text = "🔒", color = TextTertiary, fontSize = 16.sp) },
-                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        placeholder = { Text("Repite tu contrase\u00f1a", color = TextTertiary) },
+                        leadingIcon = { Text(text = "\uD83D\uDD12", color = TextTertiary, fontSize = 16.sp) },
+                        visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         singleLine = true,
                         shape = RoundedCornerShape(10.dp),
                         colors = OutlinedTextFieldDefaults.colors(
@@ -481,36 +484,41 @@ fun PasswordRecoveryScreen(
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary,
                             cursorColor = CyanNeon
-                        )
+                        ),
+                        trailingIcon = {
+                            IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
+                                Text(text = if (confirmPasswordVisible) "\uD83D\uDC41" else "\uD83D\uDC41\u200D\uD83D\uDDE3", color = CyanNeon, fontSize = 14.sp)
+                            }
+                        }
                     )
 
                     if (confirmPassword.isNotEmpty() && newPassword != confirmPassword) {
                         Spacer(modifier = Modifier.height(6.dp))
-                        Text(text = "Las contraseñas no coinciden", fontSize = 11.sp, color = Color(0xFFFF4444))
+                        Text(text = "Las contrase\u00f1as no coinciden", fontSize = 11.sp, color = Color(0xFFFF4444))
                     }
 
                     Spacer(modifier = Modifier.height(28.dp))
 
                     Button(
                         onClick = {
-                            isLoading = true
-                            triggerAction = true
+                            val codeStr = code.joinToString("")
+                            authViewModel.resetPassword(codeStr, email, newPassword)
                         },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp)
                             .clip(RoundedCornerShape(10.dp)),
-                        enabled = !isLoading && newPassword.isNotEmpty() && confirmPassword.isNotEmpty() && newPassword == confirmPassword,
+                        enabled = !uiState.isLoading && newPassword.isNotEmpty() && confirmPassword.isNotEmpty() && newPassword == confirmPassword && newPassword.length >= 6,
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = CyanNeon,
                             disabledContainerColor = CyanNeon.copy(alpha = 0.3f)
                         )
                     ) {
-                        if (isLoading) {
+                        if (uiState.isLoading) {
                             CircularProgressIndicator(modifier = Modifier.size(22.dp), color = DarkBackground, strokeWidth = 2.dp)
                         } else {
-                            Text(text = "RESTABLECER CONTRASEÑA", color = DarkBackground, fontWeight = FontWeight.Bold, letterSpacing = 2.sp, fontSize = 13.sp)
+                            Text(text = "RESTABLECER CONTRASE\u00d1A", color = DarkBackground, fontWeight = FontWeight.Bold, letterSpacing = 2.sp, fontSize = 13.sp)
                         }
                     }
                 }
@@ -519,7 +527,7 @@ fun PasswordRecoveryScreen(
             Spacer(modifier = Modifier.height(20.dp))
 
             Text(
-                text = "← Volver al inicio de sesión",
+                text = "\u2190 Volver al inicio de sesi\u00f3n",
                 fontSize = 12.sp,
                 color = TextTertiary,
                 modifier = Modifier
@@ -527,6 +535,79 @@ fun PasswordRecoveryScreen(
                     .clickable { onBack() }
                     .padding(8.dp)
             )
+        }
+
+        if (errorDialogMessage != null) {
+            SystemNotificationDialog(
+                title = "AVISO DE ERROR",
+                message = errorDialogMessage ?: "",
+                isError = true,
+                onDismiss = { errorDialogMessage = null }
+            )
+        }
+
+        if (successDialogMessage != null) {
+            SystemNotificationDialog(
+                title = "OPERACIÓN EXITOSA",
+                message = successDialogMessage ?: "",
+                isError = false,
+                onDismiss = { successDialogMessage = null }
+            )
+        }
+    }
+}
+
+@Composable
+fun SystemNotificationDialog(
+    title: String,
+    message: String,
+    isError: Boolean,
+    onDismiss: () -> Unit
+) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(com.example.bioguard_movil.ui.theme.DarkSurface)
+                .border(
+                    width = 1.dp,
+                    color = com.example.bioguard_movil.ui.theme.GlassBorder,
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .padding(24.dp)
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = title,
+                    color = if (isError) com.example.bioguard_movil.ui.theme.RedNeon else com.example.bioguard_movil.ui.theme.CyanNeon,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+                Text(
+                    text = message,
+                    color = com.example.bioguard_movil.ui.theme.TextPrimary,
+                    fontSize = 13.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(bottom = 20.dp)
+                )
+                Button(
+                    onClick = onDismiss,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isError) com.example.bioguard_movil.ui.theme.RedNeon else com.example.bioguard_movil.ui.theme.CyanNeon
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth().height(42.dp)
+                ) {
+                    Text(
+                        text = "ENTENDIDO",
+                        color = if (isError) Color.White else com.example.bioguard_movil.ui.theme.DarkBackground,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
         }
     }
 }

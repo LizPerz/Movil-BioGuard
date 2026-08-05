@@ -10,4 +10,10 @@
 *.apk
 *.aab
 *.ap_
+*.keystore
+*.jks
+*.p12
+*.jceks
 .DS_Store
+keystore.properties
+!keystore.properties.example

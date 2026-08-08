@@ -57,6 +57,7 @@ fun SupportScreen(
     val p = LocalThemeState.current.colorPalette()
     val uiState by supportViewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val emptyFormMessage = stringResource(R.string.support_error_empty)
 
     var asunto by remember { mutableStateOf("") }
     var descripcion by remember { mutableStateOf("") }
@@ -269,7 +270,7 @@ fun SupportScreen(
                         Button(
                             onClick = {
                                 if (asunto.isBlank() || descripcion.isBlank()) {
-                                    toastMessage = context.getString(R.string.support_error_empty)
+                                    toastMessage = emptyFormMessage
                                 } else {
                                     supportViewModel.crearTicket(asunto, descripcion, categoria, prioridad)
                                 }

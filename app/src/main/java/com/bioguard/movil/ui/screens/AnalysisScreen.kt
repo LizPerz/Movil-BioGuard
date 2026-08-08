@@ -30,24 +30,28 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.bioguard.movil.R
+import com.bioguard.movil.ui.components.BioHealthChart
+import com.bioguard.movil.ui.components.ChartPoint
 import com.bioguard.movil.ui.components.ErrorRetryBox
+import com.bioguard.movil.ui.model.MetricOption
 import com.bioguard.movil.ui.theme.GreenNeon
 import com.bioguard.movil.ui.theme.LocalThemeState
 import com.bioguard.movil.ui.theme.RedNeon
 import com.bioguard.movil.ui.theme.YellowNeon
 import com.bioguard.movil.ui.theme.colorPalette
-import com.bioguard.movil.ui.model.MetricOption
 import com.bioguard.movil.ui.viewmodel.AnalysisViewModel
-import androidx.compose.ui.res.stringResource
-import com.bioguard.movil.R
+import com.bioguard.movil.util.rememberBioHaptic
 
 @Composable
 fun AnalysisScreen(analysisViewModel: AnalysisViewModel) {
     val p = LocalThemeState.current.colorPalette()
     val uiState by analysisViewModel.uiState.collectAsState()
+    val haptic = rememberBioHaptic()
 
     val timeFilters = listOf("1h", "4h", "Hoy", "7 d\u00edas")
     val metrics = listOf(
@@ -56,11 +60,25 @@ fun AnalysisScreen(analysisViewModel: AnalysisViewModel) {
         MetricOption("Conductividad", YellowNeon, "\u26a1")
     )
 
-    val chartData = when (uiState.selectedMetric) {
-        "Pulso" -> uiState.lecturas.map { it.pulsoBpm.toFloat() }
-        "Temperatura" -> uiState.lecturas.map { it.temperaturaC.toFloat() }
-        "Conductividad" -> uiState.lecturas.map { it.sudoracionGsr.toFloat() }
-        else -> uiState.lecturas.map { it.pulsoBpm.toFloat() }
+    val chartPoints = uiState.lecturas.map { it ->
+        val valFloat = when (uiState.selectedMetric) {
+            "Pulso" -> it.pulsoBpm.toFloat()
+            "Temperatura" -> it.temperaturaC.toFloat()
+            "Conductividad" -> it.sudoracionGsr.toFloat()
+            else -> it.pulsoBpm.toFloat()
+        }
+        ChartPoint(
+            label = it.timestamp.substringAfter("T", "").take(5),
+            value = valFloat,
+            time = it.timestamp.substringAfter("T", "").take(8)
+        )
+    }
+
+    val chartColor = metrics.find { it.name == uiState.selectedMetric }?.color ?: p.accent
+    val unit = when (uiState.selectedMetric) {
+        "Pulso" -> "BPM"
+        "Temperatura" -> "\u00b0C"
+        else -> "\u00b5S"
     }
 
     if (uiState.isLoading) {
@@ -116,7 +134,10 @@ fun AnalysisScreen(analysisViewModel: AnalysisViewModel) {
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(if (isSelected) p.accent else p.surface)
                                 .border(width = 1.dp, color = if (isSelected) p.accent else p.border, shape = RoundedCornerShape(8.dp))
-                                .clickable { analysisViewModel.selectTimeFilter(filter) },
+                                .clickable {
+                                    haptic.performSelection()
+                                    analysisViewModel.selectTimeFilter(filter)
+                                },
                             contentAlignment = Alignment.Center
                         ) {
                             Text(text = filter, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (isSelected) p.background else p.textSecondary, letterSpacing = 1.sp)
@@ -147,7 +168,10 @@ fun AnalysisScreen(analysisViewModel: AnalysisViewModel) {
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(if (isSelected) metric.color.copy(alpha = 0.15f) else p.surface)
                                 .border(width = 1.dp, color = if (isSelected) metric.color else p.border, shape = RoundedCornerShape(8.dp))
-                                .clickable { analysisViewModel.selectMetric(metric.name) },
+                                .clickable {
+                                    haptic.performSelection()
+                                    analysisViewModel.selectMetric(metric.name)
+                                },
                             contentAlignment = Alignment.Center
                         ) {
                             Text(text = metric.icon, fontSize = 18.sp)
@@ -155,73 +179,15 @@ fun AnalysisScreen(analysisViewModel: AnalysisViewModel) {
                     }
                 }
 
-                val chartColor = metrics.find { it.name == uiState.selectedMetric }?.color ?: p.accent
+                Spacer(modifier = Modifier.height(20.dp))
 
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(p.surface)
-                        .border(width = 1.dp, color = p.border, shape = RoundedCornerShape(12.dp))
-                        .padding(16.dp)
-                ) {
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(text = uiState.selectedMetric.uppercase(), fontSize = 12.sp, color = p.accent, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
-                            Text(text = uiState.selectedTimeFilter, fontSize = 11.sp, color = p.textSecondary)
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        val maxVal = chartData.maxOfOrNull { it } ?: 0f
-                        val minVal = chartData.minOfOrNull { it } ?: 0f
-                        val range = if (maxVal - minVal == 0f) 1f else maxVal - minVal
-
-                        Box(
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            Column(
-                                modifier = Modifier.fillMaxSize(),
-                                verticalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                val yLabels = listOf(maxVal, (maxVal + minVal) / 2, minVal)
-                                yLabels.forEach { label ->
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(text = "%.0f".format(label), fontSize = 9.sp, color = p.textSecondary, modifier = Modifier.width(32.dp))
-                                        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(p.border.copy(alpha = 0.3f)))
-                                    }
-                                }
-                            }
-
-                            Row(
-                                modifier = Modifier.fillMaxSize().padding(start = 36.dp, top = 4.dp, bottom = 4.dp),
-                                horizontalArrangement = Arrangement.SpaceEvenly,
-                                verticalAlignment = Alignment.Bottom
-                            ) {
-                                chartData.forEach { value ->
-                                    val heightFraction = if (range > 0) (value - minVal) / range else 0.5f
-                                    Box(
-                                        modifier = Modifier
-                                            .width(12.dp)
-                                            .height((heightFraction * 140).dp.coerceAtLeast(4.dp))
-                                            .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
-                                            .background(chartColor)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
+                // BioHealthChart Vector Canvas Render
+                BioHealthChart(
+                    points = chartPoints,
+                    lineColor = chartColor,
+                    unit = unit,
+                    title = "Tendencia (${uiState.selectedMetric.uppercase()})"
+                )
 
                 Spacer(modifier = Modifier.height(20.dp))
 
@@ -242,8 +208,9 @@ fun AnalysisScreen(analysisViewModel: AnalysisViewModel) {
                         .padding(16.dp)
                 ) {
                     Column {
-                        val avg = chartData.average()
-                        val current = chartData.lastOrNull() ?: 0f
+                        val rawValues = chartPoints.map { it.value }
+                        val avg = if (rawValues.isNotEmpty()) rawValues.average() else 0.0
+                        val current = rawValues.lastOrNull() ?: 0f
                         val trend = if (current > avg) "\u2191" else if (current < avg) "\u2193" else "\u2192"
                         val trendColor = if (current > avg) RedNeon else if (current < avg) GreenNeon else p.textSecondary
 

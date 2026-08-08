@@ -49,8 +49,8 @@ class HttpErrorsTest {
         val exception409 = HttpException(Response.error<Any>(409, emptyBody))
         val exception500 = HttpException(Response.error<Any>(500, emptyBody))
 
-        assertEquals("Sesion expirada, inicia sesion de nuevo", exception401.toUserMessage("fallback"))
-        assertEquals("No tienes permisos para realizar esta accion", exception403.toUserMessage("fallback"))
+        assertEquals("Sesión expirada, inicia sesión de nuevo", exception401.toUserMessage("fallback"))
+        assertEquals("No tienes permisos para realizar esta acción", exception403.toUserMessage("fallback"))
         assertEquals("Recurso no encontrado", exception404.toUserMessage("fallback"))
         assertEquals("Ya existe un registro con estos datos", exception409.toUserMessage("fallback"))
         assertEquals("Error del servidor (500)", exception500.toUserMessage("fallback"))
@@ -60,7 +60,7 @@ class HttpErrorsTest {
     fun `toUserMessage returns network error message for IOException`() {
         val exception = IOException("Failed to connect")
         val result = exception.toUserMessage("Error por defecto")
-        assertEquals("Sin conexion al servidor, revisa tu internet", result)
+        assertEquals("Sin conexión al servidor, revisa tu internet", result)
     }
 
     @Test

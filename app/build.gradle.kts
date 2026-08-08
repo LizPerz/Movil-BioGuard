@@ -30,6 +30,11 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField(
+            "String",
+            "BIOGUARD_PAIRING_SECRET",
+            "\"${System.getenv("BIOGUARD_PAIRING_SECRET") ?: "dev-only-change-me-bioguard-pairing-secret-32"}\""
+        )
     }
 
     signingConfigs {
@@ -131,6 +136,10 @@ dependencies {
 
     // Play Services Location (GPS real)
     implementation(libs.play.services.location)
+    
+    // Security & Biometrics
+    implementation(libs.androidx.security.crypto)
+    implementation(libs.androidx.biometric)
     
     testImplementation(libs.junit)
     testImplementation(libs.androidx.junit)

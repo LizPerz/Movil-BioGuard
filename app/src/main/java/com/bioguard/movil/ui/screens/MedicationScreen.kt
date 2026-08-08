@@ -36,18 +36,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.bioguard.movil.ui.components.tfColors
-import com.bioguard.movil.ui.components.SystemNotificationDialog
+import com.bioguard.movil.R
+import com.bioguard.movil.network.MedicamentoResponse
 import com.bioguard.movil.ui.components.ConfirmDialog
+import com.bioguard.movil.ui.components.MedicationActionBottomSheet
+import com.bioguard.movil.ui.components.SystemNotificationDialog
+import com.bioguard.movil.ui.components.tfColors
 import com.bioguard.movil.ui.theme.LocalThemeState
 import com.bioguard.movil.ui.theme.RedNeon
 import com.bioguard.movil.ui.theme.colorPalette
 import com.bioguard.movil.ui.viewmodel.MedicationViewModel
-import androidx.compose.ui.res.stringResource
-import com.bioguard.movil.R
+import com.bioguard.movil.util.rememberBioHaptic
 
 @Composable
 fun MedicationScreen(
@@ -57,9 +60,12 @@ fun MedicationScreen(
     val p = LocalThemeState.current.colorPalette()
     val uiState by medicationViewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val haptic = rememberBioHaptic()
+
     var errorDialogMessage by remember { mutableStateOf<String?>(null) }
     var successDialogMessage by remember { mutableStateOf<String?>(null) }
     var medicationIdToDelete by remember { mutableStateOf<String?>(null) }
+    var activeMedicationForAction by remember { mutableStateOf<MedicamentoResponse?>(null) }
 
     var showAddDialog by remember { mutableStateOf(false) }
     var nombre by remember { mutableStateOf("") }
@@ -99,7 +105,10 @@ fun MedicationScreen(
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
-                        .clickable { onBack() }
+                        .clickable {
+                            haptic.performClick()
+                            onBack()
+                        }
                         .padding(8.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -113,7 +122,10 @@ fun MedicationScreen(
             }
 
             Button(
-                onClick = { showAddDialog = true },
+                onClick = {
+                    haptic.performClick()
+                    showAddDialog = true
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(44.dp)
@@ -147,6 +159,10 @@ fun MedicationScreen(
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(p.surface)
                                 .border(width = 1.dp, color = p.border, shape = RoundedCornerShape(10.dp))
+                                .clickable {
+                                    haptic.performSelection()
+                                    activeMedicationForAction = med
+                                }
                                 .padding(14.dp)
                         ) {
                             Row(
@@ -175,12 +191,18 @@ fun MedicationScreen(
                                         color = RedNeon,
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(6.dp))
-                                            .clickable { medicationIdToDelete = med.id }
+                                            .clickable {
+                                                haptic.performWarning()
+                                                medicationIdToDelete = med.id
+                                            }
                                             .padding(6.dp)
                                     )
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Button(
-                                        onClick = { medicationViewModel.registrarToma(med.id) },
+                                        onClick = {
+                                            haptic.performSuccess()
+                                            medicationViewModel.registrarToma(med.id)
+                                        },
                                         shape = RoundedCornerShape(8.dp),
                                         colors = ButtonDefaults.buttonColors(containerColor = p.accent)
                                     ) {
@@ -193,6 +215,21 @@ fun MedicationScreen(
                 }
             }
         }
+    }
+
+    activeMedicationForAction?.let { med ->
+        MedicationActionBottomSheet(
+            nombreMedicamento = med.nombre,
+            dosis = med.dosis,
+            horario = med.frecuencia,
+            onConfirmTomado = {
+                medicationViewModel.registrarToma(med.id)
+            },
+            onPosponer = {
+                Toast.makeText(context, "Recordatorio pospuesto 15 minutos", Toast.LENGTH_SHORT).show()
+            },
+            onDismiss = { activeMedicationForAction = null }
+        )
     }
 
     if (showAddDialog) {
@@ -211,6 +248,7 @@ fun MedicationScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
+                        haptic.performSuccess()
                         medicationViewModel.crearMedicamento(nombre.trim(), dosis.trim(), frecuencia.trim(), notas.trim().ifEmpty { null })
                         showAddDialog = false
                         nombre = ""
@@ -224,7 +262,10 @@ fun MedicationScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showAddDialog = false }) {
+                TextButton(onClick = {
+                    haptic.performClick()
+                    showAddDialog = false
+                }) {
                     Text(stringResource(R.string.medication_cancel), color = p.textSecondary)
                 }
             }
@@ -238,10 +279,14 @@ fun MedicationScreen(
             confirmText = stringResource(R.string.medication_delete),
             cancelText = stringResource(R.string.medication_cancel),
             onConfirm = {
+                haptic.performSuccess()
                 medicationIdToDelete?.let { id -> medicationViewModel.deleteMedicamento(id) }
                 medicationIdToDelete = null
             },
-            onCancel = { medicationIdToDelete = null }
+            onCancel = {
+                haptic.performClick()
+                medicationIdToDelete = null
+            }
         )
     }
 

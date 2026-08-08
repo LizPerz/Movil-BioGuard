@@ -33,14 +33,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.bioguard.movil.R
 import com.bioguard.movil.ui.theme.LocalThemeState
 import com.bioguard.movil.ui.theme.colorPalette
 import com.bioguard.movil.ui.viewmodel.NotificacionViewModel
-import androidx.compose.ui.res.stringResource
-import com.bioguard.movil.R
+import com.bioguard.movil.util.rememberBioHaptic
 
 @Composable
 fun NotificationsScreen(
@@ -50,6 +51,7 @@ fun NotificationsScreen(
     val p = LocalThemeState.current.colorPalette()
     val uiState by notificacionViewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val haptic = rememberBioHaptic()
     var toastMessage by remember { mutableStateOf("") }
 
     LaunchedEffect(toastMessage) {
@@ -84,7 +86,10 @@ fun NotificationsScreen(
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
-                        .clickable { onBack() }
+                        .clickable {
+                            haptic.performClick()
+                            onBack()
+                        }
                         .padding(8.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -117,7 +122,10 @@ fun NotificationsScreen(
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(p.surface)
                                 .border(width = 1.dp, color = if (notif.leida) p.border else p.accent.copy(alpha = 0.5f), shape = RoundedCornerShape(10.dp))
-                                .clickable(enabled = !notif.leida) { notificacionViewModel.markAsRead(notif.id) }
+                                .clickable(enabled = !notif.leida) {
+                                    haptic.performSuccess()
+                                    notificacionViewModel.markAsRead(notif.id)
+                                }
                                 .padding(14.dp),
                             verticalAlignment = Alignment.Top
                         ) {

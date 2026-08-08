@@ -29,9 +29,14 @@ class LoginUseCase @Inject constructor(
 }
 
 class LogoutUseCase @Inject constructor(
-    private val tokenStorage: SecureTokenStorage
+    private val authRepository: AuthRepository
 ) {
+    /**
+     * Full logout: invalidates server session, clears tokens, preferences,
+     * and purges offline pending data queue.
+     * Delegates to AuthRepository.logout() which handles all cleanup.
+     */
     suspend operator fun invoke() {
-        tokenStorage.clear()
+        authRepository.logout()
     }
 }

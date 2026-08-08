@@ -1,4 +1,4 @@
-﻿package com.bioguard.movil.service
+package com.bioguard.movil.service
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -18,6 +18,12 @@ class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
             Log.d(TAG, "Reinicio detectado, verificando sesion...")
+
+            // FIX: Use goAsync() to get a PendingResult that keeps the process alive
+            // while the coroutine runs. Without this, the OS may kill the process
+            // before the DataStore read completes, causing random failures.
+            val pendingResult = goAsync()
+
             val prefs = UserPreferences(context)
             CoroutineScope(Dispatchers.IO).launch {
                 try {
@@ -30,6 +36,9 @@ class BootReceiver : BroadcastReceiver() {
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error en BootReceiver: ${e.message}", e)
+                } finally {
+                    // CRITICAL: Always call finish() to release the wake lock
+                    pendingResult.finish()
                 }
             }
         }

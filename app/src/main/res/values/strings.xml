@@ -334,19 +334,33 @@
     <!-- DeviceScreen -->
     <string name="device_no_device">Sin dispositivo</string>
     <string name="device_title">DISPOSITIVO</string>
-    <string name="device_desc">Estado y configuración del wearable</string>
+    <string name="device_desc">Estado y configuracion del wearable</string>
     <string name="device_sensor_name">BioGuard Sensor v2.1</string>
     <string name="device_connected">CONECTADO</string>
     <string name="device_disconnected">DESCONECTADO</string>
-    <string name="device_info">INFORMACIÓN DEL DISPOSITIVO</string>
+    <string name="device_info">INFORMACION DEL DISPOSITIVO</string>
     <string name="device_model">MODELO</string>
-    <string name="device_connection">CONEXIÓN</string>
+    <string name="device_connection">CONEXION</string>
     <string name="device_active">Activa</string>
     <string name="device_inactive">Inactiva</string>
-    <string name="device_battery">BATERÍA</string>
-    <string name="device_last_sync">ÚLTIMA SINCRONIZACIÓN</string>
+    <string name="device_battery">BATERIA</string>
+    <string name="device_last_sync">ULTIMA SINCRONIZACION</string>
     <string name="device_sensors">SENSORES</string>
     <string name="device_reconnect">RECONECTAR</string>
+    <string name="device_disconnect">DESCONECTAR</string>
+    <string name="device_disconnect_title">Desconectar Dispositivo</string>
+    <string name="device_disconnect_msg">¿Estas seguro de que deseas desconectar el wearable \'%1$s\'?</string>
+    <string name="device_scan_btn">BUSCAR DISPOSITIVOS CERCANOS</string>
+    <string name="device_change_btn">CAMBIAR</string>
+    <string name="device_scanning">Buscando wearables cercanos vía Bluetooth / WearOS...</string>
+    <string name="device_detected">DISPOSITIVOS DETECTADOS (%1$s)</string>
+    <string name="device_link">Vincular</string>
+    <string name="device_no_wearable">Vincula un wearable para iniciar monitoreo</string>
+    <string name="device_wearable_type">Smartwatch WearOS / Sensor BioGuard</string>
+    <string name="device_connection_status">ESTADO DE CONEXION</string>
+    <string name="device_bt_permission_error">Se requieren permisos de Bluetooth para buscar dispositivos</string>
+    <string name="device_bt_disabled">El modulo Bluetooth esta desactivado. Por favor activa el Bluetooth en tu dispositivo.</string>
+    <string name="device_no_devices_found">No se encontraron dispositivos wearables cercanos. Asegurate de que tu wearable este encendido, con Bluetooth activo y cerca del telefono.</string>
 
     <!-- QrScannerScreen -->
     <string name="qr_camera_error">No se pudo iniciar la camara</string>

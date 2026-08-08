@@ -53,10 +53,11 @@ fun SettingsScreen(
     val p = LocalThemeState.current.colorPalette()
     val uiState by settingsViewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val saveSuccessMessage = stringResource(R.string.settings_save_success)
 
     LaunchedEffect(uiState.saveSuccess) {
         if (uiState.saveSuccess) {
-            Toast.makeText(context, context.getString(R.string.settings_save_success), Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, saveSuccessMessage, Toast.LENGTH_SHORT).show()
             settingsViewModel.resetSuccess()
         }
     }

@@ -60,6 +60,8 @@ class BioGuardMessagingService : FirebaseMessagingService() {
                     
                     val connector = WearableConnector(this@BioGuardMessagingService, {}, {}, {}, {})
                     try {
+                        connector.register()
+                        kotlinx.coroutines.delay(1000)
                         connector.sendAlertCommandToWatch(bpm, temp, gsr, probability)
                     } finally {
                         connector.unregister()

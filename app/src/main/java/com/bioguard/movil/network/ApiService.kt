@@ -25,6 +25,7 @@ data class LoginWebResponse(
     @SerializedName("plan") val plan: String? = null,
     @SerializedName("requires2FA") val requires2FA: Boolean = false
 )
+data class LoginGoogleRequest(@SerializedName("idToken") val idToken: String)
 data class LoginCodigoResponse(
     @SerializedName("accessToken") val accessToken: String? = null,
     @SerializedName("token") val token: String? = null,
@@ -308,6 +309,27 @@ data class TicketResponse(
     @SerializedName("fechaActualizacion") val fechaActualizacion: String
 )
 
+data class CrearSesionPagoRequest(
+    @SerializedName("planNombre") val planNombre: String,
+    @SerializedName("procesador") val procesador: String
+)
+
+data class CrearSesionPagoResponse(
+    @SerializedName("pagoId") val pagoId: String,
+    @SerializedName("monto") val monto: Double,
+    @SerializedName("moneda") val moneda: String,
+    @SerializedName("sesionUrl") val sesionUrl: String
+)
+
+data class HistorialPagoResponse(
+    @SerializedName("id") val id: String,
+    @SerializedName("monto") val monto: Double,
+    @SerializedName("moneda") val moneda: String,
+    @SerializedName("estado") val estado: String,
+    @SerializedName("fechaPago") val fechaPago: String,
+    @SerializedName("metodoPago") val metodoPago: String
+)
+
 interface ApiService {
 
     // =============================================
@@ -318,6 +340,9 @@ interface ApiService {
 
     @POST("api/Auth/login-web")
     suspend fun loginWeb(@Body request: LoginWebRequest): LoginWebResponse
+
+    @POST("api/Auth/login-google")
+    suspend fun loginGoogle(@Body request: LoginGoogleRequest): LoginWebResponse
 
     @POST("api/Auth/login-codigo")
     suspend fun loginCodigo(@Body request: LoginCodigoRequest): LoginCodigoResponse
@@ -511,6 +536,12 @@ interface ApiService {
 
     @POST("api/Pagos/cancelar")
     suspend fun cancelarSuscripcion(): MessageResponse
+
+    @POST("api/Pagos/crear-sesion")
+    suspend fun crearSesionPago(@Body request: CrearSesionPagoRequest): CrearSesionPagoResponse
+
+    @GET("api/Pagos/historial")
+    suspend fun getHistorialPagos(): List<HistorialPagoResponse>
 
     @POST("api/Tickets")
     suspend fun crearTicket(@Body request: CrearTicketRequest): MessageResponse

@@ -1,4 +1,4 @@
-﻿package com.bioguard.movil.datastore
+package com.bioguard.movil.datastore
 
 import android.content.Context
 import androidx.datastore.core.DataStore
@@ -31,6 +31,20 @@ class UserPreferences(private val context: Context) {
         val IS_NIGHT_GUARDIAN_ENABLED = booleanPreferencesKey("is_night_guardian_enabled")
         val NIGHT_GUARDIAN_START_HOUR = intPreferencesKey("night_guardian_start_hour")
         val NIGHT_GUARDIAN_END_HOUR = intPreferencesKey("night_guardian_end_hour")
+        
+        // Dispositivo vinculado
+        val DEVICE_ID = stringPreferencesKey("device_id")
+        val DEVICE_NAME = stringPreferencesKey("device_name")
+        val IS_DEVICE_CONNECTED = booleanPreferencesKey("is_device_connected")
+
+        // Perfil Médico / Biometría
+        val PATIENT_BIRTH_DATE = stringPreferencesKey("patient_birth_date")
+        val PATIENT_SEX = stringPreferencesKey("patient_sex")
+        val PATIENT_WEIGHT = stringPreferencesKey("patient_weight")
+        val PATIENT_HEIGHT = stringPreferencesKey("patient_height")
+        val PATIENT_IS_DIABETIC = booleanPreferencesKey("patient_is_diabetic")
+        val PATIENT_FAMILY_DIABETES = booleanPreferencesKey("patient_family_diabetes")
+        val PATIENT_ACTIVITY_LEVEL = stringPreferencesKey("patient_activity_level")
     }
 
     val userId: Flow<String?> = context.dataStore.data.map { it[Keys.USER_ID] }
@@ -48,6 +62,38 @@ class UserPreferences(private val context: Context) {
     val isNightGuardianEnabled: Flow<Boolean> = context.dataStore.data.map { it[Keys.IS_NIGHT_GUARDIAN_ENABLED] ?: true }
     val nightGuardianStartHour: Flow<Int> = context.dataStore.data.map { it[Keys.NIGHT_GUARDIAN_START_HOUR] ?: 22 }
     val nightGuardianEndHour: Flow<Int> = context.dataStore.data.map { it[Keys.NIGHT_GUARDIAN_END_HOUR] ?: 6 }
+
+    val deviceId: Flow<String?> = context.dataStore.data.map { it[Keys.DEVICE_ID] }
+    val deviceName: Flow<String?> = context.dataStore.data.map { it[Keys.DEVICE_NAME] }
+    val isDeviceConnected: Flow<Boolean> = context.dataStore.data.map { it[Keys.IS_DEVICE_CONNECTED] ?: false }
+
+    val patientBirthDate: Flow<String?> = context.dataStore.data.map { it[Keys.PATIENT_BIRTH_DATE] }
+    val patientSex: Flow<String?> = context.dataStore.data.map { it[Keys.PATIENT_SEX] }
+    val patientWeight: Flow<String?> = context.dataStore.data.map { it[Keys.PATIENT_WEIGHT] }
+    val patientHeight: Flow<String?> = context.dataStore.data.map { it[Keys.PATIENT_HEIGHT] }
+    val patientIsDiabetic: Flow<Boolean> = context.dataStore.data.map { it[Keys.PATIENT_IS_DIABETIC] ?: false }
+    val patientFamilyDiabetes: Flow<Boolean> = context.dataStore.data.map { it[Keys.PATIENT_FAMILY_DIABETES] ?: false }
+    val patientActivityLevel: Flow<String?> = context.dataStore.data.map { it[Keys.PATIENT_ACTIVITY_LEVEL] }
+
+    suspend fun savePatientBiometrics(
+        birthDate: String,
+        sex: String,
+        weight: String,
+        height: String,
+        isDiabetic: Boolean,
+        familyDiabetes: Boolean,
+        activityLevel: String
+    ) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.PATIENT_BIRTH_DATE] = birthDate
+            prefs[Keys.PATIENT_SEX] = sex
+            prefs[Keys.PATIENT_WEIGHT] = weight
+            prefs[Keys.PATIENT_HEIGHT] = height
+            prefs[Keys.PATIENT_IS_DIABETIC] = isDiabetic
+            prefs[Keys.PATIENT_FAMILY_DIABETES] = familyDiabetes
+            prefs[Keys.PATIENT_ACTIVITY_LEVEL] = activityLevel
+        }
+    }
 
     suspend fun saveUserData(userId: String, userName: String, userRole: String) {
         context.dataStore.edit { prefs ->
@@ -67,6 +113,22 @@ class UserPreferences(private val context: Context) {
     suspend fun savePatientId(patientId: String) {
         context.dataStore.edit { prefs ->
             prefs[Keys.PATIENT_ID] = patientId
+        }
+    }
+
+    suspend fun saveDeviceData(deviceId: String, deviceName: String, isConnected: Boolean = true) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.DEVICE_ID] = deviceId
+            prefs[Keys.DEVICE_NAME] = deviceName
+            prefs[Keys.IS_DEVICE_CONNECTED] = isConnected
+        }
+    }
+
+    suspend fun clearDeviceData() {
+        context.dataStore.edit { prefs ->
+            prefs.remove(Keys.DEVICE_ID)
+            prefs.remove(Keys.DEVICE_NAME)
+            prefs[Keys.IS_DEVICE_CONNECTED] = false
         }
     }
 
@@ -100,3 +162,4 @@ class UserPreferences(private val context: Context) {
         context.dataStore.edit { it.clear() }
     }
 }
+

@@ -53,6 +53,7 @@ class BioGuardMonitoringService : Service() {
     private val fusedLocation by lazy { LocationServices.getFusedLocationProviderClient(this) }
     @Volatile private var ultimaLatitud: Double? = null
     @Volatile private var ultimaLongitud: Double? = null
+    private var riskThresholdsSent = false
 
     companion object {
         private const val TAG = "BioGuardMonitoring"
@@ -97,24 +98,20 @@ class BioGuardMonitoringService : Service() {
             context = this,
             onReadingReceived = { request ->
                 serviceScope.launch {
-                    val patientId = prefs.patientId.first()
-                    if (patientId != null) {
-                        try {
-                            database.pendingDataDao().insertReading(
-                                PendingReadingEntity(
-                                    pulsoBpm = request.pulsoBpm,
-                                    temperaturaC = request.temperaturaC,
-                                    sudoracionGsr = request.sudoracionGsr,
-                                    hrv = request.hrv,
-                                    spo2 = request.spo2,
-                                    timestamp = request.timestamp
-                                )
+                    try {
+                        database.pendingDataDao().insertReading(
+                            PendingReadingEntity(
+                                pulsoBpm = request.pulsoBpm,
+                                temperaturaC = request.temperaturaC,
+                                sudoracionGsr = request.sudoracionGsr,
+                                hrv = request.hrv,
+                                spo2 = request.spo2,
+                                timestamp = request.timestamp
                             )
-                        } catch (e: Exception) {
-                            Log.w(TAG, "Error encolando lectura del reloj", e)
-                        }
-                    } else {
-                        Log.d(TAG, "Lectura del reloj sin envío: sin paciente vinculado")
+                        )
+                        Log.d(TAG, "Lectura del reloj persistida en base de datos local")
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Error encolando lectura del reloj", e)
                     }
                     evaluarRiesgoOffline(
                         request.pulsoBpm,
@@ -196,7 +193,14 @@ class BioGuardMonitoringService : Service() {
             }
         )
         wearableConnector.register()
-        wearableConnector.sendRiskThresholds()
+
+        serviceScope.launch {
+            delay(2000)
+            if (wearableConnector.connectionState.value == com.bioguard.movil.service.WearableConnectionState.CONNECTED) {
+                wearableConnector.sendRiskThresholds()
+                riskThresholdsSent = true
+            }
+        }
 
         startMonitoringLoops()
     }
@@ -215,6 +219,7 @@ class BioGuardMonitoringService : Service() {
             wearableConnector.unregister()
         }
         serviceScope.cancel()
+        Log.d(TAG, "BioGuardMonitoringService destroyed, resources cleaned up")
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -343,14 +348,33 @@ class BioGuardMonitoringService : Service() {
         serviceScope.launch {
             while (true) {
                 val delayTime = if (isInNightGuardianWindow()) {
-                    5 * 60 * 1000L // 5 minutes during sleep to save battery
+                    5 * 60 * 1000L
                 } else {
-                    30 * 1000L // 30 seconds during day for active tracking
+                    30 * 1000L
                 }
                 delay(delayTime)
                 val patientId = prefs.patientId.first()
                 if (patientId != null) {
                     enviarUbicacionReal()
+                }
+            }
+        }
+
+        // Loop: Reconnect wearable + resend thresholds if needed
+        serviceScope.launch {
+            while (true) {
+                delay(60_000L)
+                val state = wearableConnector.connectionState.value
+                if (state != com.bioguard.movil.service.WearableConnectionState.CONNECTED &&
+                    state != com.bioguard.movil.service.WearableConnectionState.UNAVAILABLE
+                ) {
+                    Log.d(TAG, "Wearable disconnected, attempting reconnect...")
+                    wearableConnector.discoverAndConnect()
+                }
+                if (wearableConnector.connectionState.value == com.bioguard.movil.service.WearableConnectionState.CONNECTED && !riskThresholdsSent) {
+                    wearableConnector.sendRiskThresholds()
+                    riskThresholdsSent = true
+                    Log.d(TAG, "Risk thresholds sent after reconnection")
                 }
             }
         }

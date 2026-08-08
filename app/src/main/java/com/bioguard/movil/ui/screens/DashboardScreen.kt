@@ -32,24 +32,39 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.res.stringResource
-import com.bioguard.movil.R
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.bioguard.movil.R
+import com.bioguard.movil.ui.components.BioHealthChart
+import com.bioguard.movil.ui.components.ChartPoint
 import com.bioguard.movil.ui.components.ErrorRetryBox
+import com.bioguard.movil.ui.components.VitalDetailBottomSheet
+import com.bioguard.movil.ui.model.HistoryItem
+import com.bioguard.movil.ui.model.VitalSign
 import com.bioguard.movil.ui.theme.GreenNeon
 import com.bioguard.movil.ui.theme.LocalThemeState
 import com.bioguard.movil.ui.theme.RedNeon
 import com.bioguard.movil.ui.theme.YellowNeon
 import com.bioguard.movil.ui.theme.colorPalette
-import com.bioguard.movil.ui.model.HistoryItem
-import com.bioguard.movil.ui.model.VitalSign
 import com.bioguard.movil.ui.viewmodel.DashboardViewModel
+import com.bioguard.movil.util.rememberBioHaptic
+
+data class VitalDetailData(
+    val title: String,
+    val value: String,
+    val status: String,
+    val unit: String,
+    val points: List<ChartPoint>
+)
 
 @Composable
 fun DashboardScreen(
@@ -58,6 +73,9 @@ fun DashboardScreen(
 ) {
     val p = LocalThemeState.current.colorPalette()
     val uiState by dashboardViewModel.uiState.collectAsState()
+    val haptic = rememberBioHaptic()
+
+    var activeVitalDetail by remember { mutableStateOf<VitalDetailData?>(null) }
 
     LaunchedEffect(uiState.summary?.alertasPendientesCount) {
         if ((uiState.summary?.alertasPendientesCount ?: 0) > 0) {
@@ -113,9 +131,9 @@ fun DashboardScreen(
     }
 
     val vitalSigns = listOf(
-        VitalSign(stringResource(R.string.dashboard_heart_rate), "${lastPulse?.toInt() ?: 0}", "BPM", "\u2665", p.accent, pulseStatus, if (pulseStatus == stringResource(R.string.dashboard_normal)) GreenNeon else if (pulseStatus == stringResource(R.string.dashboard_alert)) RedNeon else YellowNeon),
-        VitalSign(stringResource(R.string.dashboard_temperature), "${lastTemp ?: 0.0}", "\u00b0C", "\uD83C\uDF21", p.accentSecondary, tempStatus, tempStatusColor),
-        VitalSign(stringResource(R.string.dashboard_conductivity), "${lastGsr ?: 0.0}", "\u00b5S", "\u26a1", YellowNeon, gsrStatus, gsrStatusColor)
+        VitalSign(stringResource(R.string.dashboard_heart_rate), lastPulse?.toInt()?.toString() ?: "--", "BPM", "\u2665", p.accent, pulseStatus, if (pulseStatus == stringResource(R.string.dashboard_normal)) GreenNeon else if (pulseStatus == stringResource(R.string.dashboard_alert)) RedNeon else YellowNeon),
+        VitalSign(stringResource(R.string.dashboard_temperature), lastTemp?.toString() ?: "--", "\u00b0C", "\uD83C\uDF21", p.accentSecondary, tempStatus, tempStatusColor),
+        VitalSign(stringResource(R.string.dashboard_conductivity), lastGsr?.toString() ?: "--", "\u00b5S", "\u26a1", YellowNeon, gsrStatus, gsrStatusColor)
     )
 
     val metabolicStatus = when {
@@ -149,6 +167,30 @@ fun DashboardScreen(
         )
     }
 
+    val pulseChartPoints = uiState.lecturasRecientes.takeLast(10).map {
+        ChartPoint(
+            label = it.timestamp.substringAfter("T", "").take(5),
+            value = it.pulsoBpm.toFloat(),
+            time = it.timestamp.substringAfter("T", "").take(8)
+        )
+    }
+
+    val tempChartPoints = uiState.lecturasRecientes.takeLast(10).map {
+        ChartPoint(
+            label = it.timestamp.substringAfter("T", "").take(5),
+            value = it.temperaturaC.toFloat(),
+            time = it.timestamp.substringAfter("T", "").take(8)
+        )
+    }
+
+    val gsrChartPoints = uiState.lecturasRecientes.takeLast(10).map {
+        ChartPoint(
+            label = it.timestamp.substringAfter("T", "").take(5),
+            value = it.sudoracionGsr.toFloat(),
+            time = it.timestamp.substringAfter("T", "").take(8)
+        )
+    }
+
     if (uiState.isLoading) {
         Box(
             modifier = Modifier
@@ -176,7 +218,7 @@ fun DashboardScreen(
                     .padding(16.dp)
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -206,6 +248,10 @@ fun DashboardScreen(
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(p.surface)
                                 .border(width = 1.dp, color = p.border, shape = RoundedCornerShape(16.dp))
+                                .clickable {
+                                    haptic.performClick()
+                                    dashboardViewModel.loadDashboard()
+                                }
                                 .padding(horizontal = 10.dp, vertical = 5.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -217,6 +263,15 @@ fun DashboardScreen(
                         }
                     }
                 }
+
+                // Interactive Health Vector Chart
+                BioHealthChart(
+                    points = pulseChartPoints,
+                    lineColor = p.accent,
+                    unit = "BPM",
+                    title = "Ritmo Cardíaco en Tiempo Real",
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
 
                 Box(
                     modifier = Modifier
@@ -250,7 +305,25 @@ fun DashboardScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 vitalSigns.forEach { vital ->
-                    VitalSignCard(vital = vital, pulseAlpha = pulseAlpha)
+                    VitalSignCard(
+                        vital = vital,
+                        pulseAlpha = pulseAlpha,
+                        onClick = {
+                            haptic.performClick()
+                            val points = when (vital.unit) {
+                                "BPM" -> pulseChartPoints
+                                "\u00b0C" -> tempChartPoints
+                                else -> gsrChartPoints
+                            }
+                            activeVitalDetail = VitalDetailData(
+                                title = vital.name,
+                                value = vital.value,
+                                status = vital.status,
+                                unit = vital.unit,
+                                points = points
+                            )
+                        }
+                    )
                     Spacer(modifier = Modifier.height(10.dp))
                 }
 
@@ -319,10 +392,25 @@ fun DashboardScreen(
             }
         }
     }
+
+    activeVitalDetail?.let { detail ->
+        VitalDetailBottomSheet(
+            title = detail.title,
+            currentValue = detail.value,
+            statusText = detail.status,
+            unit = detail.unit,
+            chartPoints = detail.points,
+            onDismiss = { activeVitalDetail = null }
+        )
+    }
 }
 
 @Composable
-fun VitalSignCard(vital: VitalSign, pulseAlpha: Float) {
+fun VitalSignCard(
+    vital: VitalSign,
+    pulseAlpha: Float,
+    onClick: () -> Unit = {}
+) {
     val p = LocalThemeState.current.colorPalette()
     Box(
         modifier = Modifier
@@ -330,6 +418,7 @@ fun VitalSignCard(vital: VitalSign, pulseAlpha: Float) {
             .clip(RoundedCornerShape(12.dp))
             .background(p.surface)
             .border(width = 1.dp, color = p.border, shape = RoundedCornerShape(12.dp))
+            .clickable { onClick() }
             .padding(16.dp)
     ) {
         Row(

@@ -17,38 +17,50 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.res.stringResource
-import com.bioguard.movil.R
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.bioguard.movil.R
+import com.bioguard.movil.ui.components.ConfirmDialog
+import com.bioguard.movil.ui.components.SystemNotificationDialog
 import com.bioguard.movil.ui.model.UserRole
 import com.bioguard.movil.ui.theme.AppTheme
 import com.bioguard.movil.ui.theme.GreenNeon
 import com.bioguard.movil.ui.theme.LocalThemeState
 import com.bioguard.movil.ui.theme.RedNeon
 import com.bioguard.movil.ui.theme.ThemeState
-import com.bioguard.movil.ui.theme.YellowNeon
 import com.bioguard.movil.ui.theme.colorPalette
 import com.bioguard.movil.ui.viewmodel.ProfileViewModel
-import com.bioguard.movil.ui.components.SystemNotificationDialog
-import com.bioguard.movil.ui.components.ConfirmDialog
-import androidx.compose.runtime.LaunchedEffect
 
 @Composable
 fun ProfileScreen(
@@ -61,7 +73,8 @@ fun ProfileScreen(
     onNavigateToMedications: () -> Unit = {},
     onNavigateToCuidadores: () -> Unit = {},
     onNavigateToSupport: () -> Unit = {},
-    onNavigateToSettings: () -> Unit = {}
+    onNavigateToSettings: () -> Unit = {},
+    onNavigateToDevice: () -> Unit = {}
 ) {
     val p = LocalThemeState.current.colorPalette()
     val uiState by profileViewModel.uiState.collectAsState()
@@ -72,6 +85,7 @@ fun ProfileScreen(
     var errorDialogMessage by remember { mutableStateOf<String?>(null) }
     var successDialogMessage by remember { mutableStateOf<String?>(null) }
     var showLogoutConfirm by remember { mutableStateOf(false) }
+    var showEditBiometriaModal by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.error) {
         uiState.error?.let {
@@ -85,6 +99,31 @@ fun ProfileScreen(
             successDialogMessage = it
             profileViewModel.clearMessages()
         }
+    }
+
+    if (showEditBiometriaModal) {
+        EditBiometriaDialog(
+            currentBirth = uiState.biometria.fechaNacimiento,
+            currentSex = uiState.biometria.sexo,
+            currentWeight = uiState.biometria.pesoKg.takeIf { it > 0.0 }?.toString().orEmpty(),
+            currentHeight = uiState.biometria.estaturaCm.takeIf { it > 0.0 }?.toString().orEmpty(),
+            currentDiabetic = uiState.biometria.esDiabetico,
+            currentFamilyDiabetic = uiState.biometria.familiaresDiabetes,
+            currentActivity = uiState.biometria.actividadFisica,
+            onDismiss = { showEditBiometriaModal = false },
+            onSave = { birth, sex, weight, height, isDiabetic, familyDiabetic, activity ->
+                showEditBiometriaModal = false
+                profileViewModel.updateBiometriaPaciente(
+                    fechaNacimiento = birth,
+                    sexo = sex,
+                    pesoKg = weight.toDoubleOrNull() ?: 0.0,
+                    estaturaCm = height.toDoubleOrNull() ?: 0.0,
+                    esDiabetico = isDiabetic,
+                    familiaresDiabetes = familyDiabetic,
+                    actividadFisica = activity
+                )
+            }
+        )
     }
 
     if (uiState.isLoading) {
@@ -114,93 +153,107 @@ fun ProfileScreen(
                     fontWeight = FontWeight.Bold,
                     color = p.accent,
                     letterSpacing = 3.sp,
-                    modifier = Modifier.padding(bottom = 20.dp)
+                    modifier = Modifier.padding(bottom = 16.dp)
                 )
 
+                // ── Card de Información del Usuario ──
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
                         .background(p.surface)
                         .border(width = 1.dp, color = p.border, shape = RoundedCornerShape(16.dp))
-                        .padding(24.dp),
+                        .padding(20.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Box(
                             modifier = Modifier
-                                .size(80.dp)
+                                .size(70.dp)
                                 .clip(CircleShape)
-                                .background(p.accentDark.copy(alpha = 0.3f))
+                                .background(p.accentDark.copy(alpha = 0.2f))
                                 .border(width = 2.dp, color = p.accent, shape = CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(text = "\uD83D\uDC64", fontSize = 40.sp, color = p.accent)
+                            Text(text = "👤", fontSize = 34.sp)
                         }
 
                         Spacer(modifier = Modifier.height(12.dp))
 
+                        val fullUser = uiState.perfil
+                        val displayName = fullUser?.nombre ?: "Usuario BioGuard"
+
                         Text(
-                            text = uiState.perfil?.nombre ?: stringResource(R.string.profile_default_user),
+                            text = displayName,
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             color = p.textPrimary
                         )
 
                         Text(
-                            text = uiState.perfil?.correo ?: stringResource(R.string.profile_default_email),
-                            fontSize = 13.sp,
+                            text = fullUser?.correo ?: "Sin correo registrado",
+                            fontSize = 12.sp,
                             color = p.textSecondary
                         )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(GreenNeon.copy(alpha = 0.1f))
-                                .padding(horizontal = 12.dp, vertical = 4.dp)
-                        ) {
-                            Text(text = stringResource(R.string.profile_active), fontSize = 10.sp, color = GreenNeon, letterSpacing = 2.sp, fontWeight = FontWeight.Medium)
-                        }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
 
+                // ── PERFIL BIOMÉTRICO Y MÉDICO DEL PACIENTE ──
                 Text(
-                    text = stringResource(R.string.profile_biometric_data),
+                    text = "🏥 PERFIL BIOMÉTRICO Y DATO MÉDICO",
                     fontSize = 10.sp,
                     color = p.accent,
                     letterSpacing = 2.sp,
                     modifier = Modifier.padding(bottom = 10.dp)
                 )
 
-                ProfileInfoRow(label = stringResource(R.string.profile_name), value = uiState.perfil?.nombre ?: "-")
-                ProfileInfoRow(label = stringResource(R.string.profile_email), value = uiState.perfil?.correo ?: "-")
-                ProfileInfoRow(label = stringResource(R.string.profile_register_date), value = uiState.perfil?.fechaRegistro?.substringBefore("T") ?: "-")
-                ProfileInfoRow(label = stringResource(R.string.profile_plan), value = uiState.plan?.nombre ?: uiState.perfil?.planNombre ?: "-")
+                val bio = uiState.biometria
+                ProfileInfoRow(label = "FECHA NACIMIENTO", value = bio.fechaNacimiento.takeIf { it.isNotBlank() }?.let { com.bioguard.movil.data.Formatters.toDisplayDate(it) } ?: "Sin registrar")
+                ProfileInfoRow(label = "SEXO BIOLÓGICO", value = bio.sexo.ifBlank { "Sin registrar" })
+                ProfileInfoRow(label = "PESO CORPORAL", value = if (bio.pesoKg > 0.0) "${bio.pesoKg} kg" else "Sin registrar")
+                ProfileInfoRow(label = "ESTATURA", value = if (bio.estaturaCm > 0.0) "${bio.estaturaCm} cm" else "Sin registrar")
+                ProfileInfoRow(label = "NIVEL ACTIVIDAD FISICA", value = bio.actividadFisica.ifBlank { "Sin registrar" })
+                ProfileInfoRow(label = "DIAGNÓSTICO DIABETES", value = if (bio.esDiabetico) "Sí" else "No")
+                ProfileInfoRow(label = "ANTECEDENTES FAMILIARES DIABETES", value = if (bio.familiaresDiabetes) "Sí" else "No")
 
-                if (role.canSeePlan) {
-                    Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
+                Button(
+                    onClick = { showEditBiometriaModal = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(46.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = p.accent)
+                ) {
                     Text(
-                        text = stringResource(R.string.profile_my_plan),
-                        fontSize = 10.sp,
-                        color = p.accent,
-                        letterSpacing = 2.sp,
-                        modifier = Modifier.padding(bottom = 10.dp)
+                        text = "✏️ EDITAR INFORMACIÓN MÉDICA",
+                        color = p.background,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        letterSpacing = 1.sp
                     )
+                }
 
-                    uiState.plan?.let { plan ->
-                        ProfileInfoRow(label = stringResource(R.string.profile_limit_patients), value = "${plan.limitePacientes}")
-                        ProfileInfoRow(label = stringResource(R.string.profile_limit_caregivers), value = "${plan.limiteCuidadores}")
-                        ProfileInfoRow(label = stringResource(R.string.profile_history), value = stringResource(R.string.profile_days_format, plan.retencionHistorialDias))
-                        ProfileInfoRow(label = stringResource(R.string.profile_gps_continuous), value = if (plan.gpsActivo) stringResource(R.string.profile_yes) else stringResource(R.string.profile_no))
-                        ProfileInfoRow(label = stringResource(R.string.profile_ai_console), value = if (plan.consolaIaActiva) stringResource(R.string.profile_yes) else stringResource(R.string.profile_no))
-                    }
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // ── PLAN Y CONFIGURACIÓN ──
+                Text(
+                    text = stringResource(R.string.profile_my_plan),
+                    fontSize = 10.sp,
+                    color = p.accent,
+                    letterSpacing = 2.sp,
+                    modifier = Modifier.padding(bottom = 10.dp)
+                )
+
+                uiState.plan?.let { plan ->
+                    ProfileInfoRow(label = stringResource(R.string.profile_limit_patients), value = "${plan.limitePacientes}")
+                    ProfileInfoRow(label = stringResource(R.string.profile_limit_caregivers), value = "${plan.limiteCuidadores}")
+                    ProfileInfoRow(label = stringResource(R.string.profile_history), value = stringResource(R.string.profile_days_format, plan.retencionHistorialDias))
+                    ProfileInfoRow(label = stringResource(R.string.profile_gps_continuous), value = if (plan.gpsActivo) stringResource(R.string.profile_yes) else stringResource(R.string.profile_no))
+                    ProfileInfoRow(label = stringResource(R.string.profile_ai_console), value = if (plan.consolaIaActiva) stringResource(R.string.profile_yes) else stringResource(R.string.profile_no))
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -260,6 +313,7 @@ fun ProfileScreen(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 ProfileMenuRow(text = stringResource(R.string.profile_notifications), subtitle = stringResource(R.string.profile_notifications_desc), onClick = onNavigateToNotifications)
+                ProfileMenuRow(text = "Dispositivo Vinculado", subtitle = "Gestiona o conecta tu wearable / parche", onClick = onNavigateToDevice)
                 ProfileMenuRow(text = stringResource(R.string.profile_sync_settings), subtitle = stringResource(R.string.profile_sync_settings_desc), onClick = onNavigateToSettings)
                 if (role.canManageMedicamentos) {
                     ProfileMenuRow(text = stringResource(R.string.profile_medications), subtitle = stringResource(R.string.profile_medications_desc), onClick = onNavigateToMedications)
@@ -332,6 +386,200 @@ fun ProfileScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditBiometriaDialog(
+    currentBirth: String,
+    currentSex: String,
+    currentWeight: String,
+    currentHeight: String,
+    currentDiabetic: Boolean,
+    currentFamilyDiabetic: Boolean,
+    currentActivity: String,
+    onDismiss: () -> Unit,
+    onSave: (birth: String, sex: String, weight: String, height: String, isDiabetic: Boolean, familyDiabetic: Boolean, activity: String) -> Unit
+) {
+    val p = LocalThemeState.current.colorPalette()
+
+    var birthDate by remember { mutableStateOf(currentBirth) }
+    var weight by remember { mutableStateOf(currentWeight) }
+    var height by remember { mutableStateOf(currentHeight) }
+    var selectedSex by remember { mutableStateOf(currentSex) }
+    var isDiabetic by remember { mutableStateOf(currentDiabetic) }
+    var hasFamilyDiabetes by remember { mutableStateOf(currentFamilyDiabetic) }
+    var selectedActivity by remember { mutableStateOf(currentActivity) }
+    var activityExpanded by remember { mutableStateOf(false) }
+
+    val activityLevels = listOf("Sedentario", "Ligero", "Moderado", "Intenso", "Muy intenso")
+
+    var validationError by remember { mutableStateOf<String?>(null) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(text = "✏️ Editar Información Médica", color = p.accent, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                if (validationError != null) {
+                    Text(
+                        text = validationError ?: "",
+                        color = RedNeon,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                }
+
+                OutlinedTextField(
+                    value = birthDate,
+                    onValueChange = { 
+                        birthDate = it
+                        validationError = null 
+                    },
+                    label = { Text("Fecha Nacimiento (AAAA-MM-DD)", fontSize = 11.sp) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = p.accent, unfocusedBorderColor = p.border)
+                )
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = weight,
+                        onValueChange = { 
+                            weight = it
+                            validationError = null
+                        },
+                        label = { Text("Peso (kg)", fontSize = 11.sp) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = p.accent, unfocusedBorderColor = p.border)
+                    )
+
+                    OutlinedTextField(
+                        value = height,
+                        onValueChange = { 
+                            height = it
+                            validationError = null
+                        },
+                        label = { Text("Estatura (cm)", fontSize = 11.sp) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = p.accent, unfocusedBorderColor = p.border)
+                    )
+                }
+
+                Text(text = "Sexo Biológico", fontSize = 11.sp, color = p.textSecondary)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("Masculino", "Femenino", "Otro").forEach { sexOption ->
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (selectedSex == sexOption) p.accent else p.surface)
+                                .border(width = 1.dp, color = p.border, shape = RoundedCornerShape(8.dp))
+                                .clickable { selectedSex = sexOption }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = sexOption,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (selectedSex == sexOption) p.background else p.textPrimary
+                            )
+                        }
+                    }
+                }
+
+                Text(text = "Nivel de Actividad Física", fontSize = 11.sp, color = p.textSecondary)
+                ExposedDropdownMenuBox(
+                    expanded = activityExpanded,
+                    onExpandedChange = { activityExpanded = !activityExpanded }
+                ) {
+                    OutlinedTextField(
+                        value = selectedActivity,
+                        onValueChange = {},
+                        readOnly = true,
+                        modifier = Modifier.menuAnchor().fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = p.accent, unfocusedBorderColor = p.border)
+                    )
+                    ExposedDropdownMenu(
+                        expanded = activityExpanded,
+                        onDismissRequest = { activityExpanded = false },
+                        modifier = Modifier.background(p.surface)
+                    ) {
+                        activityLevels.forEach { lvl ->
+                            DropdownMenuItem(
+                                text = { Text(text = lvl, color = p.textPrimary) },
+                                onClick = {
+                                    selectedActivity = lvl
+                                    activityExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(
+                        checked = isDiabetic,
+                        onCheckedChange = { isDiabetic = it },
+                        colors = CheckboxDefaults.colors(checkedColor = p.accent)
+                    )
+                    Text(text = "Diagnosticado con Diabetes", fontSize = 12.sp, color = p.textPrimary)
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(
+                        checked = hasFamilyDiabetes,
+                        onCheckedChange = { hasFamilyDiabetes = it },
+                        colors = CheckboxDefaults.colors(checkedColor = p.accent)
+                    )
+                    Text(text = "Antecedentes de Diabetes Familiar", fontSize = 12.sp, color = p.textPrimary)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val wNum = weight.toDoubleOrNull()
+                    val hNum = height.toDoubleOrNull()
+
+                    if (birthDate.isBlank()) {
+                        validationError = "Por favor ingresa tu fecha de nacimiento"
+                        return@Button
+                    }
+                    if (wNum == null || wNum <= 0.0 || wNum > 300.0) {
+                        validationError = "Ingresa un peso válido entre 1 y 300 kg"
+                        return@Button
+                    }
+                    if (hNum == null || hNum <= 0.0 || hNum > 250.0) {
+                        validationError = "Ingresa una estatura válida entre 1 y 250 cm"
+                        return@Button
+                    }
+
+                    val isoBirth = com.bioguard.movil.data.Formatters.toIsoDate(birthDate)
+                    onSave(isoBirth, selectedSex, weight, height, isDiabetic, hasFamilyDiabetes, selectedActivity)
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = p.accent)
+            ) {
+                Text(text = "Guardar", color = p.background, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = "Cancelar", color = p.textSecondary)
+            }
+        },
+        containerColor = p.surface
+    )
+}
+
 @Composable
 fun ProfileInfoRow(label: String, value: String) {
     val p = LocalThemeState.current.colorPalette()
@@ -354,26 +602,22 @@ fun ProfileInfoRow(label: String, value: String) {
 @Composable
 fun ProfileMenuRow(text: String, subtitle: String, onClick: (() -> Unit)? = null) {
     val p = LocalThemeState.current.colorPalette()
-    Box(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
             .background(p.surface)
             .border(width = 1.dp, color = p.border, shape = RoundedCornerShape(8.dp))
-            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
-            .padding(12.dp)
+            .clickable(enabled = onClick != null) { onClick?.invoke() }
+            .padding(14.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(text = text, fontSize = 13.sp, color = p.textPrimary, fontWeight = FontWeight.Medium)
-                Text(text = subtitle, fontSize = 10.sp, color = p.textSecondary)
-            }
-            Text(text = "\u2192", fontSize = 14.sp, color = p.accent)
+        Column {
+            Text(text = text, fontSize = 13.sp, color = p.textPrimary, fontWeight = FontWeight.Medium)
+            Text(text = subtitle, fontSize = 10.sp, color = p.textSecondary)
         }
+        Text(text = "›", fontSize = 18.sp, color = p.textSecondary)
     }
     Spacer(modifier = Modifier.height(6.dp))
 }

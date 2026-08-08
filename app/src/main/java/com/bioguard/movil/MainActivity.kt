@@ -12,15 +12,15 @@ import android.provider.Settings
 import android.view.MotionEvent
 import android.view.WindowManager
 import android.widget.Toast
-import androidx.activity.ComponentActivity
+import android.app.AlertDialog
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import android.app.AlertDialog
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import com.bioguard.movil.datastore.UserPreferences
 import com.bioguard.movil.navigation.BioGuardApp
@@ -28,13 +28,14 @@ import com.bioguard.movil.ui.theme.AppTheme
 import com.bioguard.movil.ui.theme.BioGuardMovilTheme
 import com.bioguard.movil.ui.theme.ThemeState
 import com.bioguard.movil.ui.viewmodel.AuthViewModel
+import com.bioguard.movil.util.BiometricHelper
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
 
     private val authViewModel: AuthViewModel by viewModels()
     private var lastInteractionTime = System.currentTimeMillis()

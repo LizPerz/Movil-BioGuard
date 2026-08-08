@@ -34,6 +34,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -64,6 +65,10 @@ import com.bioguard.movil.ui.theme.LocalThemeState
 import com.bioguard.movil.ui.theme.colorPalette
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanResult
+import android.bluetooth.le.ScanSettings
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,15 +81,12 @@ fun OnboardingScreen(
     var step by remember { mutableIntStateOf(1) }
 
     when (step) {
-        1 -> BiometricProfileStep(
-            onNext = { step = 2 }
-        )
-        2 -> AppearanceThemeStep(
-            onNext = { step = 3 },
+        1 -> AppearanceThemeStep(
+            onNext = { step = 2 },
             themeState = themeState,
             onThemeChange = onThemeChange
         )
-        3 -> BluetoothPairingStep(
+        2 -> BluetoothPairingStep(
             onComplete = onComplete
         )
     }
@@ -453,7 +455,101 @@ fun BluetoothPairingStep(
     onComplete: () -> Unit = {}
 ) {
     val p = LocalThemeState.current.colorPalette()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val prefs = remember { UserPreferences(context) }
+
     var isScanning by remember { mutableStateOf(false) }
+    var pairedDeviceName by remember { mutableStateOf<String?>(null) }
+    var discoveredDevices by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    var hasPermissions by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        val perms = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            arrayOf(
+                android.Manifest.permission.BLUETOOTH_SCAN,
+                android.Manifest.permission.BLUETOOTH_CONNECT
+            )
+        } else {
+            arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+        hasPermissions = perms.all { perm ->
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context, perm
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        }
+    }
+
+    fun triggerScan() {
+        if (!hasPermissions) {
+            Toast.makeText(context, "Se requieren permisos de Bluetooth. Activalos en Ajustes > Aplicaciones > BioGuard > Permisos.", Toast.LENGTH_LONG).show()
+            return
+        }
+        scope.launch {
+            isScanning = true
+            discoveredDevices = emptyList()
+
+            val realDevices = mutableListOf<Pair<String, String>>()
+            try {
+                val nodeClient = com.google.android.gms.wearable.Wearable.getNodeClient(context)
+                val nodes = nodeClient.connectedNodes.await()
+                for (node in nodes) {
+                    realDevices.add((node.displayName.ifBlank { "SmartWatch WearOS" }) to node.id)
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("Onboarding", "WearOS node discovery: ${e.message}")
+            }
+
+            try {
+                val bluetoothManager = context.getSystemService(android.content.Context.BLUETOOTH_SERVICE) as? android.bluetooth.BluetoothManager
+                val adapter = bluetoothManager?.adapter
+                if (adapter != null && adapter.isEnabled) {
+                    val scanner = adapter.bluetoothLeScanner
+                    if (scanner != null) {
+                        val bleDevices = mutableListOf<Pair<String, String>>()
+                        val scanCallback = object : android.bluetooth.le.ScanCallback() {
+                            override fun onScanResult(callbackType: Int, result: android.bluetooth.le.ScanResult?) {
+                                result?.device?.let { dev ->
+                                    val name = try { dev.name } catch (_: SecurityException) { null }
+                                    if (name != null && bleDevices.none { it.second == dev.address }) {
+                                        bleDevices.add(name to dev.address)
+                                        discoveredDevices = realDevices + bleDevices
+                                    }
+                                }
+                            }
+                            override fun onScanFailed(errorCode: Int) {
+                                android.util.Log.w("Onboarding", "BLE scan failed: $errorCode")
+                            }
+                        }
+                        try {
+                            scanner.startScan(scanCallback)
+                            kotlinx.coroutines.delay(8000)
+                            scanner.stopScan(scanCallback)
+                        } catch (e: SecurityException) {
+                            android.util.Log.w("Onboarding", "BLE scan permission error: ${e.message}")
+                        }
+                        discoveredDevices = realDevices + bleDevices
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("Onboarding", "BLE scan error: ${e.message}")
+            }
+
+            isScanning = false
+
+            if (discoveredDevices.isEmpty()) {
+                Toast.makeText(context, "No se detectaron dispositivos wearables físicos encendidos ni cercanos. Asegúrate de tener Bluetooth activado.", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    fun vincular(nombre: String, mac: String) {
+        scope.launch {
+            prefs.saveDeviceData(mac, nombre, isConnected = true)
+            pairedDeviceName = nombre
+            Toast.makeText(context, "Dispositivo '$nombre' vinculado correctamente", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -480,85 +576,137 @@ fun BluetoothPairingStep(
                 Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(p.accent))
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(28.dp))
 
             Text(
-                text = "Vinculación Bluetooth",
+                text = "Vinculación Wearable",
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 color = p.textPrimary,
                 letterSpacing = 1.sp
             )
             Text(
-                text = "Selecciona tu dispositivo wearable",
+                text = "Conecta tu smartwatch o parche biométrico",
                 fontSize = 13.sp,
                 color = p.textSecondary,
-                modifier = Modifier.padding(top = 4.dp, bottom = 32.dp)
+                modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
             )
 
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.size(140.dp)
+                modifier = Modifier.size(130.dp)
             ) {
                 Box(
                     modifier = Modifier
-                        .size(140.dp)
+                        .size(130.dp)
                         .clip(CircleShape)
                         .background(p.accent.copy(alpha = 0.08f))
                         .border(width = 1.dp, color = p.accent.copy(alpha = 0.2f), shape = CircleShape)
                 )
                 Box(
                     modifier = Modifier
-                        .size(90.dp)
+                        .size(85.dp)
                         .clip(CircleShape)
                         .background(p.accent.copy(alpha = 0.12f))
                         .border(width = 1.dp, color = p.accent.copy(alpha = 0.3f), shape = CircleShape)
                 )
                 Box(
                     modifier = Modifier
-                        .size(60.dp)
+                        .size(56.dp)
                         .clip(CircleShape)
                         .background(p.surface)
-                        .border(width = 2.dp, color = p.accent, shape = CircleShape),
+                        .border(width = 2.dp, color = if (pairedDeviceName != null) GreenNeon else p.accent, shape = CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = "⌚", fontSize = 28.sp)
+                    Text(text = if (pairedDeviceName != null) "✅" else "⌚", fontSize = 26.sp)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            if (pairedDeviceName != null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(GreenNeon.copy(alpha = 0.1f))
+                        .border(width = 1.dp, color = GreenNeon, shape = RoundedCornerShape(10.dp))
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(text = "¡Dispositivo Vinculado!", fontWeight = FontWeight.Bold, color = GreenNeon, fontSize = 15.sp)
+                        Text(text = pairedDeviceName ?: "", color = p.textPrimary, fontSize = 13.sp, modifier = Modifier.padding(top = 2.dp))
+                    }
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(p.surface)
+                        .border(width = 1.dp, color = p.border, shape = RoundedCornerShape(10.dp))
+                        .clickable { if (!isScanning) triggerScan() }
+                        .padding(18.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        if (isScanning) {
+                            CircularProgressIndicator(color = p.accent, modifier = Modifier.size(32.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(text = "Escaneando dispositivos cercanos...", fontSize = 13.sp, color = p.textPrimary)
+                        } else {
+                            Text(text = "📲", fontSize = 30.sp)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Toca para buscar dispositivos cercanos",
+                                fontSize = 14.sp,
+                                color = p.textPrimary,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Asegúrate de tener Bluetooth activado",
+                                fontSize = 11.sp,
+                                color = p.textSecondary
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (discoveredDevices.isNotEmpty() && pairedDeviceName == null) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(text = "DISPOSITIVOS DISPONIBLES", fontSize = 10.sp, color = p.accent, letterSpacing = 2.sp, modifier = Modifier.fillMaxWidth())
+                Spacer(modifier = Modifier.height(8.dp))
+                discoveredDevices.forEach { (nombre, mac) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(p.surface)
+                            .border(width = 1.dp, color = p.border, shape = RoundedCornerShape(8.dp))
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(text = nombre, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = p.textPrimary)
+                            Text(text = mac, fontSize = 10.sp, color = p.textSecondary)
+                        }
+                        Button(
+                            onClick = { vincular(nombre, mac) },
+                            shape = RoundedCornerShape(6.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = p.accent)
+                        ) {
+                            Text(text = "Vincular", fontSize = 11.sp, color = p.background, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
                 }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
-
-            Text(text = "VINCULAR DISPOSITIVO", fontSize = 10.sp, color = p.accent, letterSpacing = 2.sp, modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp))
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(p.surface)
-                    .border(width = 1.dp, color = p.border, shape = RoundedCornerShape(10.dp))
-                    .clickable { isScanning = !isScanning }
-                    .padding(20.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = if (isScanning) "\u231B" else "\uD83D\uDCF1", fontSize = 32.sp)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = if (isScanning) "Buscando dispositivos..." else "Toca para buscar dispositivos",
-                        fontSize = 14.sp,
-                        color = p.textPrimary,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Aseg\u00farate de que tu dispositivo wearable est\u00e9 encendido y cerca",
-                        fontSize = 11.sp,
-                        color = p.textSecondary
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(28.dp))
 
             Button(
                 onClick = onComplete,
@@ -566,12 +714,24 @@ fun BluetoothPairingStep(
                 shape = RoundedCornerShape(10.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = p.accent)
             ) {
-                Text(text = "FINALIZAR", color = p.background, fontWeight = FontWeight.Bold, letterSpacing = 2.sp, fontSize = 14.sp)
+                Text(text = "FINALIZAR E IR AL INICIO", color = p.background, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, fontSize = 13.sp)
             }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "Omitir por ahora (puedes vincularlo luego en Dispositivo)",
+                fontSize = 12.sp,
+                color = p.textSecondary,
+                modifier = Modifier
+                    .clickable { onComplete() }
+                    .padding(8.dp)
+            )
 
             Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
+
 
 

@@ -106,6 +106,9 @@ abstract class BioGuardDatabase : RoomDatabase() {
 
         fun getInstance(context: Context): BioGuardDatabase {
             return INSTANCE ?: synchronized(this) {
+                // Ensure MasterKey and encrypted DB passphrase are created in Keystore
+                val passphrase = com.bioguard.movil.util.SecurityUtils.getOrCreateDatabasePassphrase(context)
+                
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     BioGuardDatabase::class.java,

@@ -16,6 +16,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navDeepLink
 import com.bioguard.movil.datastore.UserPreferences
 import com.bioguard.movil.service.BioGuardMonitoringService
 import com.bioguard.movil.ui.components.BioGuardBottomNavBar
@@ -203,7 +204,13 @@ fun BioGuardApp(
                 }
 
                 // ── Dashboard ──
-                composable(Screen.DASHBOARD) {
+                composable(
+                    route = Screen.DASHBOARD,
+                    deepLinks = listOf(
+                        navDeepLink { uriPattern = "bioguard://open/dashboard" },
+                        navDeepLink { uriPattern = "https://bioguard.app/dashboard" }
+                    )
+                ) {
                     val dashboardViewModel: DashboardViewModel = hiltViewModel()
 
                     LaunchedEffect(openAlert, alertAutoShown) {
@@ -220,7 +227,13 @@ fun BioGuardApp(
                 }
 
                 // ── Analysis ──
-                composable(Screen.ANALYSIS) {
+                composable(
+                    route = Screen.ANALYSIS,
+                    deepLinks = listOf(
+                        navDeepLink { uriPattern = "bioguard://open/analysis" },
+                        navDeepLink { uriPattern = "https://bioguard.app/analysis" }
+                    )
+                ) {
                     val analysisViewModel: AnalysisViewModel = hiltViewModel()
                     AnalysisScreen(analysisViewModel = analysisViewModel)
                 }
@@ -237,7 +250,10 @@ fun BioGuardApp(
                 // ── Device ──
                 composable(Screen.DEVICE) {
                     val deviceViewModel: DeviceViewModel = hiltViewModel()
-                    DeviceScreen(deviceViewModel = deviceViewModel)
+                    DeviceScreen(
+                        deviceViewModel = deviceViewModel,
+                        onNavigateToWearableQr = { navController.navigate(Screen.WEARABLE_QR_SCANNER) }
+                    )
                 }
 
                 // ── Profile ──
@@ -256,12 +272,19 @@ fun BioGuardApp(
                         onNavigateToMedications = { navController.navigate(Screen.MEDICATIONS) },
                         onNavigateToCuidadores = { navController.navigate(Screen.CUIDADORES) },
                         onNavigateToSupport = { navController.navigate(Screen.SUPPORT) },
-                        onNavigateToSettings = { navController.navigate(Screen.SETTINGS) }
+                        onNavigateToSettings = { navController.navigate(Screen.SETTINGS) },
+                        onNavigateToDevice = { navController.navigate(Screen.DEVICE) }
                     )
                 }
 
                 // ── Alert ──
-                composable(Screen.ALERT) {
+                composable(
+                    route = Screen.ALERT,
+                    deepLinks = listOf(
+                        navDeepLink { uriPattern = "bioguard://open/alert" },
+                        navDeepLink { uriPattern = "https://bioguard.app/alert" }
+                    )
+                ) {
                     val alertViewModel: AlertViewModel = hiltViewModel()
                     AlertScreen(
                         alertViewModel = alertViewModel,
@@ -287,8 +310,33 @@ fun BioGuardApp(
                     )
                 }
 
+                composable(Screen.WEARABLE_QR_SCANNER) { backStackEntry ->
+                    val parentEntry = remember(backStackEntry) {
+                        navController.getBackStackEntry(Screen.DEVICE)
+                    }
+                    val deviceViewModel: DeviceViewModel = hiltViewModel(parentEntry)
+                    val deviceState by deviceViewModel.uiState.collectAsState()
+                    WearableQrScannerScreen(
+                        isProcessing = deviceState.isLoading,
+                        errorMessage = deviceState.error,
+                        onQrDetected = { raw ->
+                            if (deviceViewModel.vincularWearableDesdeQr(raw)) {
+                                navController.popBackStack()
+                            }
+                        },
+                        onBack = { navController.popBackStack() },
+                        onClearError = { deviceViewModel.clearMessages() }
+                    )
+                }
+
                 // ── Notifications ──
-                composable(Screen.NOTIFICATIONS) {
+                composable(
+                    route = Screen.NOTIFICATIONS,
+                    deepLinks = listOf(
+                        navDeepLink { uriPattern = "bioguard://open/notifications" },
+                        navDeepLink { uriPattern = "https://bioguard.app/notifications" }
+                    )
+                ) {
                     val notifViewModel: NotificacionViewModel = hiltViewModel()
                     NotificationsScreen(
                         notificacionViewModel = notifViewModel,
@@ -297,7 +345,13 @@ fun BioGuardApp(
                 }
 
                 // ── Medications ──
-                composable(Screen.MEDICATIONS) {
+                composable(
+                    route = Screen.MEDICATIONS,
+                    deepLinks = listOf(
+                        navDeepLink { uriPattern = "bioguard://open/medications" },
+                        navDeepLink { uriPattern = "https://bioguard.app/medications" }
+                    )
+                ) {
                     val medViewModel: MedicationViewModel = hiltViewModel()
                     MedicationScreen(
                         medicationViewModel = medViewModel,

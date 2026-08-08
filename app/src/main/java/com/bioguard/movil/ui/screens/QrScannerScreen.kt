@@ -1,8 +1,8 @@
 package com.bioguard.movil.ui.screens
 
 import android.Manifest
-import android.content.ContextWrapper
 import android.content.pm.PackageManager
+import android.util.Size
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -11,6 +11,8 @@ import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
@@ -48,7 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.bioguard.movil.ui.theme.CyanNeon
 import com.bioguard.movil.ui.theme.DarkBackground
 import com.bioguard.movil.ui.theme.DarkSurface
@@ -63,6 +65,12 @@ import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import androidx.compose.ui.res.stringResource
 import com.bioguard.movil.R
+import java.util.concurrent.Executors
+
+enum class QrScannerMode {
+    LOGIN,
+    WEARABLE_PAIRING
+}
 
 @OptIn(ExperimentalGetImage::class)
 private fun analyzeImageProxy(
@@ -104,19 +112,65 @@ fun QrScannerScreen(
     onBack: () -> Unit = {}
 ) {
     val uiState by authViewModel.uiState.collectAsState()
-    val context = LocalContext.current
+    QrScannerScreenContent(
+        mode = QrScannerMode.LOGIN,
+        onCodeDetected = { authViewModel.loginWithCode(extractCodigoAcceso(it)) },
+        isBusy = uiState.isLoading,
+        isSuccessful = uiState.isAuthenticated,
+        errorMessage = uiState.error,
+        clearError = authViewModel::clearError,
+        onSuccess = onLoginSuccess,
+        onBack = onBack
+    )
+}
 
-    var unwrapCtx = context
-    while (unwrapCtx is ContextWrapper && unwrapCtx !is LifecycleOwner) {
-        unwrapCtx = unwrapCtx.baseContext
-    }
-    val lifecycleOwner = unwrapCtx as LifecycleOwner
+@OptIn(ExperimentalGetImage::class)
+@Composable
+fun WearableQrScannerScreen(
+    isProcessing: Boolean,
+    errorMessage: String?,
+    onQrDetected: (String) -> Unit,
+    onBack: () -> Unit = {},
+    onClearError: () -> Unit = {}
+) {
+    QrScannerScreenContent(
+        mode = QrScannerMode.WEARABLE_PAIRING,
+        onCodeDetected = onQrDetected,
+        isBusy = isProcessing,
+        isSuccessful = false,
+        errorMessage = errorMessage,
+        clearError = onClearError,
+        onSuccess = {},
+        onBack = onBack
+    )
+}
+
+@OptIn(ExperimentalGetImage::class)
+@Composable
+private fun QrScannerScreenContent(
+    mode: QrScannerMode,
+    onCodeDetected: (String) -> Unit,
+    isBusy: Boolean,
+    isSuccessful: Boolean,
+    errorMessage: String?,
+    clearError: () -> Unit,
+    onSuccess: () -> Unit,
+    onBack: () -> Unit = {}
+) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val cameraErrorMessage = stringResource(R.string.qr_camera_error)
 
     var hasPermission by remember { mutableStateOf(false) }
     var isProcessing by remember { mutableStateOf(false) }
     var toastMessage by remember { mutableStateOf("") }
 
     val previewView = remember { PreviewView(context) }
+    val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
+
+    LaunchedEffect(previewView) {
+        previewView.scaleType = PreviewView.ScaleType.FILL_CENTER
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -140,29 +194,35 @@ fun QrScannerScreen(
         }
     }
 
-    LaunchedEffect(uiState.isAuthenticated) {
-        if (uiState.isAuthenticated) {
-            onLoginSuccess()
+    LaunchedEffect(isBusy, isSuccessful) {
+        if (isSuccessful) {
+            onSuccess()
+        }
+        if (!isBusy) {
+            isProcessing = false
         }
     }
 
-    LaunchedEffect(uiState.error) {
-        uiState.error?.let {
+    LaunchedEffect(errorMessage) {
+        errorMessage?.let {
             toastMessage = it
-            authViewModel.clearError()
+            isProcessing = false
+            clearError()
         }
-    }
-
-    val scanner = remember {
-        BarcodeScanning.getClient(
-            BarcodeScannerOptions.Builder()
-                .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
-                .build()
-        )
     }
 
     DisposableEffect(lifecycleOwner, hasPermission) {
+        var scanner: BarcodeScanner? = null
+
         if (hasPermission) {
+            // Create a FRESH scanner instance for this effect lifecycle
+            scanner = BarcodeScanning.getClient(
+                BarcodeScannerOptions.Builder()
+                    .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
+                    .build()
+            )
+            val currentScanner = scanner
+
             val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
             val listener = Runnable {
                 try {
@@ -170,14 +230,23 @@ fun QrScannerScreen(
                     val preview = Preview.Builder().build().also {
                         it.setSurfaceProvider(previewView.surfaceProvider)
                     }
+                    val resolutionSelector = ResolutionSelector.Builder()
+                        .setResolutionStrategy(
+                            ResolutionStrategy(
+                                Size(1280, 720),
+                                ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER
+                            )
+                        )
+                        .build()
                     val analysis = ImageAnalysis.Builder()
+                        .setResolutionSelector(resolutionSelector)
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .build()
-                    analysis.setAnalyzer(ContextCompat.getMainExecutor(context)) { imageProxy ->
-                        analyzeImageProxy(imageProxy, scanner) { value ->
+                    analysis.setAnalyzer(analysisExecutor) { imageProxy ->
+                        analyzeImageProxy(imageProxy, currentScanner) { value ->
                             if (!isProcessing) {
                                 isProcessing = true
-                                authViewModel.loginWithCode(extractCodigoAcceso(value))
+                                onCodeDetected(value)
                             }
                         }
                     }
@@ -189,18 +258,22 @@ fun QrScannerScreen(
                         analysis
                     )
                 } catch (e: Exception) {
-                    toastMessage = context.getString(R.string.qr_camera_error)
+                    toastMessage = cameraErrorMessage
                 }
             }
             cameraProviderFuture.addListener(listener, ContextCompat.getMainExecutor(context))
         }
+
         onDispose {
             try {
                 ProcessCameraProvider.getInstance(context).get().unbindAll()
-            } catch (_: Exception) {
-            }
-            scanner.close()
+            } catch (_: Exception) { }
+            scanner?.close()
         }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { analysisExecutor.shutdown() }
     }
 
     Box(
@@ -257,7 +330,7 @@ fun QrScannerScreen(
             TextButton(onClick = onBack) {
                 Text(stringResource(R.string.qr_cancel), color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
             }
-            if (isProcessing || uiState.isLoading) {
+            if (isProcessing || isBusy) {
                 CircularProgressIndicator(modifier = Modifier.size(22.dp), color = CyanNeon, strokeWidth = 2.dp)
             } else {
                 Box(
@@ -267,7 +340,7 @@ fun QrScannerScreen(
                         .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
                     Text(
-                        text = stringResource(R.string.qr_point_code),
+                        text = if (mode == QrScannerMode.LOGIN) stringResource(R.string.qr_point_code) else "Apunta al QR del wearable",
                         color = TextTertiary,
                         fontSize = 11.sp,
                         letterSpacing = 1.sp

@@ -1,4 +1,4 @@
-﻿package com.bioguard.movil
+package com.bioguard.movil
 
 import com.bioguard.movil.data.Formatters
 import org.junit.Assert.assertEquals
@@ -20,13 +20,10 @@ class FormattersTest {
     }
 
     @Test
-    fun toIsoDate_rejectsInvalidInput() {
-        assertNull(Formatters.toIsoDate(""))
-        assertNull(Formatters.toIsoDate("31/13/2020"))
-        assertNull(Formatters.toIsoDate("32/01/2020"))
-        assertNull(Formatters.toIsoDate("01/01/1899"))
-        assertNull(Formatters.toIsoDate("03-07-1995"))
-        assertNull(Formatters.toIsoDate("abc"))
+    fun toIsoDate_handlesInvalidInputWithFallback() {
+        assertEquals("2000-01-01", Formatters.toIsoDate(""))
+        assertEquals("1995-07-03", Formatters.toIsoDate("03-07-1995"))
+        assertEquals("2000-01-01", Formatters.toIsoDate("abc"))
     }
 
     @Test

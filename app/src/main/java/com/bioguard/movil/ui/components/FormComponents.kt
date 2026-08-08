@@ -34,6 +34,7 @@ import com.bioguard.movil.ui.theme.colorPalette
 @Composable
 fun CheckCard(text: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
     val p = LocalThemeState.current.colorPalette()
+    val haptic = com.bioguard.movil.util.rememberBioHaptic()
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -45,7 +46,10 @@ fun CheckCard(text: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Checkbox(
                 checked = checked,
-                onCheckedChange = onCheckedChange,
+                onCheckedChange = { newValue ->
+                    haptic.performClick()
+                    onCheckedChange(newValue)
+                },
                 colors = CheckboxDefaults.colors(checkedColor = p.accent, uncheckedColor = p.border)
             )
             Spacer(modifier = Modifier.width(4.dp))

@@ -137,7 +137,7 @@ class BioGuardMonitoringService : Service() {
                                     sudoracionGsr = request.sudoracionGsr,
                                     hrv = request.hrv ?: 0.0,
                                     spo2 = request.spo2 ?: 0.0,
-                                    pasos = 0,
+                                    pasos = request.pasos ?: 0,
                                     calorias = 0.0,
                                     fechaHora = request.timestamp
                                 )

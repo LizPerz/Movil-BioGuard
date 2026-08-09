@@ -90,6 +90,7 @@ data class LecturaSensorRequest(
     @SerializedName("sudoracionGsr") val sudoracionGsr: Double,
     @SerializedName("hrv") val hrv: Double? = null,
     @SerializedName("spo2") val spo2: Double? = null,
+    @SerializedName("pasos") val pasos: Int? = null,
     @SerializedName("timestamp") val timestamp: String
 )
 data class LecturaSensorResponse(

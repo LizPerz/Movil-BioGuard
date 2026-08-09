@@ -2,6 +2,7 @@
 
 import com.bioguard.movil.data.Resource
 import com.bioguard.movil.data.local.PendingDataDao
+import com.bioguard.movil.data.local.CachedDataDao
 import com.bioguard.movil.data.toUserMessage
 import com.bioguard.movil.datastore.SecureTokenStorage
 import com.bioguard.movil.datastore.UserPreferences
@@ -29,7 +30,8 @@ class AuthRepository @Inject constructor(
     private val api: ApiService,
     private val prefs: UserPreferences,
     private val tokenStorage: SecureTokenStorage,
-    private val pendingDataDao: PendingDataDao
+    private val pendingDataDao: PendingDataDao,
+    private val cachedDataDao: CachedDataDao
 ) {
 
     init {
@@ -99,6 +101,9 @@ class AuthRepository @Inject constructor(
         tokenStorage.saveAuthToken(response.token)
         response.refreshToken?.let { tokenStorage.saveRefreshToken(it) }
         prefs.saveUserData(response.userId, response.nombre, response.rol)
+        if (response.rol.equals("paciente", ignoreCase = true)) {
+            prefs.savePatientId(response.userId)
+        }
     }
 
     private suspend fun persistSession(response: LoginCodigoResponse) {
@@ -182,5 +187,8 @@ class AuthRepository @Inject constructor(
         pendingDataDao.clearGps()
         pendingDataDao.clearEvents()
         pendingDataDao.clearAlerts()
+        cachedDataDao.clearAllReadings()
+        cachedDataDao.clearAllEvents()
+        cachedDataDao.clearAllAlerts()
     }
 }

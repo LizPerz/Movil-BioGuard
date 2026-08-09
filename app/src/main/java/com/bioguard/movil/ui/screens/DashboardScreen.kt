@@ -29,7 +29,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,6 +56,7 @@ import com.bioguard.movil.ui.theme.YellowNeon
 import com.bioguard.movil.ui.theme.colorPalette
 import com.bioguard.movil.ui.viewmodel.DashboardViewModel
 import com.bioguard.movil.util.rememberBioHaptic
+import java.time.Instant
 
 data class VitalDetailData(
     val title: String,
@@ -69,6 +69,7 @@ data class VitalDetailData(
 @Composable
 fun DashboardScreen(
     dashboardViewModel: DashboardViewModel,
+    @Suppress("UNUSED_PARAMETER")
     onPendingAlert: () -> Unit = {}
 ) {
     val p = LocalThemeState.current.colorPalette()
@@ -76,12 +77,6 @@ fun DashboardScreen(
     val haptic = rememberBioHaptic()
 
     var activeVitalDetail by remember { mutableStateOf<VitalDetailData?>(null) }
-
-    LaunchedEffect(uiState.summary?.alertasPendientesCount) {
-        if ((uiState.summary?.alertasPendientesCount ?: 0) > 0) {
-            onPendingAlert()
-        }
-    }
 
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseAlpha by infiniteTransition.animateFloat(
@@ -94,7 +89,12 @@ fun DashboardScreen(
         label = "pulse"
     )
 
-    val ultimaLectura = uiState.summary?.ultimaLectura
+    val ultimaLectura = uiState.lecturasRecientes.firstOrNull()
+    val isRecentData = ultimaLectura?.timestamp?.let { timestamp ->
+        runCatching { Instant.parse(timestamp).toEpochMilli() }
+            .getOrNull()
+            ?.let { System.currentTimeMillis() - it in 0..120_000L }
+    } == true
     val lastTemp = ultimaLectura?.temperaturaC
     val lastGsr = ultimaLectura?.sudoracionGsr
     val lastPulse = ultimaLectura?.pulsoBpm
@@ -200,7 +200,7 @@ fun DashboardScreen(
         ) {
             CircularProgressIndicator(color = p.accent)
         }
-    } else if (uiState.error != null && uiState.summary == null) {
+    } else if (uiState.error != null && uiState.lecturasRecientes.isEmpty()) {
         ErrorRetryBox(
             message = uiState.error,
             onRetry = { dashboardViewModel.loadDashboard() }
@@ -242,7 +242,7 @@ fun DashboardScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        val hasLiveData = uiState.summary?.ultimaLectura != null
+                        val hasLiveData = isRecentData
                         Row(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(16.dp))

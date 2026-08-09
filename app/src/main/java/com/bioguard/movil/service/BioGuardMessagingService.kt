@@ -53,12 +53,16 @@ class BioGuardMessagingService : FirebaseMessagingService() {
             sendCriticalNotification(title, message)
             serviceScope.launch {
                 try {
-                    val bpm = data["bpm"]?.toFloatOrNull() ?: 120f
-                    val temp = data["temperatura"]?.toFloatOrNull() ?: 38.5f
-                    val gsr = data["gsr"]?.toFloatOrNull() ?: 8.0f
-                    val probability = data["probability"]?.toFloatOrNull() ?: 0.95f
+                    val bpm = data["bpm"]?.toFloatOrNull()
+                    val temp = data["temperatura"]?.toFloatOrNull()
+                    val gsr = data["gsr"]?.toFloatOrNull()
+                    val probability = data["probability"]?.toFloatOrNull()
+                    if (bpm == null || temp == null || gsr == null || probability == null) {
+                        android.util.Log.w("BIOGUARD_FCM", "Critical push without biometric payload; watch command skipped")
+                        return@launch
+                    }
                     
-                    val connector = WearableConnector(this@BioGuardMessagingService, {}, {}, {}, {})
+                    val connector = WearableConnector(this@BioGuardMessagingService, { true }, {}, {}, {})
                     try {
                         connector.register()
                         kotlinx.coroutines.delay(1000)

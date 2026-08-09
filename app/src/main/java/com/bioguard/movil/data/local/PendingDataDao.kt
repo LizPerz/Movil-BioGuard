@@ -8,6 +8,18 @@ import androidx.room.Query
 @Dao
 interface PendingDataDao {
 
+    @Query("SELECT COUNT(*) FROM pending_readings")
+    suspend fun countPendingReadings(): Int
+
+    @Query("SELECT COUNT(*) FROM pending_gps")
+    suspend fun countPendingGps(): Int
+
+    @Query("SELECT COUNT(*) FROM pending_events")
+    suspend fun countPendingEvents(): Int
+
+    @Query("SELECT COUNT(*) FROM pending_alerts")
+    suspend fun countPendingAlerts(): Int
+
     // Sensor Readings
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertReading(reading: PendingReadingEntity): Long

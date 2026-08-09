@@ -18,6 +18,7 @@ import com.bioguard.movil.data.repository.DispositivoRepository
 import com.bioguard.movil.data.repository.PacienteRepository
 import com.bioguard.movil.datastore.UserPreferences
 import com.bioguard.movil.network.InfoCompletaDispositivo
+import com.bioguard.movil.service.BioGuardMonitoringService
 import com.bioguard.movil.service.WearableConnector
 import com.bioguard.movil.service.WearableConnectionState
 import com.bioguard.movil.service.WearableDeviceInfo
@@ -38,6 +39,7 @@ data class DispositivoScanItem(
     val id: String,
     val nombre: String,
     val macAddress: String,
+    val wearNodeId: String? = null,
     val rssi: Int = -60,
     val tipo: String = "Bluetooth LE / WearOS",
     val bateria: Int = 100
@@ -49,6 +51,7 @@ private fun parseWearableQrPayload(raw: String): DispositivoScanItem? {
         id = payload.address,
         nombre = payload.name,
         macAddress = payload.address,
+        wearNodeId = payload.nodeId,
         rssi = -45,
         tipo = "Wearable QR / Bluetooth"
     )
@@ -128,10 +131,11 @@ class DeviceViewModel @Inject constructor(
         if (wearableConnector == null) {
             wearableConnector = WearableConnector(
                 context = getApplication(),
-                onReadingReceived = {},
+                onReadingReceived = { true },
                 onEventReceived = {},
                 onAlertReceived = {},
-                onHeartbeatReceived = {}
+                onHeartbeatReceived = {},
+                trustedNodeIdProvider = { prefs.deviceNodeId.first() }
             )
             wearableConnector?.register()
         }
@@ -163,7 +167,8 @@ class DeviceViewModel @Inject constructor(
                 is Resource.Success -> {
                     val info = result.data
                     val isPaired = storedDeviceId != null || info?.reloj?.modelo != null
-                    val isConn = info?.reloj?.conectado ?: false
+                    val isConn = wearableConnector?.connectionState?.value == WearableConnectionState.CONNECTED ||
+                        (storedConnected && storedDeviceId != null)
                     val name = info?.reloj?.modelo ?: storedDeviceName
                     val devId = storedDeviceId
 
@@ -212,6 +217,7 @@ class DeviceViewModel @Inject constructor(
                             id = device.nodeId,
                             nombre = device.displayName,
                             macAddress = device.nodeId,
+                            wearNodeId = device.nodeId,
                             rssi = if (device.isNearby) -45 else -70,
                             tipo = if (device.isNearby) "WearOS (Cercano)" else "WearOS (Conectado)",
                             bateria = 100
@@ -351,39 +357,48 @@ class DeviceViewModel @Inject constructor(
     fun vincularDispositivo(item: DispositivoScanItem) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
-            prefs.saveDeviceData(item.id, item.nombre, isConnected = true)
+            prefs.saveDeviceData(
+                deviceId = item.id,
+                deviceName = item.nombre,
+                isConnected = false,
+                nodeId = item.wearNodeId
+            )
 
             when (val result = repository.vincularDispositivo(item.nombre, item.macAddress)) {
                 is Resource.Success -> {
+                    val connected = reconnectAfterPairing()
+                    prefs.saveDeviceData(item.id, item.nombre, connected, item.wearNodeId)
+                    if (connected) BioGuardMonitoringService.start(getApplication())
                     _uiState.update {
                         it.copy(
                             isLoading = false,
                             isPaired = true,
-                            isConnected = true,
+                            isConnected = connected,
                             connectedDeviceName = item.nombre,
                             connectedDeviceId = item.id,
                             dispositivosDisponibles = emptyList(),
                             successMessage = "Dispositivo '${item.nombre}' vinculado con éxito"
                         )
                     }
-                    loadDispositivo()
                 }
                 is Resource.Error -> {
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            isPaired = true,
-                            isConnected = true,
-                            connectedDeviceName = item.nombre,
-                            connectedDeviceId = item.id,
-                            dispositivosDisponibles = emptyList(),
-                            successMessage = "Dispositivo '${item.nombre}' vinculado localmente"
+                            isPaired = false,
+                            isConnected = false,
+                            error = result.message
                         )
                     }
                 }
                 is Resource.Loading -> {}
             }
         }
+    }
+
+    private suspend fun reconnectAfterPairing(): Boolean {
+        val device = getOrCreateWearableConnector().discoverAndConnect(forceWearOsRetry = true)
+        return device != null
     }
 
     fun vincularWearableDesdeQr(rawPayload: String): Boolean {
@@ -400,6 +415,7 @@ class DeviceViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             prefs.clearDeviceData()
+            BioGuardMonitoringService.stop(getApplication())
             _uiState.update {
                 it.copy(
                     isLoading = false,

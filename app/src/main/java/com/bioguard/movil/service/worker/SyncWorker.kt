@@ -45,17 +45,12 @@ class SyncWorker(
                 api.sendLecturasBatch(requests)
                 db.pendingDataDao().deleteReadings(pendingReadings.map { it.id })
             } catch (e: HttpException) {
-                // 4xx errors mean invalid payload (e.g. 400 Bad Request) -> delete to avoid infinite loop
-                if (e.code() in 400..499) {
-                    db.pendingDataDao().deleteReadings(pendingReadings.map { it.id })
-                } else {
-                    hasTransientFailures = true
-                }
+                // Preserve the evidence locally until a successful server acknowledgement.
+                hasTransientFailures = true
             } catch (e: IOException) {
                 hasTransientFailures = true
             } catch (_: Exception) {
-                // Unexpected errors -> purge to prevent lock
-                db.pendingDataDao().deleteReadings(pendingReadings.map { it.id })
+                hasTransientFailures = true
             }
         }
 
@@ -73,15 +68,11 @@ class SyncWorker(
                 api.sendTrackingBatch(requests)
                 db.pendingDataDao().deleteGps(pendingGps.map { it.id })
             } catch (e: HttpException) {
-                if (e.code() in 400..499) {
-                    db.pendingDataDao().deleteGps(pendingGps.map { it.id })
-                } else {
-                    hasTransientFailures = true
-                }
+                hasTransientFailures = true
             } catch (e: IOException) {
                 hasTransientFailures = true
             } catch (_: Exception) {
-                db.pendingDataDao().deleteGps(pendingGps.map { it.id })
+                hasTransientFailures = true
             }
         }
 
@@ -89,7 +80,6 @@ class SyncWorker(
         val pendingEvents = db.pendingDataDao().getPendingEvents(50)
         if (pendingEvents.isNotEmpty()) {
             val sent = mutableListOf<Long>()
-            val discard = mutableListOf<Long>()
             for (event in pendingEvents) {
                 try {
                     api.sendEvento(
@@ -103,22 +93,20 @@ class SyncWorker(
                     )
                     sent.add(event.id)
                 } catch (e: HttpException) {
-                    if (e.code() in 400..499) discard.add(event.id) else hasTransientFailures = true
+                    hasTransientFailures = true
                 } catch (e: IOException) {
                     hasTransientFailures = true
                 } catch (_: Exception) {
-                    discard.add(event.id)
+                    hasTransientFailures = true
                 }
             }
             if (sent.isNotEmpty()) db.pendingDataDao().deleteEvents(sent)
-            if (discard.isNotEmpty()) db.pendingDataDao().deleteEvents(discard)
         }
 
         // 4. Sync alerts
         val pendingAlerts = db.pendingDataDao().getPendingAlerts(50)
         if (pendingAlerts.isNotEmpty()) {
             val sent = mutableListOf<Long>()
-            val discard = mutableListOf<Long>()
             for (alert in pendingAlerts) {
                 try {
                     api.crearAlerta(
@@ -132,15 +120,14 @@ class SyncWorker(
                     )
                     sent.add(alert.id)
                 } catch (e: HttpException) {
-                    if (e.code() in 400..499) discard.add(alert.id) else hasTransientFailures = true
+                    hasTransientFailures = true
                 } catch (e: IOException) {
                     hasTransientFailures = true
                 } catch (_: Exception) {
-                    discard.add(alert.id)
+                    hasTransientFailures = true
                 }
             }
             if (sent.isNotEmpty()) db.pendingDataDao().deleteAlerts(sent)
-            if (discard.isNotEmpty()) db.pendingDataDao().deleteAlerts(discard)
         }
 
         return if (hasTransientFailures) Result.retry() else Result.success()

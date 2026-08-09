@@ -111,10 +111,9 @@ abstract class BioGuardDatabase : RoomDatabase() {
                 
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
-                    BioGuardDatabase::class.java,
-                    "bioguard_offline_db"
+                BioGuardDatabase::class.java,
+                "bioguard_offline_db"
                 ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
-                    .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance
                 instance

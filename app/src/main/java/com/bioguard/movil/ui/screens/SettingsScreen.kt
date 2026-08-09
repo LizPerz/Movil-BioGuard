@@ -137,8 +137,8 @@ fun SettingsScreen(
                 Slider(
                     value = uiState.syncIntervalMinutes.toFloat(),
                     onValueChange = { settingsViewModel.updateSyncInterval(it.toInt()) },
-                    valueRange = 15f..120f,
-                    steps = 6, // 15, 30, 45, 60, 75, 90, 105, 120
+                    valueRange = 5f..120f,
+                    steps = 22,
                     colors = SliderDefaults.colors(
                         thumbColor = p.accent,
                         activeTrackColor = p.accent,
@@ -159,19 +159,20 @@ fun SettingsScreen(
                 .border(1.dp, p.border, RoundedCornerShape(12.dp))
                 .padding(16.dp)
         ) {
-            Text(
-                text = stringResource(R.string.settings_batch_title),
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = p.textPrimary
-            )
-            Text(
-                text = stringResource(R.string.settings_batch_desc),
-                fontSize = 12.sp,
-                color = p.textSecondary,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = stringResource(R.string.settings_batch_title), fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = p.textPrimary)
+                    Text(text = stringResource(R.string.settings_batch_desc), fontSize = 12.sp, color = p.textSecondary)
+                }
+                Switch(
+                    checked = uiState.isBatchSyncEnabled,
+                    onCheckedChange = settingsViewModel::updateBatchSyncEnabled,
+                    colors = SwitchDefaults.colors(checkedThumbColor = p.accent, checkedTrackColor = p.accent.copy(alpha = 0.5f), uncheckedThumbColor = p.textSecondary, uncheckedTrackColor = p.border)
+                )
+            }
 
+            if (uiState.isBatchSyncEnabled) {
+            Spacer(modifier = Modifier.height(12.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -196,6 +197,15 @@ fun SettingsScreen(
                 steps = 22,
                 colors = SliderDefaults.colors(thumbColor = p.accent, activeTrackColor = p.accent, inactiveTrackColor = p.border)
             )
+            Text(text = stringResource(R.string.settings_end_hour), fontSize = 12.sp, color = p.textSecondary)
+            Slider(
+                value = uiState.batchEndHour.toFloat(),
+                onValueChange = { settingsViewModel.updateBatchHours(uiState.batchStartHour, it.toInt()) },
+                valueRange = 0f..23f,
+                steps = 22,
+                colors = SliderDefaults.colors(thumbColor = p.accent, activeTrackColor = p.accent, inactiveTrackColor = p.border)
+            )
+            }
         }
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -270,6 +280,23 @@ fun SettingsScreen(
         }
 
         Spacer(modifier = Modifier.height(30.dp))
+
+        Button(
+            onClick = settingsViewModel::syncNow,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = p.surface),
+            border = BorderStroke(1.dp, p.accent),
+            shape = RoundedCornerShape(8.dp),
+            enabled = !uiState.isManualSyncing
+        ) {
+            if (uiState.isManualSyncing) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), color = p.accent)
+            } else {
+                Text(text = "Sincronizar ahora (${uiState.pendingItems} pendientes)", color = p.textPrimary, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
 
         // BOTÓN DE GUARDAR
         Button(

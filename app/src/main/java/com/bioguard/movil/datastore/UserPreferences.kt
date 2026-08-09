@@ -28,6 +28,7 @@ class UserPreferences(private val context: Context) {
         val SYNC_INTERVAL_MINUTES = intPreferencesKey("sync_interval_minutes")
         val BATCH_START_HOUR = intPreferencesKey("batch_start_hour")
         val BATCH_END_HOUR = intPreferencesKey("batch_end_hour")
+        val IS_BATCH_SYNC_ENABLED = booleanPreferencesKey("is_batch_sync_enabled")
         val IS_NIGHT_GUARDIAN_ENABLED = booleanPreferencesKey("is_night_guardian_enabled")
         val NIGHT_GUARDIAN_START_HOUR = intPreferencesKey("night_guardian_start_hour")
         val NIGHT_GUARDIAN_END_HOUR = intPreferencesKey("night_guardian_end_hour")
@@ -35,6 +36,7 @@ class UserPreferences(private val context: Context) {
         // Dispositivo vinculado
         val DEVICE_ID = stringPreferencesKey("device_id")
         val DEVICE_NAME = stringPreferencesKey("device_name")
+        val DEVICE_NODE_ID = stringPreferencesKey("device_node_id")
         val IS_DEVICE_CONNECTED = booleanPreferencesKey("is_device_connected")
 
         // Perfil Médico / Biometría
@@ -59,12 +61,14 @@ class UserPreferences(private val context: Context) {
     val syncIntervalMinutes: Flow<Int> = context.dataStore.data.map { it[Keys.SYNC_INTERVAL_MINUTES] ?: 15 }
     val batchStartHour: Flow<Int> = context.dataStore.data.map { it[Keys.BATCH_START_HOUR] ?: 2 }
     val batchEndHour: Flow<Int> = context.dataStore.data.map { it[Keys.BATCH_END_HOUR] ?: 6 }
+    val isBatchSyncEnabled: Flow<Boolean> = context.dataStore.data.map { it[Keys.IS_BATCH_SYNC_ENABLED] ?: false }
     val isNightGuardianEnabled: Flow<Boolean> = context.dataStore.data.map { it[Keys.IS_NIGHT_GUARDIAN_ENABLED] ?: true }
     val nightGuardianStartHour: Flow<Int> = context.dataStore.data.map { it[Keys.NIGHT_GUARDIAN_START_HOUR] ?: 22 }
     val nightGuardianEndHour: Flow<Int> = context.dataStore.data.map { it[Keys.NIGHT_GUARDIAN_END_HOUR] ?: 6 }
 
     val deviceId: Flow<String?> = context.dataStore.data.map { it[Keys.DEVICE_ID] }
     val deviceName: Flow<String?> = context.dataStore.data.map { it[Keys.DEVICE_NAME] }
+    val deviceNodeId: Flow<String?> = context.dataStore.data.map { it[Keys.DEVICE_NODE_ID] }
     val isDeviceConnected: Flow<Boolean> = context.dataStore.data.map { it[Keys.IS_DEVICE_CONNECTED] ?: false }
 
     val patientBirthDate: Flow<String?> = context.dataStore.data.map { it[Keys.PATIENT_BIRTH_DATE] }
@@ -116,11 +120,17 @@ class UserPreferences(private val context: Context) {
         }
     }
 
-    suspend fun saveDeviceData(deviceId: String, deviceName: String, isConnected: Boolean = true) {
+    suspend fun saveDeviceData(
+        deviceId: String,
+        deviceName: String,
+        isConnected: Boolean = true,
+        nodeId: String? = null
+    ) {
         context.dataStore.edit { prefs ->
             prefs[Keys.DEVICE_ID] = deviceId
             prefs[Keys.DEVICE_NAME] = deviceName
             prefs[Keys.IS_DEVICE_CONNECTED] = isConnected
+            nodeId?.takeIf { it.isNotBlank() }?.let { prefs[Keys.DEVICE_NODE_ID] = it }
         }
     }
 
@@ -128,6 +138,7 @@ class UserPreferences(private val context: Context) {
         context.dataStore.edit { prefs ->
             prefs.remove(Keys.DEVICE_ID)
             prefs.remove(Keys.DEVICE_NAME)
+            prefs.remove(Keys.DEVICE_NODE_ID)
             prefs[Keys.IS_DEVICE_CONNECTED] = false
         }
     }
@@ -136,13 +147,15 @@ class UserPreferences(private val context: Context) {
         isSyncEnabled: Boolean,
         syncIntervalMinutes: Int,
         batchStartHour: Int,
-        batchEndHour: Int
+        batchEndHour: Int,
+        isBatchSyncEnabled: Boolean
     ) {
         context.dataStore.edit { prefs ->
             prefs[Keys.IS_SYNC_ENABLED] = isSyncEnabled
             prefs[Keys.SYNC_INTERVAL_MINUTES] = syncIntervalMinutes
             prefs[Keys.BATCH_START_HOUR] = batchStartHour
             prefs[Keys.BATCH_END_HOUR] = batchEndHour
+            prefs[Keys.IS_BATCH_SYNC_ENABLED] = isBatchSyncEnabled
         }
     }
 
@@ -162,4 +175,3 @@ class UserPreferences(private val context: Context) {
         context.dataStore.edit { it.clear() }
     }
 }
-

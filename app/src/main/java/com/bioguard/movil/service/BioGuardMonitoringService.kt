@@ -9,6 +9,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.BatteryManager
 import android.os.Build
 import android.os.IBinder
@@ -17,6 +19,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.bioguard.movil.data.local.BioGuardDatabase
+import com.bioguard.movil.data.local.CachedReadingEntity
 import com.bioguard.movil.data.local.PendingAlertEntity
 import com.bioguard.movil.data.local.PendingEventEntity
 import com.bioguard.movil.data.local.PendingGpsEntity
@@ -39,8 +42,11 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
 import java.time.Instant
+import java.util.UUID
 
 class BioGuardMonitoringService : Service() {
 
@@ -54,11 +60,13 @@ class BioGuardMonitoringService : Service() {
     @Volatile private var ultimaLatitud: Double? = null
     @Volatile private var ultimaLongitud: Double? = null
     private var riskThresholdsSent = false
+    private val cloudSyncMutex = Mutex()
 
     companion object {
         private const val TAG = "BioGuardMonitoring"
         private const val CHANNEL_ID = "bioguard_estandar"
         private const val NOTIFICATION_ID = 991
+        private const val ACTION_SYNC_NOW = "com.bioguard.movil.action.SYNC_NOW"
 
         fun start(context: Context) {
             val intent = Intent(context, BioGuardMonitoringService::class.java)
@@ -72,6 +80,15 @@ class BioGuardMonitoringService : Service() {
         fun stop(context: Context) {
             val intent = Intent(context, BioGuardMonitoringService::class.java)
             context.stopService(intent)
+        }
+
+        fun requestCloudSync(context: Context) {
+            val intent = Intent(context, BioGuardMonitoringService::class.java).setAction(ACTION_SYNC_NOW)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
         }
     }
 
@@ -97,21 +114,35 @@ class BioGuardMonitoringService : Service() {
         wearableConnector = WearableConnector(
             context = this,
             onReadingReceived = { request ->
-                serviceScope.launch {
-                    try {
-                        database.pendingDataDao().insertReading(
-                            PendingReadingEntity(
-                                pulsoBpm = request.pulsoBpm,
-                                temperaturaC = request.temperaturaC,
-                                sudoracionGsr = request.sudoracionGsr,
-                                hrv = request.hrv,
-                                spo2 = request.spo2,
-                                timestamp = request.timestamp
+                val patientId = prefs.patientId.first()
+                try {
+                    database.pendingDataDao().insertReading(
+                        PendingReadingEntity(
+                            pulsoBpm = request.pulsoBpm,
+                            temperaturaC = request.temperaturaC,
+                            sudoracionGsr = request.sudoracionGsr,
+                            hrv = request.hrv,
+                            spo2 = request.spo2,
+                            timestamp = request.timestamp
+                        )
+                    )
+                    if (patientId != null) {
+                        database.cachedDataDao().insertReadings(
+                            listOf(
+                                CachedReadingEntity(
+                                    id = UUID.randomUUID().toString(),
+                                    pacienteId = patientId,
+                                    pulsoBpm = request.pulsoBpm,
+                                    temperaturaC = request.temperaturaC,
+                                    sudoracionGsr = request.sudoracionGsr,
+                                    hrv = request.hrv ?: 0.0,
+                                    spo2 = request.spo2 ?: 0.0,
+                                    pasos = 0,
+                                    calorias = 0.0,
+                                    fechaHora = request.timestamp
+                                )
                             )
                         )
-                        Log.d(TAG, "Lectura del reloj persistida en base de datos local")
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Error encolando lectura del reloj", e)
                     }
                     evaluarRiesgoOffline(
                         request.pulsoBpm,
@@ -120,6 +151,11 @@ class BioGuardMonitoringService : Service() {
                         request.hrv ?: 55.0,
                         request.spo2 ?: 98.0
                     )
+                    Log.d(TAG, "Lectura del reloj persistida en base de datos local")
+                    true
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error encolando lectura del reloj", e)
+                    false
                 }
             },
             onEventReceived = { request ->
@@ -130,21 +166,13 @@ class BioGuardMonitoringService : Service() {
                         return@launch
                     }
                     val updated = request.copy(pacienteId = patientId)
-                    try {
-                        api.sendEvento(updated)
-                    } catch (e: Exception) {
-                        Log.w(TAG, "No se pudo enviar evento del reloj; encolando", e)
-                        database.pendingDataDao().insertEvent(
-                            PendingEventEntity(
-                                pacienteId = patientId,
-                                dispositivoMac = updated.dispositivoMac,
-                                nivelRiesgo = updated.nivelRiesgo,
-                                probabilidadMl = updated.probabilidadMl,
-                                descripcion = updated.descripcion,
-                                timestamp = Instant.now().toString()
-                            )
+                    database.pendingDataDao().insertEvent(
+                        PendingEventEntity(
+                            pacienteId = patientId, dispositivoMac = updated.dispositivoMac,
+                            nivelRiesgo = updated.nivelRiesgo, probabilidadMl = updated.probabilidadMl,
+                            descripcion = updated.descripcion, timestamp = Instant.now().toString()
                         )
-                    }
+                    )
                 }
             },
             onAlertReceived = { request ->
@@ -159,21 +187,13 @@ class BioGuardMonitoringService : Service() {
                         latitud = request.latitud ?: ultimaLatitud,
                         longitud = request.longitud ?: ultimaLongitud
                     )
-                    try {
-                        api.crearAlerta(conUbicacion)
-                    } catch (e: Exception) {
-                        Log.w(TAG, "No se pudo enviar alerta del reloj; encolando", e)
-                        database.pendingDataDao().insertAlert(
-                            PendingAlertEntity(
-                                pacienteId = patientId,
-                                tipoAlerta = conUbicacion.tipoAlerta,
-                                descripcion = conUbicacion.descripcion,
-                                latitud = conUbicacion.latitud,
-                                longitud = conUbicacion.longitud,
-                                timestamp = Instant.now().toString()
-                            )
+                    database.pendingDataDao().insertAlert(
+                        PendingAlertEntity(
+                            pacienteId = patientId, tipoAlerta = conUbicacion.tipoAlerta,
+                            descripcion = conUbicacion.descripcion, latitud = conUbicacion.latitud,
+                            longitud = conUbicacion.longitud, timestamp = Instant.now().toString()
                         )
-                    }
+                    )
                 }
             },
             onHeartbeatReceived = { request ->
@@ -190,7 +210,8 @@ class BioGuardMonitoringService : Service() {
                         Log.w(TAG, "No se pudo enviar heartbeat del reloj", e)
                     }
                 }
-            }
+            },
+            trustedNodeIdProvider = { prefs.deviceNodeId.first() }
         )
         wearableConnector.register()
 
@@ -206,6 +227,9 @@ class BioGuardMonitoringService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_SYNC_NOW) {
+            serviceScope.launch { syncAllPending("manual") }
+        }
         return START_STICKY
     }
 
@@ -286,7 +310,7 @@ class BioGuardMonitoringService : Service() {
                         HeartbeatRequest(
                             pacienteId = patientId,
                             bateria = obtenerBateriaTelefono(),
-                            sensoresActivos = listOf("pulso", "temperatura", "sudoracion", "hrv", "spo2")
+                            sensoresActivos = emptyList()
                         )
                     )
                 } catch (e: Exception) {
@@ -300,7 +324,7 @@ class BioGuardMonitoringService : Service() {
             while (true) {
                 val isSync = prefs.isSyncEnabled.first()
                 val intervalMin = prefs.syncIntervalMinutes.first()
-                if (isSync) {
+                if (false && isSync) {
                     try {
                         syncPendingReadings()
                     } catch (e: Exception) {
@@ -316,7 +340,7 @@ class BioGuardMonitoringService : Service() {
         // Loop: Sincronización en lotes pesados (Batch window)
         serviceScope.launch {
             while (true) {
-                if (isInBatchWindow()) {
+                if (false && isInBatchWindow()) {
                     try {
                         Log.d(TAG, "Ventana de transmision por lotes activa. Sincronizando...")
                         syncPendingReadings()
@@ -334,7 +358,7 @@ class BioGuardMonitoringService : Service() {
         // Loop: Sincronizar eventos y alertas individuales (Frecuente)
         serviceScope.launch {
             while (true) {
-                try {
+                if (false) try {
                     syncPendingEvents()
                     syncPendingAlerts()
                 } catch (e: Exception) {
@@ -344,15 +368,29 @@ class BioGuardMonitoringService : Service() {
             }
         }
 
+        serviceScope.launch {
+            while (true) {
+                val intervalMs = prefs.syncIntervalMinutes.first().coerceIn(5, 120) * 60_000L
+                val batchAllowed = !prefs.isBatchSyncEnabled.first() || isInBatchWindow()
+                if (prefs.isSyncEnabled.first() && batchAllowed && hasValidatedInternet()) {
+                    syncAllPending("automatico")
+                }
+                delay(intervalMs)
+            }
+        }
+
         // Loop: GPS real del teléfono (Guardián Nocturno consciente)
         serviceScope.launch {
             while (true) {
-                val delayTime = if (isInNightGuardianWindow()) {
-                    5 * 60 * 1000L
-                } else {
-                    30 * 1000L
+                if (!prefs.isNightGuardianEnabled.first()) {
+                    delay(15 * 60 * 1000L)
+                    continue
                 }
-                delay(delayTime)
+                if (!isInNightGuardianWindow()) {
+                    delay(15 * 60 * 1000L)
+                    continue
+                }
+                delay(5 * 60 * 1000L)
                 val patientId = prefs.patientId.first()
                 if (patientId != null) {
                     enviarUbicacionReal()
@@ -407,8 +445,14 @@ class BioGuardMonitoringService : Service() {
                 esEmergencia = false
             )
             try {
-                api.sendTracking(gpsRequest)
-                syncPendingGps()
+                database.pendingDataDao().insertGps(
+                    PendingGpsEntity(
+                        latitud = gpsRequest.latitud,
+                        longitud = gpsRequest.longitud,
+                        esEmergencia = gpsRequest.esEmergencia,
+                        timestamp = Instant.now().toString()
+                    )
+                )
             } catch (e: Exception) {
                 Log.w(TAG, "Envío de GPS falló; guardando offline", e)
                 database.pendingDataDao().insertGps(
@@ -425,6 +469,26 @@ class BioGuardMonitoringService : Service() {
         } catch (e: Exception) {
             Log.w(TAG, "Error obteniendo ubicación", e)
         }
+    }
+
+    private fun hasValidatedInternet(): Boolean {
+        val manager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = manager.activeNetwork ?: return false
+        val capabilities = manager.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+    }
+
+    private suspend fun syncAllPending(trigger: String) = cloudSyncMutex.withLock {
+        if (!hasValidatedInternet()) {
+            Log.d(TAG, "Sin conexion validada; la cola offline se conserva")
+            return@withLock
+        }
+        Log.d(TAG, "Sincronizacion $trigger iniciada desde la cola Room")
+        syncPendingReadings()
+        syncPendingGps()
+        syncPendingEvents()
+        syncPendingAlerts()
     }
 
     private suspend fun syncPendingReadings() {

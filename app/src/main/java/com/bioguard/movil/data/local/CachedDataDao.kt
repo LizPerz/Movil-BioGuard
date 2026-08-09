@@ -19,6 +19,9 @@ interface CachedDataDao {
     @Query("DELETE FROM cached_readings WHERE pacienteId = :pacienteId")
     suspend fun clearReadings(pacienteId: String): Int
 
+    @Query("DELETE FROM cached_readings")
+    suspend fun clearAllReadings(): Int
+
     // Cached Events
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertEvents(events: List<CachedEventEntity>): List<Long>
@@ -29,6 +32,9 @@ interface CachedDataDao {
     @Query("DELETE FROM cached_events WHERE pacienteId = :pacienteId")
     suspend fun clearEvents(pacienteId: String): Int
 
+    @Query("DELETE FROM cached_events")
+    suspend fun clearAllEvents(): Int
+
     // Cached Alerts
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAlerts(alerts: List<CachedAlertEntity>): List<Long>
@@ -38,4 +44,7 @@ interface CachedDataDao {
 
     @Query("DELETE FROM cached_alerts WHERE pacienteId = :pacienteId")
     suspend fun clearAlerts(pacienteId: String): Int
+
+    @Query("DELETE FROM cached_alerts")
+    suspend fun clearAllAlerts(): Int
 }

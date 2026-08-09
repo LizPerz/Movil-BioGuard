@@ -50,6 +50,13 @@ android {
 
     buildTypes {
         release {
+            val pairingSecret = System.getenv("BIOGUARD_PAIRING_SECRET")
+                ?: if (gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }) {
+                    throw GradleException("BIOGUARD_PAIRING_SECRET is required for release builds")
+                } else {
+                    "release-secret-not-configured"
+                }
+            buildConfigField("String", "BIOGUARD_PAIRING_SECRET", "\"$pairingSecret\"")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

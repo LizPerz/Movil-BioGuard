@@ -53,7 +53,8 @@ import androidx.compose.ui.unit.sp
 import com.bioguard.movil.R
 import com.bioguard.movil.ui.components.ConfirmDialog
 import com.bioguard.movil.ui.components.SystemNotificationDialog
-import com.bioguard.movil.ui.model.UserRole
+import com.bioguard.movil.ui.model.AppPermission
+import com.bioguard.movil.ui.model.EffectiveAccess
 import com.bioguard.movil.ui.theme.AppTheme
 import com.bioguard.movil.ui.theme.GreenNeon
 import com.bioguard.movil.ui.theme.LocalThemeState
@@ -65,7 +66,7 @@ import com.bioguard.movil.ui.viewmodel.ProfileViewModel
 @Composable
 fun ProfileScreen(
     profileViewModel: ProfileViewModel,
-    role: UserRole = UserRole.UNKNOWN,
+    access: EffectiveAccess = EffectiveAccess(),
     onLogout: () -> Unit = {},
     themeState: ThemeState = ThemeState(),
     onThemeChange: (ThemeState) -> Unit = {},
@@ -101,7 +102,7 @@ fun ProfileScreen(
         }
     }
 
-    if (showEditBiometriaModal) {
+    if (showEditBiometriaModal && access.allows(AppPermission.PATIENT_MANAGE)) {
         EditBiometriaDialog(
             currentBirth = uiState.biometria.fechaNacimiento,
             currentSex = uiState.biometria.sexo,
@@ -206,6 +207,7 @@ fun ProfileScreen(
                 Spacer(modifier = Modifier.height(20.dp))
 
                 // ── PERFIL BIOMÉTRICO Y MÉDICO DEL PACIENTE ──
+                if (access.allows(AppPermission.PATIENT_MANAGE)) {
                 Text(
                     text = "🏥 PERFIL BIOMÉTRICO Y DATO MÉDICO",
                     fontSize = 10.sp,
@@ -241,10 +243,12 @@ fun ProfileScreen(
                         letterSpacing = 1.sp
                     )
                 }
+                }
 
                 Spacer(modifier = Modifier.height(20.dp))
 
                 // ── PLAN Y CONFIGURACIÓN ──
+                if (access.allows(AppPermission.BILLING_MANAGE)) {
                 Text(
                     text = stringResource(R.string.profile_my_plan),
                     fontSize = 10.sp,
@@ -259,6 +263,7 @@ fun ProfileScreen(
                     ProfileInfoRow(label = stringResource(R.string.profile_history), value = stringResource(R.string.profile_days_format, plan.retencionHistorialDias))
                     ProfileInfoRow(label = stringResource(R.string.profile_gps_continuous), value = if (plan.gpsActivo) stringResource(R.string.profile_yes) else stringResource(R.string.profile_no))
                     ProfileInfoRow(label = stringResource(R.string.profile_ai_console), value = if (plan.consolaIaActiva) stringResource(R.string.profile_yes) else stringResource(R.string.profile_no))
+                }
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -318,15 +323,17 @@ fun ProfileScreen(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 ProfileMenuRow(text = stringResource(R.string.profile_notifications), subtitle = stringResource(R.string.profile_notifications_desc), onClick = onNavigateToNotifications)
-                ProfileMenuRow(text = "Dispositivo Vinculado", subtitle = "Gestiona o conecta tu wearable / parche", onClick = onNavigateToDevice)
+                if (access.allows(AppPermission.DEVICE_READ) || access.allows(AppPermission.DEVICE_PAIR)) {
+                    ProfileMenuRow(text = "Dispositivo Vinculado", subtitle = "Gestiona o conecta tu wearable / parche", onClick = onNavigateToDevice)
+                }
                 ProfileMenuRow(text = stringResource(R.string.profile_sync_settings), subtitle = stringResource(R.string.profile_sync_settings_desc), onClick = onNavigateToSettings)
-                if (role.canManageMedicamentos) {
+                if (access.allows(AppPermission.MEDICATION_READ)) {
                     ProfileMenuRow(text = stringResource(R.string.profile_medications), subtitle = stringResource(R.string.profile_medications_desc), onClick = onNavigateToMedications)
                 }
-                if (role.canManageCuidadores) {
+                if (access.allows(AppPermission.CAREGIVER_MANAGE)) {
                     ProfileMenuRow(text = stringResource(R.string.profile_caregivers), subtitle = stringResource(R.string.profile_caregivers_desc), onClick = onNavigateToCuidadores)
                 }
-                if (role.canManagePayments) {
+                if (access.allows(AppPermission.BILLING_MANAGE)) {
                     ProfileMenuRow(text = stringResource(R.string.profile_premium), subtitle = stringResource(R.string.profile_premium_desc))
                 }
                 ProfileMenuRow(text = stringResource(R.string.profile_support), subtitle = stringResource(R.string.profile_support_desc), onClick = onNavigateToSupport)
@@ -406,7 +413,9 @@ fun EditBiometriaDialog(
 ) {
     val p = LocalThemeState.current.colorPalette()
 
-    var birthDate by remember { mutableStateOf(currentBirth) }
+    var birthDate by remember(currentBirth) {
+        mutableStateOf(com.bioguard.movil.data.Formatters.toDisplayDate(currentBirth))
+    }
     var weight by remember { mutableStateOf(currentWeight) }
     var height by remember { mutableStateOf(currentHeight) }
     var selectedSex by remember { mutableStateOf(currentSex) }
@@ -443,11 +452,13 @@ fun EditBiometriaDialog(
 
                 OutlinedTextField(
                     value = birthDate,
-                    onValueChange = { 
-                        birthDate = it
+                    onValueChange = {
+                        birthDate = com.bioguard.movil.data.Formatters.formatDateInput(it)
                         validationError = null 
                     },
-                    label = { Text("Fecha Nacimiento (AAAA-MM-DD)", fontSize = 11.sp) },
+                    label = { Text("Fecha de nacimiento (dd/mm/aaaa)", fontSize = 11.sp) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = p.accent, unfocusedBorderColor = p.border)
                 )
@@ -456,7 +467,7 @@ fun EditBiometriaDialog(
                     OutlinedTextField(
                         value = weight,
                         onValueChange = { 
-                            weight = it
+                            weight = it.filter(Char::isDigit).take(3)
                             validationError = null
                         },
                         label = { Text("Peso (kg)", fontSize = 11.sp) },
@@ -468,7 +479,7 @@ fun EditBiometriaDialog(
                     OutlinedTextField(
                         value = height,
                         onValueChange = { 
-                            height = it
+                            height = it.filter(Char::isDigit).take(3)
                             validationError = null
                         },
                         label = { Text("Estatura (cm)", fontSize = 11.sp) },
@@ -569,6 +580,10 @@ fun EditBiometriaDialog(
                     }
 
                     val isoBirth = com.bioguard.movil.data.Formatters.toIsoDate(birthDate)
+                    if (isoBirth == null) {
+                        validationError = "Ingresa una fecha válida en formato dd/mm/aaaa"
+                        return@Button
+                    }
                     onSave(isoBirth, selectedSex, weight, height, isDiabetic, hasFamilyDiabetes, selectedActivity)
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = p.accent)

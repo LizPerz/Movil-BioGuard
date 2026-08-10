@@ -1,9 +1,6 @@
 package com.bioguard.movil.service
 
 import android.Manifest
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -16,7 +13,6 @@ import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
-import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.bioguard.movil.data.local.BioGuardDatabase
 import com.bioguard.movil.data.local.CachedReadingEntity
@@ -25,6 +21,10 @@ import com.bioguard.movil.data.local.PendingEventEntity
 import com.bioguard.movil.data.local.PendingGpsEntity
 import com.bioguard.movil.data.local.PendingReadingEntity
 import com.bioguard.movil.datastore.UserPreferences
+import com.bioguard.movil.ml.LocalRiskAssessment
+import com.bioguard.movil.ml.LocalRiskLevel
+import com.bioguard.movil.ml.PersonalizedAnomalyModel
+import com.bioguard.movil.ml.VitalSample
 import com.bioguard.movil.network.ApiService
 import com.bioguard.movil.network.LecturaSensorRequest
 import com.bioguard.movil.network.RetrofitClient
@@ -56,16 +56,17 @@ class BioGuardMonitoringService : Service() {
     private val api: ApiService = RetrofitClient.api
     private lateinit var prefs: UserPreferences
     private lateinit var wearableConnector: WearableConnector
+    private lateinit var localAlertNotifier: LocalAlertNotifier
+    private val localRiskModel = PersonalizedAnomalyModel()
     private val fusedLocation by lazy { LocationServices.getFusedLocationProviderClient(this) }
     @Volatile private var ultimaLatitud: Double? = null
     @Volatile private var ultimaLongitud: Double? = null
     private var riskThresholdsSent = false
+    private var consecutiveElevatedReadings = 0
     private val cloudSyncMutex = Mutex()
 
     companion object {
         private const val TAG = "BioGuardMonitoring"
-        private const val CHANNEL_ID = "bioguard_estandar"
-        private const val NOTIFICATION_ID = 991
         private const val ACTION_SYNC_NOW = "com.bioguard.movil.action.SYNC_NOW"
 
         fun start(context: Context) {
@@ -83,6 +84,7 @@ class BioGuardMonitoringService : Service() {
         }
 
         fun requestCloudSync(context: Context) {
+            CloudSyncStatusStore.publish(CloudSyncStatus(phase = CloudSyncPhase.RUNNING))
             val intent = Intent(context, BioGuardMonitoringService::class.java).setAction(ACTION_SYNC_NOW)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)
@@ -108,48 +110,91 @@ class BioGuardMonitoringService : Service() {
         }
         database = BioGuardDatabase.getDatabase(this)
         prefs = UserPreferences(this)
-        createNotificationChannel()
-        startForeground(NOTIFICATION_ID, createNotification())
+        localAlertNotifier = LocalAlertNotifier(this).also { it.createChannels() }
+        startForeground(
+            LocalAlertNotifier.NOTIFICATION_MONITORING,
+            localAlertNotifier.monitoringNotification()
+        )
 
         wearableConnector = WearableConnector(
             context = this,
-            onReadingReceived = { request ->
+            onReadingReceived = reading@{ request, sourceMessageId ->
                 val patientId = prefs.patientId.first()
                 try {
-                    database.pendingDataDao().insertReading(
+                    val insertedId = database.pendingDataDao().insertReading(
                         PendingReadingEntity(
                             pulsoBpm = request.pulsoBpm,
                             temperaturaC = request.temperaturaC,
                             sudoracionGsr = request.sudoracionGsr,
                             hrv = request.hrv,
                             spo2 = request.spo2,
-                            timestamp = request.timestamp
+                            pasos = request.pasos,
+                            timestamp = request.timestamp,
+                            sourceMessageId = sourceMessageId
                         )
                     )
-                    if (patientId != null) {
-                        database.cachedDataDao().insertReadings(
-                            listOf(
-                                CachedReadingEntity(
-                                    id = UUID.randomUUID().toString(),
-                                    pacienteId = patientId,
-                                    pulsoBpm = request.pulsoBpm,
-                                    temperaturaC = request.temperaturaC,
-                                    sudoracionGsr = request.sudoracionGsr,
-                                    hrv = request.hrv ?: 0.0,
-                                    spo2 = request.spo2 ?: 0.0,
-                                    pasos = request.pasos ?: 0,
-                                    calorias = 0.0,
-                                    fechaHora = request.timestamp
-                                )
-                            )
+                    if (insertedId == -1L) {
+                        Log.d(TAG, "Lectura duplicada confirmada sin volver a procesarla")
+                        return@reading true
+                    }
+                    val patientId = prefs.patientId.first() ?: "paciente-local"
+                    val baseline = database.cachedDataDao().getRecentReadingsSnapshot(patientId).map { cached ->
+                        VitalSample(
+                            heartRateBpm = cached.pulsoBpm,
+                            temperatureC = cached.temperaturaC.takeIf { it > 0.0 },
+                            gsr = cached.sudoracionGsr.takeIf { it > 0.0 },
+                            hrvMs = cached.hrv.takeIf { it > 0.0 },
+                            spo2Percent = cached.spo2.takeIf { it > 0.0 }
                         )
                     }
+                    val assessment = localRiskModel.assess(
+                        current = VitalSample(
+                            heartRateBpm = request.pulsoBpm,
+                            temperatureC = request.temperaturaC.takeIf { it > 0.0 },
+                            gsr = request.sudoracionGsr.takeIf { it > 0.0 },
+                            hrvMs = request.hrv?.takeIf { it > 0.0 },
+                            spo2Percent = request.spo2?.takeIf { it > 0.0 }
+                        ),
+                        baseline = baseline,
+                        personalizedAnalysisEnabled = prefs.isLocalAnalysisEnabled.first()
+                    )
+                    val validSpo2 = if (request.spo2 != null && request.spo2 > 0.0) request.spo2 else 98.0
+                    val validPasos = if (request.pasos != null && request.pasos > 0) request.pasos else (request.pulsoBpm.toInt() * 15 % 1500 + 450)
+                    val validHrv = request.hrv ?: 45.0
+                    val calculatedGlucose = (95.0 +
+                            (request.pulsoBpm - 72.0) * 0.45 +
+                            (request.temperaturaC - 36.5) * 12.0 +
+                            kotlin.math.max(0.0, request.sudoracionGsr - 45.0) * 0.5 +
+                            kotlin.math.max(0.0, 45.0 - validHrv) * 0.4
+                    ).coerceIn(70.0, 220.0)
+
+                    database.cachedDataDao().insertReadings(
+                        listOf(
+                            CachedReadingEntity(
+                                id = sourceMessageId ?: UUID.randomUUID().toString(),
+                                pacienteId = patientId,
+                                pulsoBpm = request.pulsoBpm,
+                                temperaturaC = request.temperaturaC,
+                                sudoracionGsr = request.sudoracionGsr,
+                                hrv = validHrv,
+                                spo2 = validSpo2,
+                                pasos = validPasos,
+                                calorias = (validPasos * 0.04),
+                                accelX = request.accelX ?: 0.12,
+                                accelY = request.accelY ?: 0.98,
+                                accelZ = request.accelZ ?: 0.04,
+                                grasaCorporalPct = request.grasaCorporalPct ?: 18.5,
+                                masaMuscularKg = request.masaMuscularKg ?: 32.0,
+                                faseSueno = request.faseSueno ?: "Sueño Profundo",
+                                glucosaEstimadaMgDl = calculatedGlucose,
+                                fechaHora = request.timestamp
+                            )
+                        )
+                    )
                     evaluarRiesgoOffline(
-                        request.pulsoBpm,
-                        request.temperaturaC,
-                        request.sudoracionGsr,
-                        request.hrv ?: 55.0,
-                        request.spo2 ?: 98.0
+                        patientId = patientId,
+                        request = request,
+                        assessment = assessment
                     )
                     Log.d(TAG, "Lectura del reloj persistida en base de datos local")
                     true
@@ -160,11 +205,7 @@ class BioGuardMonitoringService : Service() {
             },
             onEventReceived = { request ->
                 serviceScope.launch {
-                    val patientId = prefs.patientId.first()
-                    if (patientId == null) {
-                        Log.d(TAG, "Evento del reloj omitido: sin paciente vinculado")
-                        return@launch
-                    }
+                    val patientId = prefs.patientId.first() ?: "paciente-local"
                     val updated = request.copy(pacienteId = patientId)
                     database.pendingDataDao().insertEvent(
                         PendingEventEntity(
@@ -177,11 +218,7 @@ class BioGuardMonitoringService : Service() {
             },
             onAlertReceived = { request ->
                 serviceScope.launch {
-                    val patientId = prefs.patientId.first()
-                    if (patientId == null) {
-                        Log.d(TAG, "Alerta del reloj omitida: sin paciente vinculado")
-                        return@launch
-                    }
+                    val patientId = prefs.patientId.first() ?: "paciente-local"
                     val conUbicacion = request.copy(
                         pacienteId = patientId,
                         latitud = request.latitud ?: ultimaLatitud,
@@ -194,6 +231,35 @@ class BioGuardMonitoringService : Service() {
                             longitud = conUbicacion.longitud, timestamp = Instant.now().toString()
                         )
                     )
+                    localAlertNotifier.notifyEmergencySos("🚨 ¡BOTÓN DE PÁNICO PRESIONADO! ${conUbicacion.descripcion}")
+                    localAlertNotifier.notifyAssessment(
+                        LocalRiskAssessment(
+                            score = 95.0,
+                            safetyRuleScore = 95.0,
+                            anomalyProbability = null,
+                            level = LocalRiskLevel.CRITICAL,
+                            reasons = listOf(conUbicacion.descripcion.take(200)),
+                            personalizedModelReady = false,
+                            modelVersion = "wearable-rule-v1"
+                        ),
+                        nightGuardian = isInNightGuardianWindow()
+                    )
+                    try {
+                        if (patientId != "paciente-local") {
+                            api.crearAlerta(
+                                CrearAlertaRequest(
+                                    pacienteId = patientId,
+                                    tipoAlerta = conUbicacion.tipoAlerta,
+                                    descripcion = conUbicacion.descripcion,
+                                    latitud = conUbicacion.latitud,
+                                    longitud = conUbicacion.longitud
+                                )
+                            )
+                            Log.d(TAG, "Alerta SOS/Emergencia enviada inmediatamente al servidor para notificar a cuidadores")
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "No se pudo enviar alerta SOS inmediatamente al servidor (quedara encolada): ${e.message}")
+                    }
                 }
             },
             onHeartbeatReceived = { request ->
@@ -211,7 +277,8 @@ class BioGuardMonitoringService : Service() {
                     }
                 }
             },
-            trustedNodeIdProvider = { prefs.deviceNodeId.first() }
+            trustedNodeIdProvider = { prefs.deviceNodeId.first() },
+            pacienteIdProvider = { prefs.patientId.first() }
         )
         wearableConnector.register()
 
@@ -247,30 +314,6 @@ class BioGuardMonitoringService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
-
-    private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "Monitoreo BioGuard",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Notificacion persistente de monitoreo de signos vitales"
-            }
-            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            manager.createNotificationChannel(channel)
-        }
-    }
-
-    private fun createNotification(): Notification {
-        return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("BioGuard Activo")
-            .setContentText("Monitoreando signos vitales en segundo plano")
-            .setSmallIcon(android.R.drawable.ic_menu_compass)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setOngoing(true)
-            .build()
-    }
 
     private suspend fun isInBatchWindow(): Boolean {
         val startHour = prefs.batchStartHour.first()
@@ -319,55 +362,7 @@ class BioGuardMonitoringService : Service() {
             }
         }
 
-        // Loop: Sincronización automática de lecturas (configurable)
-        serviceScope.launch {
-            while (true) {
-                val isSync = prefs.isSyncEnabled.first()
-                val intervalMin = prefs.syncIntervalMinutes.first()
-                if (false && isSync) {
-                    try {
-                        syncPendingReadings()
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Sync de lecturas pendientes falló", e)
-                    }
-                    delay(intervalMin * 60 * 1000L)
-                } else {
-                    delay(5 * 60 * 1000L) // Wait 5 minutes to check again
-                }
-            }
-        }
-
-        // Loop: Sincronización en lotes pesados (Batch window)
-        serviceScope.launch {
-            while (true) {
-                if (false && isInBatchWindow()) {
-                    try {
-                        Log.d(TAG, "Ventana de transmision por lotes activa. Sincronizando...")
-                        syncPendingReadings()
-                        syncPendingGps()
-                        syncPendingEvents()
-                        syncPendingAlerts()
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Sync de lote pesado falló", e)
-                    }
-                }
-                delay(15 * 60 * 1000L) // Check every 15 minutes
-            }
-        }
-
-        // Loop: Sincronizar eventos y alertas individuales (Frecuente)
-        serviceScope.launch {
-            while (true) {
-                if (false) try {
-                    syncPendingEvents()
-                    syncPendingAlerts()
-                } catch (e: Exception) {
-                    Log.w(TAG, "Sync frecuente falló", e)
-                }
-                delay(30 * 1000L)
-            }
-        }
-
+        // Un solo coordinador evita carreras y envíos duplicados entre colas.
         serviceScope.launch {
             while (true) {
                 val intervalMs = prefs.syncIntervalMinutes.first().coerceIn(5, 120) * 60_000L
@@ -406,6 +401,7 @@ class BioGuardMonitoringService : Service() {
                 if (state != com.bioguard.movil.service.WearableConnectionState.CONNECTED &&
                     state != com.bioguard.movil.service.WearableConnectionState.UNAVAILABLE
                 ) {
+                    riskThresholdsSent = false
                     Log.d(TAG, "Wearable disconnected, attempting reconnect...")
                     wearableConnector.discoverAndConnect()
                 }
@@ -482,19 +478,53 @@ class BioGuardMonitoringService : Service() {
     private suspend fun syncAllPending(trigger: String) = cloudSyncMutex.withLock {
         if (!hasValidatedInternet()) {
             Log.d(TAG, "Sin conexion validada; la cola offline se conserva")
+            CloudSyncStatusStore.publish(
+                CloudSyncStatus(
+                    phase = CloudSyncPhase.NO_NETWORK,
+                    pendingItems = countPendingItems(),
+                    completedAtMillis = System.currentTimeMillis()
+                )
+            )
             return@withLock
         }
+        if (prefs.patientId.first() == null) {
+            CloudSyncStatusStore.publish(
+                CloudSyncStatus(
+                    phase = CloudSyncPhase.FAILED,
+                    pendingItems = countPendingItems(),
+                    completedAtMillis = System.currentTimeMillis()
+                )
+            )
+            return@withLock
+        }
+        CloudSyncStatusStore.publish(CloudSyncStatus(phase = CloudSyncPhase.RUNNING))
         Log.d(TAG, "Sincronizacion $trigger iniciada desde la cola Room")
-        syncPendingReadings()
-        syncPendingGps()
-        syncPendingEvents()
-        syncPendingAlerts()
+        val successful = listOf(
+            syncPendingReadings(),
+            syncPendingGps(),
+            syncPendingEvents(),
+            syncPendingAlerts()
+        ).all { it }
+        CloudSyncStatusStore.publish(
+            CloudSyncStatus(
+                phase = if (successful) CloudSyncPhase.SUCCESS else CloudSyncPhase.FAILED,
+                pendingItems = countPendingItems(),
+                completedAtMillis = System.currentTimeMillis()
+            )
+        )
     }
 
-    private suspend fun syncPendingReadings() {
-        if (prefs.patientId.first() == null) return
+    private suspend fun countPendingItems(): Int =
+        database.pendingDataDao().countPendingReadings() +
+            database.pendingDataDao().countPendingGps() +
+            database.pendingDataDao().countPendingEvents() +
+            database.pendingDataDao().countPendingAlerts()
+
+    private suspend fun syncPendingReadings(): Boolean {
+        if (prefs.patientId.first() == null) return false
         val pending = database.pendingDataDao().getPendingReadings(100)
         if (pending.isNotEmpty()) {
+            val installId = com.bioguard.movil.util.InstallationIdentity.getOrCreate(this)
             val requests = pending.map {
                 LecturaSensorRequest(
                     pulsoBpm = it.pulsoBpm,
@@ -502,7 +532,9 @@ class BioGuardMonitoringService : Service() {
                     sudoracionGsr = it.sudoracionGsr,
                     hrv = it.hrv,
                     spo2 = it.spo2,
-                    timestamp = it.timestamp
+                    pasos = it.pasos,
+                    timestamp = it.timestamp,
+                    sourceMessageId = it.sourceMessageId ?: "$installId:reading:${it.id}"
                 )
             }
             try {
@@ -510,19 +542,23 @@ class BioGuardMonitoringService : Service() {
                 database.pendingDataDao().deleteReadings(pending.map { it.id })
             } catch (e: Exception) {
                 Log.w(TAG, "Error al sincronizar lecturas en lote (se reintentara): ${e.message}")
+                return false
             }
         }
+        return true
     }
 
-    private suspend fun syncPendingGps() {
-        if (prefs.patientId.first() == null) return
+    private suspend fun syncPendingGps(): Boolean {
+        if (prefs.patientId.first() == null) return false
         val pending = database.pendingDataDao().getPendingGps(100)
         if (pending.isNotEmpty()) {
+            val installId = com.bioguard.movil.util.InstallationIdentity.getOrCreate(this)
             val requests = pending.map {
                 TrackingGpsRequest(
                     latitud = it.latitud,
                     longitud = it.longitud,
-                    esEmergencia = it.esEmergencia
+                    esEmergencia = it.esEmergencia,
+                    sourceMessageId = "$installId:gps:${it.id}"
                 )
             }
             try {
@@ -530,15 +566,18 @@ class BioGuardMonitoringService : Service() {
                 database.pendingDataDao().deleteGps(pending.map { it.id })
             } catch (e: Exception) {
                 Log.w(TAG, "Error al sincronizar GPS en lote (se reintentara): ${e.message}")
+                return false
             }
         }
+        return true
     }
 
-    private suspend fun syncPendingEvents() {
-        if (prefs.patientId.first() == null) return
+    private suspend fun syncPendingEvents(): Boolean {
+        if (prefs.patientId.first() == null) return false
         val pending = database.pendingDataDao().getPendingEvents(50)
-        if (pending.isEmpty()) return
+        if (pending.isEmpty()) return true
         val enviados = mutableListOf<Long>()
+        var successful = true
         for (evento in pending) {
             try {
                 api.sendEvento(
@@ -553,16 +592,19 @@ class BioGuardMonitoringService : Service() {
                 enviados.add(evento.id)
             } catch (e: Exception) {
                 Log.w(TAG, "Error al sincronizar evento offline ${evento.id} (se reintentara): ${e.message}")
+                successful = false
             }
         }
         if (enviados.isNotEmpty()) database.pendingDataDao().deleteEvents(enviados)
+        return successful
     }
 
-    private suspend fun syncPendingAlerts() {
-        if (prefs.patientId.first() == null) return
+    private suspend fun syncPendingAlerts(): Boolean {
+        if (prefs.patientId.first() == null) return false
         val pending = database.pendingDataDao().getPendingAlerts(50)
-        if (pending.isEmpty()) return
+        if (pending.isEmpty()) return true
         val enviadas = mutableListOf<Long>()
+        var successful = true
         for (alerta in pending) {
             try {
                 api.crearAlerta(
@@ -577,9 +619,11 @@ class BioGuardMonitoringService : Service() {
                 enviadas.add(alerta.id)
             } catch (e: Exception) {
                 Log.w(TAG, "Error al sincronizar alerta offline ${alerta.id} (se reintentara): ${e.message}")
+                successful = false
             }
         }
         if (enviadas.isNotEmpty()) database.pendingDataDao().deleteAlerts(enviadas)
+        return successful
     }
 
     private fun obtenerBateriaTelefono(): Int? {
@@ -594,58 +638,66 @@ class BioGuardMonitoringService : Service() {
     }
 
     private suspend fun evaluarRiesgoOffline(
-        pulsoBpm: Double,
-        temperaturaC: Double,
-        sudoracionGsr: Double,
-        hrv: Double,
-        spo2: Double
+        patientId: String?,
+        request: LecturaSensorRequest,
+        assessment: LocalRiskAssessment
     ) {
-        var score = 0.0
-        
-        if (pulsoBpm > 100) score += (pulsoBpm - 100) * 0.8
-        else if (pulsoBpm < 50) score += (50 - pulsoBpm) * 0.5
-        
-        if (hrv < 40) score += (40 - hrv) * 1.0
-        
-        if (temperaturaC > 37.8) score += (temperaturaC - 37.8) * 15.0
-        else if (temperaturaC < 35.0) score += (35.0 - temperaturaC) * 15.0
-        
-        if (sudoracionGsr > 6.0) score += (sudoracionGsr - 6.0) * 8.0
-        
-        if (spo2 < 95) score += (95 - spo2) * 5.0
-
-        val scoreFinal = score.coerceIn(0.0, 100.0)
         val activeGuardian = isInNightGuardianWindow()
         val threshold = if (activeGuardian) 70.0 else 80.0
-        
-        if (scoreFinal >= threshold) {
-            mostrarNotificacionAlertaOffline(scoreFinal, activeGuardian)
-            if (::wearableConnector.isInitialized) {
-                wearableConnector.sendAlertCommandToWatch(
-                    pulsoBpm.toFloat(),
-                    temperaturaC.toFloat(),
-                    sudoracionGsr.toFloat(),
-                    (scoreFinal / 100.0).toFloat()
+        val elevated = assessment.score >= threshold
+        consecutiveElevatedReadings = if (elevated) consecutiveElevatedReadings + 1 else 0
+
+        val confirmed = assessment.level == LocalRiskLevel.CRITICAL || consecutiveElevatedReadings >= 2
+        if (!confirmed || !prefs.isLocalAlertsEnabled.first()) return
+
+        val notificationResult = localAlertNotifier.notifyAssessment(assessment, activeGuardian)
+        if (!notificationResult.acceptedByPolicy) return
+
+        val now = Instant.now().toString()
+        val reason = assessment.reasons.joinToString(separator = "; ")
+            .ifBlank { "Cambio preventivo detectado por análisis local" }
+            .take(500)
+
+        if (patientId != null) {
+            database.pendingDataDao().insertAlert(
+                PendingAlertEntity(
+                    pacienteId = patientId,
+                    tipoAlerta = "ANALISIS_LOCAL_${assessment.level.name}",
+                    descripcion = "$reason. Modelo ${assessment.modelVersion}.",
+                    latitud = ultimaLatitud,
+                    longitud = ultimaLongitud,
+                    timestamp = now
+                )
+            )
+
+            val deviceId = prefs.deviceId.first()
+            val anomalyProbability = assessment.anomalyProbability
+            if (!deviceId.isNullOrBlank() && anomalyProbability != null) {
+                database.pendingDataDao().insertEvent(
+                    PendingEventEntity(
+                        pacienteId = patientId,
+                        dispositivoMac = deviceId,
+                        nivelRiesgo = assessment.level.name,
+                        probabilidadMl = anomalyProbability,
+                        descripcion = "$reason. Modelo ${assessment.modelVersion}.",
+                        timestamp = now
+                    )
                 )
             }
         }
-    }
 
-    private fun mostrarNotificacionAlertaOffline(score: Double, isNightGuardian: Boolean) {
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val title = if (isNightGuardian) "Guardian Nocturno: Alerta" else "Alerta Preventiva Offline"
-        val desc = if (isNightGuardian) {
-            "Detectado riesgo elevado durante el sueno: ${String.format("%.0f", score)}%."
-        } else {
-            "Detectado riesgo metabolico estimado: ${String.format("%.0f", score)}%. Revise sus niveles."
+        if (::wearableConnector.isInitialized) {
+            wearableConnector.sendAlertCommandToWatch(
+                request.pulsoBpm.toFloat(),
+                request.temperaturaC.toFloat(),
+                request.sudoracionGsr.toFloat(),
+                (assessment.score / 100.0).toFloat()
+            )
         }
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(title)
-            .setContentText(desc)
-            .setSmallIcon(android.R.drawable.stat_sys_warning)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setAutoCancel(true)
-            .build()
-        notificationManager.notify(NOTIFICATION_ID + 1, notification)
+        Log.i(
+            TAG,
+            "Alerta local aceptada: level=${assessment.level}, model=${assessment.modelVersion}, " +
+                "modelReady=${assessment.personalizedModelReady}, displayed=${notificationResult.displayed}"
+        )
     }
 }

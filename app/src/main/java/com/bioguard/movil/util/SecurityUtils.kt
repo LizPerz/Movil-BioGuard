@@ -41,7 +41,9 @@ object SecurityUtils {
             val randomBytes = ByteArray(32)
             SecureRandom().nextBytes(randomBytes)
             existingPassphraseHex = randomBytes.toHexString()
-            prefs.edit().putString(DB_PASSPHRASE_KEY, existingPassphraseHex).apply()
+            check(prefs.edit().putString(DB_PASSPHRASE_KEY, existingPassphraseHex).commit()) {
+                "Could not persist database encryption key"
+            }
         }
 
         return existingPassphraseHex.hexToByteArray()

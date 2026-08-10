@@ -25,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,10 +45,15 @@ import com.bioguard.movil.R
 @Composable
 fun ReportsScreen(
     reportsViewModel: ReportsViewModel,
+    canReadHistory: Boolean = false,
     onNavigateToHistory: () -> Unit = {}
 ) {
     val p = LocalThemeState.current.colorPalette()
     val uiState by reportsViewModel.uiState.collectAsState()
+
+    LaunchedEffect(canReadHistory) {
+        reportsViewModel.loadReportes(canReadHistory)
+    }
 
     if (uiState.isLoading) {
         Box(
@@ -136,7 +142,7 @@ fun ReportsScreen(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                Text(
+                if (canReadHistory) Text(
                     text = stringResource(R.string.reports_history),
                     fontSize = 10.sp,
                     color = p.accent,
@@ -144,7 +150,7 @@ fun ReportsScreen(
                     modifier = Modifier.padding(bottom = 10.dp)
                 )
 
-                if (uiState.eventos.isNotEmpty()) {
+                if (canReadHistory && uiState.eventos.isNotEmpty()) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -202,7 +208,7 @@ fun ReportsScreen(
                             }
                         }
                     }
-                } else {
+                } else if (canReadHistory) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -218,7 +224,7 @@ fun ReportsScreen(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                Button(
+                if (canReadHistory) Button(
                     onClick = onNavigateToHistory,
                     modifier = Modifier
                         .fillMaxWidth()

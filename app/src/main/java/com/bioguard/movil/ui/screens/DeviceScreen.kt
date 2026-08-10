@@ -147,13 +147,7 @@ fun DeviceScreen(
     val reloj = uiState.dispositivo?.reloj
     val isPaired = uiState.isPaired || uiState.connectedDeviceId != null || reloj?.modelo != null
     val isConnected = uiState.isConnected || (reloj?.conectado ?: false)
-    val connectionStateText = when (uiState.connectionState) {
-        WearableConnectionState.CONNECTED -> "Conectado"
-        WearableConnectionState.CONNECTING -> "Conectando..."
-        WearableConnectionState.DISCONNECTED -> "Desconectado"
-        WearableConnectionState.UNAVAILABLE -> "Wear OS no disponible"
-        WearableConnectionState.ERROR -> "Error de conexión"
-    }
+    val connectionStateText = uiState.connectionState.toDisplayString(uiState.lastSyncMillis)
     val deviceName = uiState.connectedDeviceName ?: reloj?.modelo ?: stringResource(R.string.device_no_device)
     val bateria = reloj?.bateria
     val ultimaSincronizacion = reloj?.ultimaSincronizacion
@@ -362,7 +356,26 @@ fun DeviceScreen(
                         }
                     }
                 } else {
-                    // ── Botón Principal de Búsqueda si no hay dispositivo ──
+                    // ── Botón Principal de Emparejamiento Automático ──
+                    Button(
+                        onClick = { deviceViewModel.vincularWearableAutomatico() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = p.accent)
+                    ) {
+                        Text(
+                            text = "⚡ Conectar automáticamente",
+                            color = p.background,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
+                            fontSize = 13.sp
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
                     OutlinedButton(
                         onClick = onNavigateToWearableQr,
                         modifier = Modifier

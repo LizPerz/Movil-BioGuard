@@ -1,4 +1,4 @@
-﻿package com.bioguard.movil.data.repository
+package com.bioguard.movil.data.repository
 
 import com.bioguard.movil.data.Resource
 import com.bioguard.movil.data.toUserMessage
@@ -20,7 +20,27 @@ class PacienteRepository @Inject constructor(
 ) {
 
     suspend fun resolvePatientId(prefs: UserPreferences): String? {
-        return prefs.patientId.first()
+        val cached = prefs.patientId.first()
+        if (!cached.isNullOrBlank()) return cached
+
+        return try {
+            val miPaciente = api.getMiPaciente()
+            if (miPaciente.id.isNotBlank()) {
+                prefs.savePatientId(miPaciente.id)
+                miPaciente.id
+            } else null
+        } catch (e: Exception) {
+            android.util.Log.w("PacienteRepository", "No se pudo obtener mi-paciente del backend: ${e.message}")
+            null
+        }
+    }
+
+    suspend fun getBiometria(pacienteId: String): Resource<com.bioguard.movil.network.BiometriaResponse> {
+        return try {
+            Resource.Success(api.getBiometria(pacienteId))
+        } catch (e: Exception) {
+            Resource.Error(e.toUserMessage("Error al obtener biometría del paciente"))
+        }
     }
 
     suspend fun crearPaciente(nombre: String, esDiabetico: Boolean): Resource<CrearPacienteResponse> {

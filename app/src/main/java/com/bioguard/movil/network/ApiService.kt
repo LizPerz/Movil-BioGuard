@@ -1,4 +1,4 @@
-﻿package com.bioguard.movil.network
+package com.bioguard.movil.network
 
 import com.google.gson.annotations.SerializedName
 import retrofit2.http.*
@@ -84,6 +84,15 @@ data class ActualizarBiometriaRequest(
     @SerializedName("familiaresDiabetes") val familiaresDiabetes: Boolean = false,
     @SerializedName("actividadFisica") val actividadFisica: String
 )
+data class BiometriaResponse(
+    @SerializedName("fechaNacimiento") val fechaNacimiento: String? = null,
+    @SerializedName("sexo") val sexo: String? = null,
+    @SerializedName("pesoKg") val pesoKg: Double? = null,
+    @SerializedName("estaturaCm") val estaturaCm: Double? = null,
+    @SerializedName("esDiabetico") val esDiabetico: Boolean = false,
+    @SerializedName("familiaresDiabetes") val familiaresDiabetes: Boolean = false,
+    @SerializedName("actividadFisica") val actividadFisica: String? = null
+)
 data class TrackingResponse(@SerializedName("longitud") val longitud: Double, @SerializedName("latitud") val latitud: Double, @SerializedName("timestamp") val timestamp: String, @SerializedName("esEmergencia") val esEmergencia: Boolean = false)
 data class DispositivoEstado(@SerializedName("vinculado") val vinculado: Boolean = false, @SerializedName("nombreDispositivo") val nombreDispositivo: String? = null, @SerializedName("macAddress") val macAddress: String? = null, @SerializedName("conectado") val conectado: Boolean = false)
 data class DashboardSummary(
@@ -106,7 +115,15 @@ data class LecturaSensorRequest(
     @SerializedName("hrv") val hrv: Double? = null,
     @SerializedName("spo2") val spo2: Double? = null,
     @SerializedName("pasos") val pasos: Int? = null,
-    @SerializedName("timestamp") val timestamp: String
+    @SerializedName("accelX") val accelX: Double? = null,
+    @SerializedName("accelY") val accelY: Double? = null,
+    @SerializedName("accelZ") val accelZ: Double? = null,
+    @SerializedName("grasaCorporalPct") val grasaCorporalPct: Double? = null,
+    @SerializedName("masaMuscularKg") val masaMuscularKg: Double? = null,
+    @SerializedName("faseSueno") val faseSueno: String? = null,
+    @SerializedName("glucosaEstimadaMgDl") val glucosaEstimadaMgDl: Double? = null,
+    @SerializedName("timestamp") val timestamp: String,
+    @SerializedName("sourceMessageId") val sourceMessageId: String? = null
 )
 data class LecturaSensorResponse(
     @SerializedName("id") val id: String? = null,
@@ -116,6 +133,14 @@ data class LecturaSensorResponse(
     @SerializedName("sudoracionGsr") val sudoracionGsr: Double,
     @SerializedName("hrv") val hrv: Double? = null,
     @SerializedName("spo2") val spo2: Double? = null,
+    @SerializedName("pasos") val pasos: Int? = null,
+    @SerializedName("accelX") val accelX: Double? = null,
+    @SerializedName("accelY") val accelY: Double? = null,
+    @SerializedName("accelZ") val accelZ: Double? = null,
+    @SerializedName("grasaCorporalPct") val grasaCorporalPct: Double? = null,
+    @SerializedName("masaMuscularKg") val masaMuscularKg: Double? = null,
+    @SerializedName("faseSueno") val faseSueno: String? = null,
+    @SerializedName("glucosaEstimadaMgDl") val glucosaEstimadaMgDl: Double? = null,
     @SerializedName("probabilidadPico") val probabilidadPico: Double? = null,
     @SerializedName("nivelRiesgo") val nivelRiesgo: String? = null
 )
@@ -135,7 +160,12 @@ data class EventoMetabolicoResponse(
     @SerializedName("atendida") val atendida: Boolean = false
 )
 data class AtenderEventoRequest(@SerializedName("cuidadorId") val cuidadorId: String, @SerializedName("notasAtencion") val notasAtencion: String? = null)
-data class TrackingGpsRequest(@SerializedName("latitud") val latitud: Double, @SerializedName("longitud") val longitud: Double, @SerializedName("esEmergencia") val esEmergencia: Boolean = false)
+data class TrackingGpsRequest(
+    @SerializedName("latitud") val latitud: Double,
+    @SerializedName("longitud") val longitud: Double,
+    @SerializedName("esEmergencia") val esEmergencia: Boolean = false,
+    @SerializedName("sourceMessageId") val sourceMessageId: String? = null
+)
 
 // =============================================
 // USUARIOS WEB
@@ -151,13 +181,23 @@ data class UsuarioWebResponse(
 data class UpdatePerfilRequest(@SerializedName("nombre") val nombre: String?, @SerializedName("apellidoPaterno") val apellidoPaterno: String?, @SerializedName("apellidoMaterno") val apellidoMaterno: String?)
 data class UpdateCorreoRequest(@SerializedName("nuevoCorreo") val nuevoCorreo: String, @SerializedName("passwordActual") val passwordActual: String)
 data class MiPlanResponse(
-    @SerializedName("planId") val planId: String? = null,
+    @SerializedName(value = "id", alternate = ["planId"]) val planId: String? = null,
     @SerializedName("nombre") val nombre: String? = null,
     @SerializedName("limitePacientes") val limitePacientes: Int = 0,
     @SerializedName("limiteCuidadores") val limiteCuidadores: Int = 0,
-    @SerializedName("retencionHistorialDias") val retencionHistorialDias: Int = 0,
-    @SerializedName("gpsActivo") val gpsActivo: Boolean = false,
-    @SerializedName("consolaIaActiva") val consolaIaActiva: Boolean = false
+    @SerializedName(value = "diasHistorial", alternate = ["retencionHistorialDias"]) val retencionHistorialDias: Int = 0,
+    @SerializedName(value = "gpsContinuo", alternate = ["gpsActivo"]) val gpsActivo: Boolean = false,
+    @SerializedName(value = "aiConsole", alternate = ["consolaIaActiva"]) val consolaIaActiva: Boolean = false,
+    @SerializedName("guardianNocturnoDisponible") val guardianNocturnoDisponible: Boolean = false,
+    @SerializedName("exportacionReportesDisponible") val exportacionReportesDisponible: Boolean = false
+)
+data class EffectiveAccessResponse(
+    @SerializedName("rol") val rol: String,
+    @SerializedName("pacienteId") val pacienteId: String? = null,
+    @SerializedName("nivelAccesoCuidador") val nivelAccesoCuidador: String? = null,
+    @SerializedName("cuidadorDentroDelPlan") val cuidadorDentroDelPlan: Boolean = false,
+    @SerializedName("plan") val plan: MiPlanResponse? = null,
+    @SerializedName("permisos") val permisos: List<String> = emptyList()
 )
 data class SesionResponse(
     @SerializedName("id") val id: String? = null,
@@ -298,7 +338,6 @@ data class MessageResponse(
     @SerializedName("userId") val userId: String? = null,
     @SerializedName("correo") val correo: String? = null
 )
-data class RegisterFcmTokenRequest(@SerializedName("token") val token: String)
 data class UpdateNivelAccesoRequest(@SerializedName("nivelAcceso") val nivelAcceso: String)
 data class UpdateFotoRequest(@SerializedName("fotoUrl") val fotoUrl: String)
 data class HeartbeatRequest(
@@ -387,11 +426,17 @@ interface ApiService {
     // =============================================
     // PACIENTES
     // =============================================
+    @GET("api/Pacientes/mi-paciente")
+    suspend fun getMiPaciente(): PacienteResumen
+
     @POST("api/Pacientes")
     suspend fun crearPaciente(@Body request: CrearPacienteRequest): CrearPacienteResponse
 
     @PUT("api/Pacientes/{id}/biometria")
     suspend fun updateBiometria(@Path("id") id: String, @Body request: ActualizarBiometriaRequest): MessageResponse
+
+    @GET("api/Pacientes/{id}/biometria")
+    suspend fun getBiometria(@Path("id") id: String): BiometriaResponse
 
     @GET("api/Pacientes/{id}/dashboard-summary")
     suspend fun getDashboardSummary(@Path("id") id: String): DashboardSummary
@@ -444,6 +489,9 @@ interface ApiService {
 
     @GET("api/UsuariosWeb/mi-plan")
     suspend fun getMiPlan(): MiPlanResponse
+
+    @GET("api/UsuariosWeb/mi-acceso")
+    suspend fun getMiAcceso(): EffectiveAccessResponse
 
     @GET("api/UsuariosWeb/mis-sesiones")
     suspend fun getMisSesiones(): List<SesionResponse>
@@ -537,12 +585,6 @@ interface ApiService {
 
     @POST("api/Sensores/tracking-batch")
     suspend fun sendTrackingBatch(@Body requests: List<TrackingGpsRequest>): MessageResponse
-
-    @POST("api/Notificaciones/fcm/registrar-token")
-    suspend fun registerFcmToken(@Body request: RegisterFcmTokenRequest): MessageResponse
-
-    @DELETE("api/Notificaciones/fcm/token/{token}")
-    suspend fun deleteFcmToken(@Path("token") token: String): MessageResponse
 
     @DELETE("api/UsuariosWeb/mis-sesiones/{id}")
     suspend fun deleteSesion(@Path("id") id: String): MessageResponse

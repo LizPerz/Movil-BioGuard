@@ -16,6 +16,12 @@ interface CachedDataDao {
     @Query("SELECT * FROM cached_readings WHERE pacienteId = :pacienteId ORDER BY timestamp DESC LIMIT :limit")
     fun getCachedReadings(pacienteId: String, limit: Int = 50): Flow<List<CachedReadingEntity>>
 
+    @Query("SELECT * FROM cached_readings ORDER BY timestamp DESC LIMIT :limit")
+    fun getAllCachedReadings(limit: Int = 50): Flow<List<CachedReadingEntity>>
+
+    @Query("SELECT * FROM cached_readings WHERE pacienteId = :pacienteId ORDER BY timestamp DESC LIMIT :limit")
+    suspend fun getRecentReadingsSnapshot(pacienteId: String, limit: Int = 120): List<CachedReadingEntity>
+
     @Query("DELETE FROM cached_readings WHERE pacienteId = :pacienteId")
     suspend fun clearReadings(pacienteId: String): Int
 

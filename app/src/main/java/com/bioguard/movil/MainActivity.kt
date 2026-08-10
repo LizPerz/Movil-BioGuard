@@ -4,15 +4,11 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.PowerManager
-import android.provider.Settings
 import android.view.MotionEvent
 import android.view.WindowManager
 import android.widget.Toast
-import android.app.AlertDialog
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -49,7 +45,6 @@ class MainActivity : FragmentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
 
         requestRuntimePermissions()
-        checkBatteryOptimizations()
         checkRootAndWarn()
         startInactivityTimer()
 
@@ -125,27 +120,6 @@ class MainActivity : FragmentActivity() {
         }
         if (missing.isNotEmpty()) {
             permissionLauncher.launch(missing.toTypedArray())
-        }
-    }
-
-    private fun checkBatteryOptimizations() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
-                AlertDialog.Builder(this)
-                    .setTitle("Optimización de Batería")
-                    .setMessage("Para evitar que el sistema interrumpa el monitoreo del Guardián Nocturno, excluya a BioGuard de las optimizaciones de batería.")
-                    .setPositiveButton("Configurar") { _, _ ->
-                        try {
-                            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                                data = Uri.parse("package:$packageName")
-                            }
-                            startActivity(intent)
-                        } catch (_: Exception) {}
-                    }
-                    .setNegativeButton("Cancelar", null)
-                    .show()
-            }
         }
     }
 

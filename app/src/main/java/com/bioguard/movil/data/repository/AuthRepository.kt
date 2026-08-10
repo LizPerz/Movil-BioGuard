@@ -19,6 +19,9 @@ import com.bioguard.movil.network.CambiarPasswordRequest
 import com.bioguard.movil.network.RefreshTokenRequest
 import com.bioguard.movil.network.Verificar2faRequest
 import com.bioguard.movil.network.MessageResponse
+import com.bioguard.movil.ui.model.AppPermission
+import com.bioguard.movil.ui.model.EffectiveAccess
+import com.bioguard.movil.ui.model.UserRole
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 
@@ -163,6 +166,42 @@ class AuthRepository @Inject constructor(
         return true
     }
 
+    suspend fun getEffectiveAccess(fallbackRole: UserRole): EffectiveAccess {
+        return try {
+            val response = api.getMiAcceso()
+            val role = UserRole.from(response.rol)
+            val access = EffectiveAccess(
+                role = role,
+                patientId = response.pacienteId,
+                caregiverAccessLevel = response.nivelAccesoCuidador,
+                caregiverWithinPlan = response.cuidadorDentroDelPlan,
+                planName = response.plan?.nombre,
+                permissions = response.permisos.mapNotNull { AppPermission.fromCode(it) }.toSet()
+            )
+            prefs.saveEffectiveAccess(
+                patientId = access.patientId,
+                caregiverAccessLevel = access.caregiverAccessLevel,
+                planName = access.planName,
+                permissionCodes = access.permissions.map { it.code }.toSet()
+            )
+            access
+        } catch (_: Exception) {
+            val cachedCodes = prefs.accessPermissions.first()
+            if (cachedCodes.isNotEmpty()) {
+                EffectiveAccess(
+                    role = fallbackRole,
+                    patientId = prefs.patientId.first(),
+                    caregiverAccessLevel = prefs.caregiverAccessLevel.first(),
+                    caregiverWithinPlan = true,
+                    planName = prefs.planName.first(),
+                    permissions = cachedCodes.mapNotNull { AppPermission.fromCode(it) }.toSet()
+                )
+            } else {
+                EffectiveAccess.restricted(fallbackRole, prefs.patientId.first())
+            }
+        }
+    }
+
     suspend fun verificar2fa(correo: String, codigoOtp: String): Resource<LoginWebResponse> {
         return try {
             val response = api.verificar2fa(Verificar2faRequest(correo = correo, codigoOtp = codigoOtp))
@@ -181,7 +220,8 @@ class AuthRepository @Inject constructor(
         }
         RetrofitClient.setToken(null)
         tokenStorage.clear()
-        prefs.clearAll()
+        // Pairing identity and UI preferences belong to this installation, not to the cloud session.
+        prefs.clearSession()
         // Purga la cola offline para no dejar datos del usuario anterior
         pendingDataDao.clearReadings()
         pendingDataDao.clearGps()

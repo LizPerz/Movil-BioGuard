@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.bioguard.movil.datastore.UserPreferences
 import com.bioguard.movil.data.local.PendingDataDao
 import com.bioguard.movil.service.BioGuardMonitoringService
+import com.bioguard.movil.service.CloudSyncPhase
+import com.bioguard.movil.service.CloudSyncStatusStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,9 +25,12 @@ data class SettingsUiState(
     val isBatchSyncEnabled: Boolean = false,
     val pendingItems: Int = 0,
     val isManualSyncing: Boolean = false,
+    val cloudSyncPhase: CloudSyncPhase = CloudSyncPhase.IDLE,
     val isNightGuardianEnabled: Boolean = true,
     val nightGuardianStartHour: Int = 22,
     val nightGuardianEndHour: Int = 6,
+    val isLocalAlertsEnabled: Boolean = true,
+    val isLocalAnalysisEnabled: Boolean = true,
     val isSaving: Boolean = false,
     val saveSuccess: Boolean = false
 )
@@ -42,6 +47,7 @@ class SettingsViewModel @Inject constructor(
 
     init {
         loadSettings()
+        observeCloudSync()
     }
 
     private fun loadSettings() {
@@ -54,6 +60,8 @@ class SettingsViewModel @Inject constructor(
             val nightEnabled = prefs.isNightGuardianEnabled.first()
             val nStart = prefs.nightGuardianStartHour.first()
             val nEnd = prefs.nightGuardianEndHour.first()
+            val localAlerts = prefs.isLocalAlertsEnabled.first()
+            val localAnalysis = prefs.isLocalAnalysisEnabled.first()
 
             _uiState.update {
                 it.copy(
@@ -64,7 +72,9 @@ class SettingsViewModel @Inject constructor(
                     isBatchSyncEnabled = batchEnabled,
                     isNightGuardianEnabled = nightEnabled,
                     nightGuardianStartHour = nStart,
-                    nightGuardianEndHour = nEnd
+                    nightGuardianEndHour = nEnd,
+                    isLocalAlertsEnabled = localAlerts,
+                    isLocalAnalysisEnabled = localAnalysis
                 )
             }
             refreshPendingItems()
@@ -88,13 +98,22 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun syncNow() {
-        _uiState.update { it.copy(isManualSyncing = true) }
         BioGuardMonitoringService.requestCloudSync(getApplication())
+    }
+
+    private fun observeCloudSync() {
         viewModelScope.launch {
-            // The foreground service publishes the result; refresh after its current batch settles.
-            kotlinx.coroutines.delay(2_000)
-            refreshPendingItems()
-            _uiState.update { it.copy(isManualSyncing = false) }
+            CloudSyncStatusStore.status.collect { status ->
+                status.pendingItems?.let { pending ->
+                    _uiState.update { it.copy(pendingItems = pending) }
+                }
+                _uiState.update {
+                    it.copy(
+                        isManualSyncing = status.phase == CloudSyncPhase.RUNNING,
+                        cloudSyncPhase = status.phase
+                    )
+                }
+            }
         }
     }
 
@@ -114,6 +133,14 @@ class SettingsViewModel @Inject constructor(
         _uiState.update { it.copy(nightGuardianStartHour = start, nightGuardianEndHour = end) }
     }
 
+    fun updateLocalAlertsEnabled(enabled: Boolean) {
+        _uiState.update { it.copy(isLocalAlertsEnabled = enabled) }
+    }
+
+    fun updateLocalAnalysisEnabled(enabled: Boolean) {
+        _uiState.update { it.copy(isLocalAnalysisEnabled = enabled) }
+    }
+
     fun saveSettings() {
         viewModelScope.launch {
             _uiState.update { it.copy(isSaving = true, saveSuccess = false) }
@@ -131,6 +158,11 @@ class SettingsViewModel @Inject constructor(
                 isEnabled = state.isNightGuardianEnabled,
                 startHour = state.nightGuardianStartHour,
                 endHour = state.nightGuardianEndHour
+            )
+
+            prefs.saveLocalAnalysisSettings(
+                alertsEnabled = state.isLocalAlertsEnabled,
+                analysisEnabled = state.isLocalAnalysisEnabled
             )
 
             _uiState.update { it.copy(isSaving = false, saveSuccess = true) }

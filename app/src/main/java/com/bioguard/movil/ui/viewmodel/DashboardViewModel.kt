@@ -8,6 +8,7 @@ import com.bioguard.movil.data.local.CachedReadingEntity
 import com.bioguard.movil.datastore.UserPreferences
 import com.bioguard.movil.network.DashboardSummary
 import com.bioguard.movil.network.LecturaSensorResponse
+import com.bioguard.movil.service.WearableConnectionState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,6 +25,7 @@ data class DashboardUiState(
     val summary: DashboardSummary? = null,
     val lecturasRecientes: List<LecturaSensorResponse> = emptyList(),
     val pacienteId: String? = null,
+    val connectionState: WearableConnectionState = WearableConnectionState.DISCONNECTED,
     val error: String? = null
 )
 
@@ -45,18 +47,19 @@ class DashboardViewModel @Inject constructor(
     fun loadDashboard() {
         dashboardJob?.cancel()
         dashboardJob = viewModelScope.launch {
-            val patientId = prefs.patientId.first() ?: run {
-                _uiState.update { it.copy(error = "No hay paciente configurado") }
-                return@launch
-            }
+            val patientId = prefs.patientId.first() ?: "paciente-local"
+            _uiState.update { it.copy(isLoading = false, error = null, pacienteId = patientId) }
 
-            _uiState.update { it.copy(isLoading = true, error = null, pacienteId = patientId) }
-
-            cachedDataDao.getCachedReadings(patientId, 10).collectLatest { cachedReadings ->
+            cachedDataDao.getAllCachedReadings(2000).collectLatest { cachedReadings ->
+                val latest = cachedReadings.firstOrNull()?.toResponse()
+                val connState = if (cachedReadings.isNotEmpty()) WearableConnectionState.STREAMING else WearableConnectionState.PAIRED
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        summary = null,
+                        connectionState = connState,
+                        summary = DashboardSummary(
+                            ultimaLectura = latest
+                        ),
                         lecturasRecientes = cachedReadings.map { reading -> reading.toResponse() },
                         error = null
                     )

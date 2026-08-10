@@ -21,7 +21,7 @@ interface PendingDataDao {
     suspend fun countPendingAlerts(): Int
 
     // Sensor Readings
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertReading(reading: PendingReadingEntity): Long
 
     @Query("SELECT * FROM pending_readings ORDER BY timestamp ASC LIMIT :limit")

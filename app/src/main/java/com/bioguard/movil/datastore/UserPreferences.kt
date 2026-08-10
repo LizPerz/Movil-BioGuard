@@ -20,6 +20,9 @@ class UserPreferences(private val context: Context) {
         val USER_NAME = stringPreferencesKey("user_name")
         val USER_ROLE = stringPreferencesKey("user_role")
         val PATIENT_ID = stringPreferencesKey("patient_id")
+        val ACCESS_PERMISSIONS = stringPreferencesKey("access_permissions")
+        val CAREGIVER_ACCESS_LEVEL = stringPreferencesKey("caregiver_access_level")
+        val PLAN_NAME = stringPreferencesKey("plan_name")
         val THEME = stringPreferencesKey("theme")
         val IS_DARK_MODE = booleanPreferencesKey("is_dark_mode")
         
@@ -32,6 +35,8 @@ class UserPreferences(private val context: Context) {
         val IS_NIGHT_GUARDIAN_ENABLED = booleanPreferencesKey("is_night_guardian_enabled")
         val NIGHT_GUARDIAN_START_HOUR = intPreferencesKey("night_guardian_start_hour")
         val NIGHT_GUARDIAN_END_HOUR = intPreferencesKey("night_guardian_end_hour")
+        val IS_LOCAL_ALERTS_ENABLED = booleanPreferencesKey("is_local_alerts_enabled")
+        val IS_LOCAL_ANALYSIS_ENABLED = booleanPreferencesKey("is_local_analysis_enabled")
         
         // Dispositivo vinculado
         val DEVICE_ID = stringPreferencesKey("device_id")
@@ -53,6 +58,15 @@ class UserPreferences(private val context: Context) {
     val userName: Flow<String?> = context.dataStore.data.map { it[Keys.USER_NAME] }
     val userRole: Flow<String?> = context.dataStore.data.map { it[Keys.USER_ROLE] }
     val patientId: Flow<String?> = context.dataStore.data.map { it[Keys.PATIENT_ID] }
+    val accessPermissions: Flow<Set<String>> = context.dataStore.data.map { prefs ->
+        prefs[Keys.ACCESS_PERMISSIONS]
+            ?.split(',')
+            ?.filter { it.isNotBlank() }
+            ?.toSet()
+            ?: emptySet()
+    }
+    val caregiverAccessLevel: Flow<String?> = context.dataStore.data.map { it[Keys.CAREGIVER_ACCESS_LEVEL] }
+    val planName: Flow<String?> = context.dataStore.data.map { it[Keys.PLAN_NAME] }
     val theme: Flow<String?> = context.dataStore.data.map { it[Keys.THEME] }
     val isDarkMode: Flow<Boolean> = context.dataStore.data.map { it[Keys.IS_DARK_MODE] ?: true }
 
@@ -65,6 +79,8 @@ class UserPreferences(private val context: Context) {
     val isNightGuardianEnabled: Flow<Boolean> = context.dataStore.data.map { it[Keys.IS_NIGHT_GUARDIAN_ENABLED] ?: true }
     val nightGuardianStartHour: Flow<Int> = context.dataStore.data.map { it[Keys.NIGHT_GUARDIAN_START_HOUR] ?: 22 }
     val nightGuardianEndHour: Flow<Int> = context.dataStore.data.map { it[Keys.NIGHT_GUARDIAN_END_HOUR] ?: 6 }
+    val isLocalAlertsEnabled: Flow<Boolean> = context.dataStore.data.map { it[Keys.IS_LOCAL_ALERTS_ENABLED] ?: true }
+    val isLocalAnalysisEnabled: Flow<Boolean> = context.dataStore.data.map { it[Keys.IS_LOCAL_ANALYSIS_ENABLED] ?: true }
 
     val deviceId: Flow<String?> = context.dataStore.data.map { it[Keys.DEVICE_ID] }
     val deviceName: Flow<String?> = context.dataStore.data.map { it[Keys.DEVICE_NAME] }
@@ -120,6 +136,23 @@ class UserPreferences(private val context: Context) {
         }
     }
 
+    suspend fun saveEffectiveAccess(
+        patientId: String?,
+        caregiverAccessLevel: String?,
+        planName: String?,
+        permissionCodes: Set<String>
+    ) {
+        context.dataStore.edit { prefs ->
+            if (patientId.isNullOrBlank()) prefs.remove(Keys.PATIENT_ID)
+            else prefs[Keys.PATIENT_ID] = patientId
+            if (caregiverAccessLevel.isNullOrBlank()) prefs.remove(Keys.CAREGIVER_ACCESS_LEVEL)
+            else prefs[Keys.CAREGIVER_ACCESS_LEVEL] = caregiverAccessLevel
+            if (planName.isNullOrBlank()) prefs.remove(Keys.PLAN_NAME)
+            else prefs[Keys.PLAN_NAME] = planName
+            prefs[Keys.ACCESS_PERMISSIONS] = permissionCodes.sorted().joinToString(",")
+        }
+    }
+
     suspend fun saveDeviceData(
         deviceId: String,
         deviceName: String,
@@ -171,7 +204,33 @@ class UserPreferences(private val context: Context) {
         }
     }
 
+    suspend fun saveLocalAnalysisSettings(alertsEnabled: Boolean, analysisEnabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.IS_LOCAL_ALERTS_ENABLED] = alertsEnabled
+            prefs[Keys.IS_LOCAL_ANALYSIS_ENABLED] = analysisEnabled
+        }
+    }
+
     suspend fun clearAll() {
         context.dataStore.edit { it.clear() }
+    }
+
+    suspend fun clearSession() {
+        context.dataStore.edit { prefs ->
+            prefs.remove(Keys.USER_ID)
+            prefs.remove(Keys.USER_NAME)
+            prefs.remove(Keys.USER_ROLE)
+            prefs.remove(Keys.PATIENT_ID)
+            prefs.remove(Keys.ACCESS_PERMISSIONS)
+            prefs.remove(Keys.CAREGIVER_ACCESS_LEVEL)
+            prefs.remove(Keys.PLAN_NAME)
+            prefs.remove(Keys.PATIENT_BIRTH_DATE)
+            prefs.remove(Keys.PATIENT_SEX)
+            prefs.remove(Keys.PATIENT_WEIGHT)
+            prefs.remove(Keys.PATIENT_HEIGHT)
+            prefs.remove(Keys.PATIENT_IS_DIABETIC)
+            prefs.remove(Keys.PATIENT_FAMILY_DIABETES)
+            prefs.remove(Keys.PATIENT_ACTIVITY_LEVEL)
+        }
     }
 }

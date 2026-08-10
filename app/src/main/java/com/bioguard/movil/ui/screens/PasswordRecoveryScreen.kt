@@ -216,7 +216,7 @@ fun PasswordRecoveryScreen(
 
                     OutlinedTextField(
                         value = email,
-                        onValueChange = { email = it },
+                        onValueChange = { email = it.take(254) },
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text(stringResource(R.string.password_recovery_email_hint), color = TextTertiary) },
                         leadingIcon = { Text(text = "\u2709", color = TextTertiary, fontSize = 16.sp) },
@@ -434,7 +434,7 @@ fun PasswordRecoveryScreen(
 
                     OutlinedTextField(
                         value = newPassword,
-                        onValueChange = { newPassword = it },
+                        onValueChange = { newPassword = it.take(128) },
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text(stringResource(R.string.password_recovery_new_hint), color = TextTertiary) },
                         leadingIcon = { Text(text = "\uD83D\uDD12", color = TextTertiary, fontSize = 16.sp) },
@@ -470,7 +470,7 @@ fun PasswordRecoveryScreen(
 
                     OutlinedTextField(
                         value = confirmPassword,
-                        onValueChange = { confirmPassword = it },
+                        onValueChange = { confirmPassword = it.take(128) },
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text(stringResource(R.string.password_recovery_confirm_hint), color = TextTertiary) },
                         leadingIcon = { Text(text = "\uD83D\uDD12", color = TextTertiary, fontSize = 16.sp) },

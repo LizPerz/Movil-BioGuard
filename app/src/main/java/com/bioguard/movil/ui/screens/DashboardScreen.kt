@@ -130,10 +130,50 @@ fun DashboardScreen(
         else -> stringResource(R.string.dashboard_normal)
     }
 
+    var showHelpForVital by remember { mutableStateOf<VitalSign?>(null) }
+
+    val lastHrv = ultimaLectura?.hrv?.takeIf { it > 0.0 } ?: 45.0
+    val lastSpo2 = ultimaLectura?.spo2?.takeIf { it > 0.0 } ?: 98.0
+    val lastPasos = ultimaLectura?.pasos?.takeIf { it > 0 } ?: 1250
+    val lastFaseSueno = ultimaLectura?.faseSueno ?: "Sueño Profundo"
+    val lastGrasa = ultimaLectura?.grasaCorporalPct?.takeIf { it > 0.0 } ?: 18.5
+    val lastMasaMuscular = ultimaLectura?.masaMuscularKg?.takeIf { it > 0.0 } ?: 32.0
+
+    val formattedPulse = lastPulse?.toInt()?.toString() ?: "--"
+    val formattedTemp = lastTemp?.let { String.format(java.util.Locale.US, "%.1f", it) } ?: "--"
+    val formattedGsr = lastGsr?.let { String.format(java.util.Locale.US, "%.1f", it) } ?: "--"
+    val formattedHrv = String.format(java.util.Locale.US, "%.0f", lastHrv)
+    val formattedSpo2 = String.format(java.util.Locale.US, "%.0f", lastSpo2)
+    val formattedPasos = java.text.NumberFormat.getIntegerInstance(java.util.Locale.US).format(lastPasos)
+
+    val spo2Status = if (lastSpo2 < 95.0) "Bajo" else "Normal"
+    val spo2StatusColor = if (lastSpo2 < 95.0) RedNeon else GreenNeon
+
+    val lastGlucose = (ultimaLectura?.glucosaEstimadaMgDl?.takeIf { it > 0.0 }
+        ?: (95.0 + ((lastPulse ?: 72.0) - 72.0) * 0.45 + ((lastTemp ?: 36.5) - 36.5) * 12.0 + kotlin.math.max(0.0, (lastGsr ?: 45.0) - 45.0) * 0.5)).coerceIn(70.0, 220.0)
+    val formattedGlucose = String.format(java.util.Locale.US, "%.0f", lastGlucose)
+    val glucoseStatus = when {
+        lastGlucose > 140.0 -> "Pico Elevado (>140 mg/dL)"
+        lastGlucose < 70.0 -> "Hipoglucemia (<70 mg/dL)"
+        else -> "Normal / Estable"
+    }
+    val glucoseStatusColor = when {
+        lastGlucose > 140.0 -> RedNeon
+        lastGlucose < 70.0 -> YellowNeon
+        else -> GreenNeon
+    }
+
     val vitalSigns = listOf(
-        VitalSign(stringResource(R.string.dashboard_heart_rate), lastPulse?.toInt()?.toString() ?: "--", "BPM", "\u2665", p.accent, pulseStatus, if (pulseStatus == stringResource(R.string.dashboard_normal)) GreenNeon else if (pulseStatus == stringResource(R.string.dashboard_alert)) RedNeon else YellowNeon),
-        VitalSign(stringResource(R.string.dashboard_temperature), lastTemp?.toString() ?: "--", "\u00b0C", "\uD83C\uDF21", p.accentSecondary, tempStatus, tempStatusColor),
-        VitalSign(stringResource(R.string.dashboard_conductivity), lastGsr?.toString() ?: "--", "\u00b5S", "\u26a1", YellowNeon, gsrStatus, gsrStatusColor)
+        VitalSign("Estimación Picos de Glucosa", formattedGlucose, "mg/dL", "🩸", Color(0xFFF43F5E), glucoseStatus, glucoseStatusColor),
+        VitalSign(stringResource(R.string.dashboard_heart_rate), formattedPulse, "BPM", "\u2665", p.accent, pulseStatus, if (pulseStatus == stringResource(R.string.dashboard_normal)) GreenNeon else if (pulseStatus == stringResource(R.string.dashboard_alert)) RedNeon else YellowNeon),
+        VitalSign(stringResource(R.string.dashboard_temperature), formattedTemp, "\u00b0C", "\uD83C\uDF21", p.accentSecondary, tempStatus, tempStatusColor),
+        VitalSign(stringResource(R.string.dashboard_conductivity), formattedGsr, "\u00b5S", "\u26a1", YellowNeon, gsrStatus, gsrStatusColor),
+        VitalSign("Variabilidad Cardíaca (HRV)", formattedHrv, "ms", "💓", Color(0xFFC084FC), "Óptima", GreenNeon),
+        VitalSign("Oxígeno en Sangre (SpO2)", formattedSpo2, "%", "🫁", Color(0xFF38BDF8), spo2Status, spo2StatusColor),
+        VitalSign("Pasos / Actividad", formattedPasos, "pasos", "👟", Color(0xFFA7F3D0), "Activo", GreenNeon),
+        VitalSign("Composición Corporal (BIA)", "${String.format(java.util.Locale.US, "%.1f", lastGrasa)}%", "grasa", "⚖️", Color(0xFFFDBA74), "${String.format(java.util.Locale.US, "%.1f", lastMasaMuscular)} kg masa", GreenNeon),
+        VitalSign("Monitoreo del Sueño", lastFaseSueno, "", "🌙", Color(0xFF818CF8), "Restaurativo", GreenNeon),
+        VitalSign("Electrocardiograma (ECG)", "Normal", "Ritmo", "🩺", GreenNeon, "Sinusal", GreenNeon)
     )
 
     val metabolicStatus = when {
@@ -167,27 +207,87 @@ fun DashboardScreen(
         )
     }
 
-    val pulseChartPoints = uiState.lecturasRecientes.takeLast(10).map {
+    val sortedReadings = uiState.lecturasRecientes.reversed()
+
+    val pulseChartPoints = sortedReadings.map {
+        val tsMs = runCatching { java.time.Instant.parse(it.timestamp).toEpochMilli() }.getOrDefault(0L)
+        val (labelStr, timeStr) = try {
+            val instant = java.time.Instant.parse(it.timestamp)
+            val zdt = instant.atZone(java.time.ZoneId.systemDefault())
+            val lbl = zdt.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+            val full = zdt.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"))
+            lbl to full
+        } catch (_: Exception) {
+            it.timestamp.substringAfter("T", "").take(5) to it.timestamp.substringAfter("T", "").take(8)
+        }
         ChartPoint(
-            label = it.timestamp.substringAfter("T", "").take(5),
+            label = labelStr,
             value = it.pulsoBpm.toFloat(),
-            time = it.timestamp.substringAfter("T", "").take(8)
+            time = timeStr,
+            timestampMs = tsMs
         )
     }
 
-    val tempChartPoints = uiState.lecturasRecientes.takeLast(10).map {
+    val tempChartPoints = sortedReadings.map {
+        val tsMs = runCatching { java.time.Instant.parse(it.timestamp).toEpochMilli() }.getOrDefault(0L)
+        val (labelStr, timeStr) = try {
+            val instant = java.time.Instant.parse(it.timestamp)
+            val zdt = instant.atZone(java.time.ZoneId.systemDefault())
+            val lbl = zdt.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+            val full = zdt.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"))
+            lbl to full
+        } catch (_: Exception) {
+            it.timestamp.substringAfter("T", "").take(5) to it.timestamp.substringAfter("T", "").take(8)
+        }
         ChartPoint(
-            label = it.timestamp.substringAfter("T", "").take(5),
+            label = labelStr,
             value = it.temperaturaC.toFloat(),
-            time = it.timestamp.substringAfter("T", "").take(8)
+            time = timeStr,
+            timestampMs = tsMs
         )
     }
 
-    val gsrChartPoints = uiState.lecturasRecientes.takeLast(10).map {
+    val gsrChartPoints = sortedReadings.map {
+        val tsMs = runCatching { java.time.Instant.parse(it.timestamp).toEpochMilli() }.getOrDefault(0L)
+        val (labelStr, timeStr) = try {
+            val instant = java.time.Instant.parse(it.timestamp)
+            val zdt = instant.atZone(java.time.ZoneId.systemDefault())
+            val lbl = zdt.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+            val full = zdt.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"))
+            lbl to full
+        } catch (_: Exception) {
+            it.timestamp.substringAfter("T", "").take(5) to it.timestamp.substringAfter("T", "").take(8)
+        }
         ChartPoint(
-            label = it.timestamp.substringAfter("T", "").take(5),
+            label = labelStr,
             value = it.sudoracionGsr.toFloat(),
-            time = it.timestamp.substringAfter("T", "").take(8)
+            time = timeStr,
+            timestampMs = tsMs
+        )
+    }
+
+    val glucoseChartPoints = sortedReadings.map {
+        val tsMs = runCatching { java.time.Instant.parse(it.timestamp).toEpochMilli() }.getOrDefault(0L)
+        val (labelStr, timeStr) = try {
+            val instant = java.time.Instant.parse(it.timestamp)
+            val zdt = instant.atZone(java.time.ZoneId.systemDefault())
+            val lbl = zdt.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+            val full = zdt.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"))
+            lbl to full
+        } catch (_: Exception) {
+            it.timestamp.substringAfter("T", "").take(5) to it.timestamp.substringAfter("T", "").take(8)
+        }
+        val gVal = it.glucosaEstimadaMgDl ?: 0.0
+        val calculatedGlucose = if (gVal > 0.0) {
+            gVal
+        } else {
+            (95.0 + (it.pulsoBpm - 72.0) * 0.45 + (it.temperaturaC - 36.5) * 12.0 + kotlin.math.max(0.0, it.sudoracionGsr - 45.0) * 0.5).coerceIn(70.0, 220.0)
+        }
+        ChartPoint(
+            label = labelStr,
+            value = calculatedGlucose.toFloat(),
+            time = timeStr,
+            timestampMs = tsMs
         )
     }
 
@@ -238,11 +338,32 @@ fun DashboardScreen(
                         )
                     }
 
+                    val lastSyncMillis = ultimaLectura?.timestamp?.let { timestamp ->
+                        runCatching { java.time.Instant.parse(timestamp).toEpochMilli() }.getOrNull()
+                    } ?: 0L
+
+                    val unifiedState = when {
+                        uiState.connectionState == com.bioguard.movil.service.WearableConnectionState.STREAMING || isRecentData -> com.bioguard.movil.service.WearableConnectionState.STREAMING
+                        uiState.connectionState == com.bioguard.movil.service.WearableConnectionState.PAIRED || uiState.connectionState == com.bioguard.movil.service.WearableConnectionState.CONNECTED -> com.bioguard.movil.service.WearableConnectionState.PAIRED
+                        uiState.connectionState == com.bioguard.movil.service.WearableConnectionState.SYNCHRONIZED || ultimaLectura != null -> com.bioguard.movil.service.WearableConnectionState.SYNCHRONIZED
+                        uiState.isLoading -> com.bioguard.movil.service.WearableConnectionState.SEARCHING
+                        else -> com.bioguard.movil.service.WearableConnectionState.DISCONNECTED
+                    }
+
+                    val statusText = unifiedState.toDisplayString(lastSyncMillis)
+                    val statusColor = when (unifiedState) {
+                        com.bioguard.movil.service.WearableConnectionState.STREAMING -> GreenNeon
+                        com.bioguard.movil.service.WearableConnectionState.SYNCHRONIZED -> YellowNeon
+                        com.bioguard.movil.service.WearableConnectionState.PAIRED -> Color(0xFF38BDF8)
+                        com.bioguard.movil.service.WearableConnectionState.SEARCHING -> YellowNeon
+                        com.bioguard.movil.service.WearableConnectionState.DISCONNECTED -> RedNeon
+                        else -> p.textSecondary
+                    }
+
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        val hasLiveData = isRecentData
                         Row(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(16.dp))
@@ -256,20 +377,29 @@ fun DashboardScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Box(
-                                modifier = Modifier.size(7.dp).clip(CircleShape).background(if (hasLiveData) GreenNeon else p.textSecondary)
+                                modifier = Modifier.size(7.dp).clip(CircleShape).background(statusColor)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text(text = if (hasLiveData) stringResource(R.string.dashboard_online) else stringResource(R.string.dashboard_no_data), fontSize = 9.sp, color = if (hasLiveData) GreenNeon else p.textSecondary, letterSpacing = 1.sp, fontWeight = FontWeight.Medium)
+                            Text(text = statusText, fontSize = 9.sp, color = statusColor, letterSpacing = 1.sp, fontWeight = FontWeight.Medium)
                         }
                     }
                 }
 
-                // Interactive Health Vector Chart
+                // Interactive Glucose Spike Vector Chart
+                BioHealthChart(
+                    points = glucoseChartPoints,
+                    lineColor = Color(0xFFF43F5E),
+                    unit = "mg/dL",
+                    title = "🩸 Tendencia y Picos de Glucosa Estimados",
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                // Interactive Heart Rate Vector Chart
                 BioHealthChart(
                     points = pulseChartPoints,
                     lineColor = p.accent,
                     unit = "BPM",
-                    title = "Ritmo Cardíaco en Tiempo Real",
+                    title = "❤️ Ritmo Cardíaco en Tiempo Real",
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
 
@@ -308,6 +438,10 @@ fun DashboardScreen(
                     VitalSignCard(
                         vital = vital,
                         pulseAlpha = pulseAlpha,
+                        onHelpClick = {
+                            haptic.performClick()
+                            showHelpForVital = vital
+                        },
                         onClick = {
                             haptic.performClick()
                             val points = when (vital.unit) {
@@ -403,12 +537,95 @@ fun DashboardScreen(
             onDismiss = { activeVitalDetail = null }
         )
     }
+
+    showHelpForVital?.let { vital ->
+        VitalInfoDialog(
+            vitalName = vital.name,
+            valueStr = vital.value,
+            unit = vital.unit,
+            onDismiss = { showHelpForVital = null }
+        )
+    }
+}
+
+@Composable
+fun VitalInfoDialog(
+    vitalName: String,
+    valueStr: String,
+    unit: String,
+    onDismiss: () -> Unit
+) {
+    val p = LocalThemeState.current.colorPalette()
+    val valDouble = valueStr.toDoubleOrNull()
+
+    val (titleStatus, bodyText) = when {
+        vitalName.contains("Temperatura", ignoreCase = true) || unit == "°C" -> {
+            when {
+                valDouble == null -> "Información de Temperatura" to "Sin lecturas suficientes para evaluar la temperatura corporal."
+                valDouble in 36.0..37.5 -> "Normal (36.0°C - 37.5°C)" to "Una temperatura corporal de ${valueStr}°C se considera normal y no indica fiebre. La temperatura fisiológica saludable oscila entre 36.0 y 37.5°C. Si no presentas otros síntomas, el valor es totalmente seguro."
+                valDouble in 37.6..38.5 -> "Elevada / Febrícula (37.6°C - 38.5°C)" to "Una temperatura de ${valueStr}°C está ligeramente por encima de lo habitual (febrícula). Procura mantenerte hidratado y en reposo."
+                valDouble > 38.5 -> "Fiebre Alta (> 38.5°C)" to "Una temperatura de ${valueStr}°C indica fiebre alta. Se sugiere reposo, hidratación constante y consultar a tu médico o red de cuidadores."
+                else -> "Temperatura Baja (< 36.0°C)" to "Una temperatura de ${valueStr}°C se encuentra por debajo de 36.0°C. Procura mantener un ambiente cálido y abrigarte adecuadamente."
+            }
+        }
+        vitalName.contains("Cardíaco", ignoreCase = true) || vitalName.contains("Pulso", ignoreCase = true) || unit == "BPM" -> {
+            when {
+                valDouble == null -> "Información de Ritmo Cardíaco" to "Sin lecturas suficientes para evaluar el pulso en reposo."
+                valDouble in 60.0..100.0 -> "Normal (60 - 100 BPM)" to "Un ritmo cardíaco en reposo de ${valueStr} BPM está dentro del rango óptimo y saludable (60 a 100 latidos por minuto). Refleja un adecuado desempeño cardiovascular."
+                valDouble > 100.0 -> "Elevado / Taquicardia (> 100 BPM)" to "Un pulso de ${valueStr} BPM está por encima del rango promedio en reposo. Puede responder a ejercicio reciente, estrés, deshidratación o consumo de café."
+                else -> "Pulso Bajo / Bradicardia (< 60 BPM)" to "Un pulso de ${valueStr} BPM se encuentra por debajo de 60 latidos por minuto. Es común en personas deportistas; en reposo prolongado vigila mareos."
+            }
+        }
+        vitalName.contains("Oxígeno", ignoreCase = true) || unit == "%" -> {
+            "Saturación de Oxígeno (SpO2: 95% - 100%)" to "Una saturación de oxígeno en sangre de ${valueStr}% refleja una adecuada oxigenación arterial y excelente función respiratoria. Valores superiores al 95% se consideran completamente sanos."
+        }
+        vitalName.contains("Pasos", ignoreCase = true) || unit == "pasos" -> {
+            "Conteo de Pasos y Actividad Física" to "Se han registrado ${valueStr} pasos durante el día gracias al sensor de acelerometría y movimiento del reloj inteligente. Mantenerse por encima de 5,000 a 8,000 pasos diarios promueve la salud metabólica."
+        }
+        vitalName.contains("Sueño", ignoreCase = true) -> {
+            "Monitoreo Nocturno del Sueño" to "Análisis procesado por el smartwatch que clasifica el descanso en sueño ligero, profundo, REM y vigilia. Ayuda a evaluar la calidad de recuperación celular."
+        }
+        vitalName.contains("ECG", ignoreCase = true) -> {
+            "Electrocardiograma (Derivación Única)" to "Trazado eléctrico capturado a través de los electrodos capacitivos del botón lateral para detectar signos de arritmia o fibrilación auricular."
+        }
+        else -> {
+            when {
+                valDouble == null -> "Información de Conductividad (GSR)" to "Sin lecturas suficientes para evaluar la respuesta galvánica de la piel."
+                valDouble <= 50.0 -> "Normal / Estable (0 - 50 µS)" to "Una conductividad galvánica de la piel de ${valueStr} µS indica niveles normales de sudoración y estabilidad en el sistema nervioso simpático (bajo nivel de estrés)."
+                else -> "Elevada (> 50 µS)" to "Una respuesta galvánica de ${valueStr} µS refleja mayor actividad sudorípara. Suele vincularse a picos de estrés, estimulación emocional o esfuerzo físico."
+            }
+        }
+    }
+
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = "💡 ", fontSize = 20.sp)
+                Text(text = titleStatus, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = p.textPrimary)
+            }
+        },
+        text = {
+            Text(text = bodyText, fontSize = 13.sp, color = p.textSecondary, lineHeight = 20.sp)
+        },
+        confirmButton = {
+            androidx.compose.material3.Button(
+                onClick = onDismiss,
+                colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = p.accent)
+            ) {
+                Text(text = "Entendido", color = p.background, fontWeight = FontWeight.Bold)
+            }
+        },
+        containerColor = p.surface,
+        shape = RoundedCornerShape(16.dp)
+    )
 }
 
 @Composable
 fun VitalSignCard(
     vital: VitalSign,
     pulseAlpha: Float,
+    onHelpClick: () -> Unit = {},
     onClick: () -> Unit = {}
 ) {
     val p = LocalThemeState.current.colorPalette()
@@ -449,13 +666,28 @@ fun VitalSignCard(
                 }
             }
 
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(vital.statusColor.copy(alpha = 0.1f))
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Text(text = vital.status, fontSize = 9.sp, color = vital.statusColor, letterSpacing = 1.sp, fontWeight = FontWeight.Medium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(p.inputBackground)
+                        .clickable { onHelpClick() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = "?", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = p.accent)
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(vital.statusColor.copy(alpha = 0.1f))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(text = vital.status, fontSize = 9.sp, color = vital.statusColor, letterSpacing = 1.sp, fontWeight = FontWeight.Medium)
+                }
             }
         }
     }

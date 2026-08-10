@@ -21,7 +21,7 @@ class SensorRepository @Inject constructor(
 
     suspend fun sendLectura(request: LecturaSensorRequest): Resource<String> {
         return try {
-            val response = api.sendLecturas(listOf(request))
+            val response = api.sendLectura(request)
             Resource.Success(response.message)
         } catch (e: Exception) {
             Resource.Error(e.toUserMessage("Error al enviar lectura"))
@@ -30,8 +30,8 @@ class SensorRepository @Inject constructor(
 
     suspend fun sendLecturas(requests: List<LecturaSensorRequest>): Resource<String> {
         return try {
-            val response = api.sendLecturas(requests)
-            Resource.Success(response.message)
+            requests.forEach { api.sendLectura(it) }
+            Resource.Success("Lecturas enviadas")
         } catch (e: Exception) {
             Resource.Error(e.toUserMessage("Error al enviar lecturas"))
         }
@@ -64,7 +64,7 @@ class SensorRepository @Inject constructor(
 
     suspend fun atenderEvento(eventoId: String, cuidadorId: String, accion: String): Resource<String> {
         return try {
-            val response = api.atenderEvento(eventoId, AtenderEventoRequest(cuidadorId = cuidadorId, notasAtencion = accion))
+            val response = api.atenderEvento(eventoId, AtenderEventoRequest(cuidadorId = cuidadorId))
             Resource.Success(response.message)
         } catch (e: Exception) {
             Resource.Error(e.toUserMessage("Error al atender evento"))

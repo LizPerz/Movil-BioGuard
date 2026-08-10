@@ -492,10 +492,10 @@ class WearableConnector(
                         onAlertReceived(
                             CrearAlertaRequest(
                                 pacienteId = pacienteId,
-                                tipoAlerta = dto.tipoAlerta,
-                                descripcion = dto.mensaje,
-                                latitud = null,
-                                longitud = null
+                                tipo = dto.tipoAlerta,
+                                nivel = "CRITICAL",
+                                titulo = dto.tipoAlerta,
+                                mensaje = dto.mensaje
                             )
                         )
                     }

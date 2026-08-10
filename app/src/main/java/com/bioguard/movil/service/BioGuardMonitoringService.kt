@@ -219,26 +219,22 @@ class BioGuardMonitoringService : Service() {
             onAlertReceived = { request ->
                 serviceScope.launch {
                     val patientId = prefs.patientId.first() ?: "paciente-local"
-                    val conUbicacion = request.copy(
-                        pacienteId = patientId,
-                        latitud = request.latitud ?: ultimaLatitud,
-                        longitud = request.longitud ?: ultimaLongitud
-                    )
+                    val conUbicacion = request.copy(pacienteId = patientId)
                     database.pendingDataDao().insertAlert(
                         PendingAlertEntity(
-                            pacienteId = patientId, tipoAlerta = conUbicacion.tipoAlerta,
-                            descripcion = conUbicacion.descripcion, latitud = conUbicacion.latitud,
-                            longitud = conUbicacion.longitud, timestamp = Instant.now().toString()
+                            pacienteId = patientId, tipoAlerta = conUbicacion.tipo,
+                            descripcion = conUbicacion.mensaje, latitud = ultimaLatitud,
+                            longitud = ultimaLongitud, timestamp = Instant.now().toString()
                         )
                     )
-                    localAlertNotifier.notifyEmergencySos("🚨 ¡BOTÓN DE PÁNICO PRESIONADO! ${conUbicacion.descripcion}")
+                    localAlertNotifier.notifyEmergencySos("🚨 ¡BOTÓN DE PÁNICO PRESIONADO! ${conUbicacion.mensaje}")
                     localAlertNotifier.notifyAssessment(
                         LocalRiskAssessment(
                             score = 95.0,
                             safetyRuleScore = 95.0,
                             anomalyProbability = null,
                             level = LocalRiskLevel.CRITICAL,
-                            reasons = listOf(conUbicacion.descripcion.take(200)),
+                            reasons = listOf(conUbicacion.mensaje.take(200)),
                             personalizedModelReady = false,
                             modelVersion = "wearable-rule-v1"
                         ),
@@ -246,15 +242,7 @@ class BioGuardMonitoringService : Service() {
                     )
                     try {
                         if (patientId != "paciente-local") {
-                            api.crearAlerta(
-                                CrearAlertaRequest(
-                                    pacienteId = patientId,
-                                    tipoAlerta = conUbicacion.tipoAlerta,
-                                    descripcion = conUbicacion.descripcion,
-                                    latitud = conUbicacion.latitud,
-                                    longitud = conUbicacion.longitud
-                                )
-                            )
+                            api.crearAlerta(conUbicacion)
                             Log.d(TAG, "Alerta SOS/Emergencia enviada inmediatamente al servidor para notificar a cuidadores")
                         }
                     } catch (e: Exception) {
@@ -527,6 +515,7 @@ class BioGuardMonitoringService : Service() {
             val installId = com.bioguard.movil.util.InstallationIdentity.getOrCreate(this)
             val requests = pending.map {
                 LecturaSensorRequest(
+                    pacienteId = prefs.patientId.first(),
                     pulsoBpm = it.pulsoBpm,
                     temperaturaC = it.temperaturaC,
                     sudoracionGsr = it.sudoracionGsr,
@@ -555,6 +544,7 @@ class BioGuardMonitoringService : Service() {
             val installId = com.bioguard.movil.util.InstallationIdentity.getOrCreate(this)
             val requests = pending.map {
                 TrackingGpsRequest(
+                    pacienteId = prefs.patientId.first(),
                     latitud = it.latitud,
                     longitud = it.longitud,
                     esEmergencia = it.esEmergencia,
@@ -610,10 +600,10 @@ class BioGuardMonitoringService : Service() {
                 api.crearAlerta(
                     CrearAlertaRequest(
                         pacienteId = alerta.pacienteId,
-                        tipoAlerta = alerta.tipoAlerta,
-                        descripcion = alerta.descripcion,
-                        latitud = alerta.latitud,
-                        longitud = alerta.longitud
+                        tipo = alerta.tipoAlerta,
+                        nivel = "CRITICAL",
+                        titulo = alerta.tipoAlerta,
+                        mensaje = alerta.descripcion
                     )
                 )
                 enviadas.add(alerta.id)

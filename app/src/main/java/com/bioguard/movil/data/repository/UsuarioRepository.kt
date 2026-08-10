@@ -93,7 +93,7 @@ class UsuarioRepository @Inject constructor(
 
     suspend fun updateFotoPerfil(base64Foto: String): Resource<String> {
         return try {
-            val response = api.updateFotoPerfil(com.bioguard.movil.network.UpdateFotoRequest(fotoUrl = base64Foto))
+            val response = api.updateFotoPerfil(com.bioguard.movil.network.UpdateFotoRequest(fotoBase64 = base64Foto))
             Resource.Success(response.message)
         } catch (e: Exception) {
             Resource.Error(e.toUserMessage("Error al actualizar foto de perfil"))

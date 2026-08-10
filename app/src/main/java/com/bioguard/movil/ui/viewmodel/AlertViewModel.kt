@@ -13,6 +13,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -45,15 +46,15 @@ class AlertViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true, error = null) }
             val pacienteId = pacienteRepository.resolvePatientId(prefs)
                 ?: return@launch _uiState.update { it.copy(isLoading = false, error = "No se encontro un paciente vinculado") }
-            when (val result = pacienteRepository.getDashboardSummary(pacienteId)) {
+            when (val result = repository.getAlertas(pacienteId)) {
                 is Resource.Success -> {
-                    val todas = result.data.alertasRecientes
+                    val todas = result.data
                     val pendientes = todas.filter { !it.atendida }
                     _uiState.update {
                         it.copy(
                             alertasPendientes = pendientes,
                             todasAlertas = todas,
-                            alertasPendientesCount = result.data.alertasPendientesCount,
+                            alertasPendientesCount = pendientes.size,
                             isLoading = false
                         )
                     }
@@ -69,7 +70,8 @@ class AlertViewModel @Inject constructor(
     fun atenderAlerta(id: String, notasAtencion: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
-            when (val result = repository.atenderAlerta(id, notasAtencion)) {
+            val cuidadorId = prefs.userId.first().orEmpty()
+            when (val result = repository.atenderAlerta(id, cuidadorId, notasAtencion)) {
                 is Resource.Success -> {
                     _uiState.update { it.copy(isLoading = false, successMessage = "Alerta atendida") }
                     loadAlertas()

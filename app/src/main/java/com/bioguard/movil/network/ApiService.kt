@@ -79,7 +79,7 @@ data class BiometriaResponse(
     @SerializedName("actividadFisica") val actividadFisica: String? = null
 )
 data class TrackingResponse(@SerializedName("longitud") val longitud: Double, @SerializedName("latitud") val latitud: Double, @SerializedName("timestamp") val timestamp: String, @SerializedName("esEmergencia") val esEmergencia: Boolean = false)
-data class DispositivoEstado(@SerializedName("vinculado") val vinculado: Boolean = false, @SerializedName("nombreDispositivo") val nombreDispositivo: String? = null, @SerializedName("macAddress") val macAddress: String? = null, @SerializedName("conectado") val conectado: Boolean = false)
+data class DispositivoEstado(@SerializedName("vinculado") val vinculado: Boolean = false, @SerializedName("nombreDispositivo") val nombreDispositivo: String? = null, @SerializedName("macAddress") val macAddress: String? = null, @SerializedName("conectado") val conectado: Boolean = false, @SerializedName("fechaVinculacion") val fechaVinculacion: String? = null)
 data class DashboardSummary(
     @SerializedName("paciente") val paciente: PacienteResumen? = null,
     @SerializedName("ultimaLectura") val ultimaLectura: LecturaSensorResponse? = null,
@@ -94,6 +94,7 @@ data class DashboardSummary(
 // SENSORES
 // =============================================
 data class LecturaSensorRequest(
+    @SerializedName("pacienteId") val pacienteId: String? = null,
     @SerializedName("pulsoBpm") val pulsoBpm: Double,
     @SerializedName("temperaturaC") val temperaturaC: Double,
     @SerializedName("sudoracionGsr") val sudoracionGsr: Double,
@@ -144,8 +145,9 @@ data class EventoMetabolicoResponse(
     @SerializedName("fechaEvento") val fechaEvento: String? = null,
     @SerializedName("atendida") val atendida: Boolean = false
 )
-data class AtenderEventoRequest(@SerializedName("cuidadorId") val cuidadorId: String, @SerializedName("notasAtencion") val notasAtencion: String? = null)
+data class AtenderEventoRequest(@SerializedName("cuidadorId") val cuidadorId: String)
 data class TrackingGpsRequest(
+    @SerializedName("pacienteId") val pacienteId: String? = null,
     @SerializedName("latitud") val latitud: Double,
     @SerializedName("longitud") val longitud: Double,
     @SerializedName("esEmergencia") val esEmergencia: Boolean = false,
@@ -219,7 +221,7 @@ data class CrearCuidadorResponse(@SerializedName("cuidadorId") val cuidadorId: S
 // =============================================
 // DISPOSITIVOS
 // =============================================
-data class VincularDispositivoRequest(@SerializedName("nombre") val nombre: String, @SerializedName("macAddress") val macAddress: String)
+data class VincularDispositivoRequest(@SerializedName("pacienteId") val pacienteId: String, @SerializedName("nombre") val nombre: String, @SerializedName("macAddress") val macAddress: String)
 data class VincularDispositivoResponse(@SerializedName("dispositivoId") val dispositivoId: String, @SerializedName("message") val message: String)
 data class DispositivoRelojInfo(
     @SerializedName("modelo") val modelo: String? = null,
@@ -265,17 +267,18 @@ data class ActualizarMedicamentoRequest(@SerializedName("nombre") val nombre: St
 // =============================================
 data class AlertaResponse(
     @SerializedName("id") val id: String,
-    @SerializedName("tipoAlerta") val tipoAlerta: String = "",
-    @SerializedName("descripcion") val descripcion: String = "",
+    @SerializedName("pacienteId") val pacienteId: String? = null,
+    @SerializedName("tipo") val tipo: String = "",
+    @SerializedName("nivel") val nivel: String = "",
+    @SerializedName("titulo") val titulo: String = "",
+    @SerializedName("mensaje") val mensaje: String = "",
     @SerializedName("atendida") val atendida: Boolean = false,
     @SerializedName("fechaCreacion") val fechaCreacion: String = "",
-    @SerializedName("fechaAtencion") val fechaAtencion: String? = null,
-    @SerializedName("latitud") val latitud: Double? = null,
-    @SerializedName("longitud") val longitud: Double? = null
+    @SerializedName("fechaAtencion") val fechaAtencion: String? = null
 )
-data class CrearAlertaRequest(@SerializedName("pacienteId") val pacienteId: String, @SerializedName("tipoAlerta") val tipoAlerta: String, @SerializedName("descripcion") val descripcion: String, @SerializedName("latitud") val latitud: Double? = null, @SerializedName("longitud") val longitud: Double? = null)
+data class CrearAlertaRequest(@SerializedName("pacienteId") val pacienteId: String, @SerializedName("tipo") val tipo: String, @SerializedName("nivel") val nivel: String, @SerializedName("titulo") val titulo: String, @SerializedName("mensaje") val mensaje: String, @SerializedName("pulsoBpm") val pulsoBpm: Int? = null, @SerializedName("temperaturaC") val temperaturaC: Double? = null, @SerializedName("sudoracionGsr") val sudoracionGsr: Double? = null, @SerializedName("probabilidadPico") val probabilidadPico: Double? = null)
 data class CrearAlertaResponse(@SerializedName("alertaId") val alertaId: String, @SerializedName("message") val message: String)
-data class AtenderAlertaRequest(@SerializedName("notasAtencion") val notasAtencion: String)
+data class AtenderAlertaRequest(@SerializedName("cuidadorId") val cuidadorId: String, @SerializedName("accionTomada") val accionTomada: String? = null)
 
 // =============================================
 // ML
@@ -324,7 +327,7 @@ data class MessageResponse(
     @SerializedName("correo") val correo: String? = null
 )
 data class UpdateNivelAccesoRequest(@SerializedName("nivelAcceso") val nivelAcceso: String)
-data class UpdateFotoRequest(@SerializedName("fotoUrl") val fotoUrl: String)
+data class UpdateFotoRequest(@SerializedName("fotoBase64") val fotoBase64: String)
 data class HeartbeatRequest(
     @SerializedName("pacienteId") val pacienteId: String? = null,
     @SerializedName("bateria") val bateria: Int? = null,
@@ -420,17 +423,14 @@ interface ApiService {
     @PUT("api/Pacientes/{id}/biometria")
     suspend fun updateBiometria(@Path("id") id: String, @Body request: ActualizarBiometriaRequest): MessageResponse
 
-    @GET("api/Pacientes/{id}/biometria")
+    @GET("api/Pacientes/{id}")
     suspend fun getBiometria(@Path("id") id: String): BiometriaResponse
-
-    @GET("api/Pacientes/{id}/dashboard-summary")
-    suspend fun getDashboardSummary(@Path("id") id: String): DashboardSummary
 
     // =============================================
     // SENSORES
     // =============================================
-    @POST("api/Sensores/lecturas")
-    suspend fun sendLecturas(@Body requests: List<LecturaSensorRequest>): MessageResponse
+    @POST("api/Sensores/lectura")
+    suspend fun sendLectura(@Body request: LecturaSensorRequest): MessageResponse
 
     @GET("api/Sensores/lecturas/{pacienteId}")
     suspend fun getLecturas(@Path("pacienteId") pacienteId: String, @Query("limite") limite: Int = 100): List<LecturaSensorResponse>
@@ -499,8 +499,8 @@ interface ApiService {
     @POST("api/Dispositivos/vincular")
     suspend fun vincularDispositivo(@Body request: VincularDispositivoRequest): VincularDispositivoResponse
 
-    @GET("api/Dispositivos/{pacienteId}/info-completa")
-    suspend fun getInfoCompleta(@Path("pacienteId") pacienteId: String): InfoCompletaDispositivo
+    @GET("api/Dispositivos/{pacienteId}")
+    suspend fun getInfoCompleta(@Path("pacienteId") pacienteId: String): DispositivoEstado
 
     // =============================================
     // NOTIFICACIONES
@@ -535,7 +535,13 @@ interface ApiService {
     @POST("api/Alertas")
     suspend fun crearAlerta(@Body request: CrearAlertaRequest): CrearAlertaResponse
 
-    @POST("api/Alertas/{id}/atender")
+    @GET("api/Alertas/by-paciente/{pacienteId}")
+    suspend fun getAlertasByPaciente(@Path("pacienteId") pacienteId: String): List<AlertaResponse>
+
+    @GET("api/Alertas/pendientes/{pacienteId}")
+    suspend fun getAlertasPendientes(@Path("pacienteId") pacienteId: String): List<AlertaResponse>
+
+    @PUT("api/Alertas/{id}/resolver")
     suspend fun atenderAlerta(@Path("id") id: String, @Body request: AtenderAlertaRequest): MessageResponse
 
     // =============================================

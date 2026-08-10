@@ -174,7 +174,7 @@ fun AlertScreen(
                 )
 
                 Text(
-                    text = pendingAlert.tipoAlerta.uppercase(),
+                    text = pendingAlert.tipo.uppercase(),
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = RedNeon,
@@ -225,7 +225,7 @@ fun AlertScreen(
                         .padding(14.dp)
                 ) {
                     Text(
-                        text = pendingAlert.descripcion.ifEmpty { stringResource(R.string.alert_default_desc) },
+                        text = pendingAlert.mensaje.ifEmpty { stringResource(R.string.alert_default_desc) },
                         fontSize = 13.sp,
                         color = TextPrimary,
                         textAlign = TextAlign.Center,

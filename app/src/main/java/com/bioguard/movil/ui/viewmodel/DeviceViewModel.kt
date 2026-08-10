@@ -17,7 +17,7 @@ import com.bioguard.movil.data.Resource
 import com.bioguard.movil.data.repository.DispositivoRepository
 import com.bioguard.movil.data.repository.PacienteRepository
 import com.bioguard.movil.datastore.UserPreferences
-import com.bioguard.movil.network.InfoCompletaDispositivo
+import com.bioguard.movil.network.DispositivoEstado
 import com.bioguard.movil.service.BioGuardMonitoringService
 import com.bioguard.movil.service.WearableConnector
 import com.bioguard.movil.service.WearableConnectionState
@@ -67,7 +67,7 @@ private fun parseWearableQrPayload(raw: String): DispositivoScanItem? {
 data class DeviceUiState(
     val isLoading: Boolean = false,
     val isScanning: Boolean = false,
-    val dispositivo: InfoCompletaDispositivo? = null,
+    val dispositivo: DispositivoEstado? = null,
     val dispositivosDisponibles: List<DispositivoScanItem> = emptyList(),
     val isPaired: Boolean = false,
     val isConnected: Boolean = false,
@@ -172,7 +172,7 @@ class DeviceViewModel @Inject constructor(
             when (val result = repository.getInfoCompleta(pacienteId)) {
                 is Resource.Success -> {
                     val info = result.data
-                    val name = info?.reloj?.modelo ?: storedDeviceName ?: "BioGuard Wearable"
+                    val name = info?.nombreDispositivo ?: storedDeviceName ?: "BioGuard Wearable"
                     _uiState.update {
                         it.copy(
                             dispositivo = info,
@@ -391,7 +391,8 @@ class DeviceViewModel @Inject constructor(
             }
 
             // El registro remoto es secundario y nunca invalida una vinculación local válida.
-            when (repository.vincularDispositivo(item.nombre, item.macAddress)) {
+            val pacienteId = pacienteRepository.resolvePatientId(prefs)
+            when (repository.vincularDispositivo(item.nombre, item.macAddress, pacienteId.orEmpty())) {
                 is Resource.Error -> _uiState.update {
                     it.copy(successMessage = "Vinculado localmente; registro en la nube pendiente")
                 }

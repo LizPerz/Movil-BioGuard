@@ -144,14 +144,14 @@ fun DeviceScreen(
         label = "pulse"
     )
 
-    val reloj = uiState.dispositivo?.reloj
-    val isPaired = uiState.isPaired || uiState.connectedDeviceId != null || reloj?.modelo != null
-    val isConnected = uiState.isConnected || (reloj?.conectado ?: false)
+    val disp = uiState.dispositivo
+    val isPaired = uiState.isPaired || uiState.connectedDeviceId != null || disp?.vinculado == true
+    val isConnected = uiState.isConnected || (disp?.conectado ?: false)
     val connectionStateText = uiState.connectionState.toDisplayString(uiState.lastSyncMillis)
-    val deviceName = uiState.connectedDeviceName ?: reloj?.modelo ?: stringResource(R.string.device_no_device)
-    val bateria = reloj?.bateria
-    val ultimaSincronizacion = reloj?.ultimaSincronizacion
-    val sensores = reloj?.sensoresDisponibles.orEmpty()
+    val deviceName = uiState.connectedDeviceName ?: disp?.nombreDispositivo ?: stringResource(R.string.device_no_device)
+    val bateria: Int? = null
+    val ultimaSincronizacion: String? = disp?.fechaVinculacion
+    val sensores: List<String> = emptyList()
 
     if (showDisconnectDialog) {
         AlertDialog(

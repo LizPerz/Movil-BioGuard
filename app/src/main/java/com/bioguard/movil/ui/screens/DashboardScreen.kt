@@ -130,10 +130,16 @@ fun DashboardScreen(
         else -> stringResource(R.string.dashboard_normal)
     }
 
+    var showHelpForVital by remember { mutableStateOf<VitalSign?>(null) }
+
+    val formattedPulse = lastPulse?.toInt()?.toString() ?: "--"
+    val formattedTemp = lastTemp?.let { String.format(java.util.Locale.US, "%.1f", it) } ?: "--"
+    val formattedGsr = lastGsr?.let { String.format(java.util.Locale.US, "%.1f", it) } ?: "--"
+
     val vitalSigns = listOf(
-        VitalSign(stringResource(R.string.dashboard_heart_rate), lastPulse?.toInt()?.toString() ?: "--", "BPM", "\u2665", p.accent, pulseStatus, if (pulseStatus == stringResource(R.string.dashboard_normal)) GreenNeon else if (pulseStatus == stringResource(R.string.dashboard_alert)) RedNeon else YellowNeon),
-        VitalSign(stringResource(R.string.dashboard_temperature), lastTemp?.toString() ?: "--", "\u00b0C", "\uD83C\uDF21", p.accentSecondary, tempStatus, tempStatusColor),
-        VitalSign(stringResource(R.string.dashboard_conductivity), lastGsr?.toString() ?: "--", "\u00b5S", "\u26a1", YellowNeon, gsrStatus, gsrStatusColor)
+        VitalSign(stringResource(R.string.dashboard_heart_rate), formattedPulse, "BPM", "\u2665", p.accent, pulseStatus, if (pulseStatus == stringResource(R.string.dashboard_normal)) GreenNeon else if (pulseStatus == stringResource(R.string.dashboard_alert)) RedNeon else YellowNeon),
+        VitalSign(stringResource(R.string.dashboard_temperature), formattedTemp, "\u00b0C", "\uD83C\uDF21", p.accentSecondary, tempStatus, tempStatusColor),
+        VitalSign(stringResource(R.string.dashboard_conductivity), formattedGsr, "\u00b5S", "\u26a1", YellowNeon, gsrStatus, gsrStatusColor)
     )
 
     val metabolicStatus = when {
@@ -329,6 +335,10 @@ fun DashboardScreen(
                     VitalSignCard(
                         vital = vital,
                         pulseAlpha = pulseAlpha,
+                        onHelpClick = {
+                            haptic.performClick()
+                            showHelpForVital = vital
+                        },
                         onClick = {
                             haptic.performClick()
                             val points = when (vital.unit) {
@@ -424,12 +434,83 @@ fun DashboardScreen(
             onDismiss = { activeVitalDetail = null }
         )
     }
+
+    showHelpForVital?.let { vital ->
+        VitalInfoDialog(
+            vitalName = vital.name,
+            valueStr = vital.value,
+            unit = vital.unit,
+            onDismiss = { showHelpForVital = null }
+        )
+    }
+}
+
+@Composable
+fun VitalInfoDialog(
+    vitalName: String,
+    valueStr: String,
+    unit: String,
+    onDismiss: () -> Unit
+) {
+    val p = LocalThemeState.current.colorPalette()
+    val valDouble = valueStr.toDoubleOrNull()
+
+    val (titleStatus, bodyText) = when {
+        vitalName.contains("Temperatura", ignoreCase = true) || unit == "°C" -> {
+            when {
+                valDouble == null -> "Información de Temperatura" to "Sin lecturas suficientes para evaluar la temperatura corporal."
+                valDouble in 36.0..37.5 -> "Normal (36.0°C - 37.5°C)" to "Una temperatura corporal de ${valueStr}°C se considera normal y no indica fiebre. La temperatura fisiológica saludable oscila entre 36.0 y 37.5°C. Si no presentas otros síntomas, el valor es totalmente seguro."
+                valDouble in 37.6..38.5 -> "Elevada / Febrícula (37.6°C - 38.5°C)" to "Una temperatura de ${valueStr}°C está ligeramente por encima de lo habitual (febrícula). Procura mantenerte hidratado y en reposo."
+                valDouble > 38.5 -> "Fiebre Alta (> 38.5°C)" to "Una temperatura de ${valueStr}°C indica fiebre alta. Se sugiere reposo, hidratación constante y consultar a tu médico o red de cuidadores."
+                else -> "Temperatura Baja (< 36.0°C)" to "Una temperatura de ${valueStr}°C se encuentra por debajo de 36.0°C. Procura mantener un ambiente cálido y abrigarte adecuadamente."
+            }
+        }
+        vitalName.contains("Cardíaco", ignoreCase = true) || vitalName.contains("Pulso", ignoreCase = true) || unit == "BPM" -> {
+            when {
+                valDouble == null -> "Información de Ritmo Cardíaco" to "Sin lecturas suficientes para evaluar el pulso en reposo."
+                valDouble in 60.0..100.0 -> "Normal (60 - 100 BPM)" to "Un ritmo cardíaco en reposo de ${valueStr} BPM está dentro del rango óptimo y saludable (60 a 100 latidos por minuto). Refleja un adecuado desempeño cardiovascular."
+                valDouble > 100.0 -> "Elevado / Taquicardia (> 100 BPM)" to "Un pulso de ${valueStr} BPM está por encima del rango promedio en reposo. Puede responder a ejercicio reciente, estrés, deshidratación o consumo de café."
+                else -> "Pulso Bajo / Bradicardia (< 60 BPM)" to "Un pulso de ${valueStr} BPM se encuentra por debajo de 60 latidos por minuto. Es común en personas deportistas; en reposo prolongado vigila mareos."
+            }
+        }
+        else -> {
+            when {
+                valDouble == null -> "Información de Conductividad (GSR)" to "Sin lecturas suficientes para evaluar la respuesta galvánica de la piel."
+                valDouble <= 50.0 -> "Normal / Estable (0 - 50 µS)" to "Una conductividad galvánica de la piel de ${valueStr} µS indica niveles normales de sudoración y estabilidad en el sistema nervioso simpático (bajo nivel de estrés)."
+                else -> "Elevada (> 50 µS)" to "Una respuesta galvánica de ${valueStr} µS refleja mayor actividad sudorípara. Suele vincularse a picos de estrés, estimulación emocional o esfuerzo físico."
+            }
+        }
+    }
+
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = "💡 ", fontSize = 20.sp)
+                Text(text = titleStatus, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = p.textPrimary)
+            }
+        },
+        text = {
+            Text(text = bodyText, fontSize = 13.sp, color = p.textSecondary, lineHeight = 20.sp)
+        },
+        confirmButton = {
+            androidx.compose.material3.Button(
+                onClick = onDismiss,
+                colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = p.accent)
+            ) {
+                Text(text = "Entendido", color = p.background, fontWeight = FontWeight.Bold)
+            }
+        },
+        containerColor = p.surface,
+        shape = RoundedCornerShape(16.dp)
+    )
 }
 
 @Composable
 fun VitalSignCard(
     vital: VitalSign,
     pulseAlpha: Float,
+    onHelpClick: () -> Unit = {},
     onClick: () -> Unit = {}
 ) {
     val p = LocalThemeState.current.colorPalette()
@@ -470,13 +551,28 @@ fun VitalSignCard(
                 }
             }
 
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(vital.statusColor.copy(alpha = 0.1f))
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Text(text = vital.status, fontSize = 9.sp, color = vital.statusColor, letterSpacing = 1.sp, fontWeight = FontWeight.Medium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(p.inputBackground)
+                        .clickable { onHelpClick() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = "?", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = p.accent)
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(vital.statusColor.copy(alpha = 0.1f))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(text = vital.status, fontSize = 9.sp, color = vital.statusColor, letterSpacing = 1.sp, fontWeight = FontWeight.Medium)
+                }
             }
         }
     }

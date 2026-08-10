@@ -66,6 +66,14 @@ fun BioHealthChart(
     val maxValue = points.maxOf { it.value }
     val valueRange = if (maxValue == minValue) 1f else (maxValue - minValue)
 
+    fun formatVal(valFloat: Float): String {
+        return if (unit == "°C" || unit == "µS" || valFloat % 1f != 0f) {
+            String.format(java.util.Locale.US, "%.1f", valFloat)
+        } else {
+            valFloat.toInt().toString()
+        }
+    }
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -73,37 +81,40 @@ fun BioHealthChart(
             .background(theme.surface)
             .padding(16.dp)
     ) {
-        if (title != null) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (title != null) {
                 Text(
                     text = title,
                     color = theme.textPrimary,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold
                 )
-                selectedPointIndex?.let { idx ->
-                    val pt = points[idx]
-                    Text(
-                        text = "${pt.value.toInt()} $unit (${pt.time.ifEmpty { pt.label }})",
-                        color = lineColor,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                } ?: run {
-                    val last = points.last()
-                    Text(
-                        text = "Último: ${last.value.toInt()} $unit",
-                        color = theme.textSecondary,
-                        fontSize = 12.sp
-                    )
-                }
             }
-            Spacer(modifier = Modifier.height(12.dp))
+            selectedPointIndex?.let { idx ->
+                val pt = points[idx]
+                val formattedVal = formatVal(pt.value)
+                val timeStr = pt.time.ifEmpty { pt.label }
+                Text(
+                    text = "📍 $formattedVal $unit ($timeStr)",
+                    color = lineColor,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            } ?: run {
+                val last = points.last()
+                val formattedVal = formatVal(last.value)
+                Text(
+                    text = "Último: $formattedVal $unit",
+                    color = theme.textSecondary,
+                    fontSize = 12.sp
+                )
+            }
         }
+        Spacer(modifier = Modifier.height(12.dp))
 
         Box(
             modifier = Modifier
@@ -118,8 +129,10 @@ fun BioHealthChart(
                             val width = size.width
                             val stepX = width / (points.size - 1).coerceAtLeast(1)
                             val index = ((offset.x + stepX / 2) / stepX).toInt().coerceIn(0, points.size - 1)
-                            selectedPointIndex = index
-                            haptic.performSelection()
+                            if (selectedPointIndex != index) {
+                                selectedPointIndex = index
+                                haptic.performSelection()
+                            }
                         }
                     }
             ) {
@@ -203,8 +216,19 @@ fun BioHealthChart(
                     // Highlight data points
                     offsets.forEachIndexed { idx, offset ->
                         val isSelected = selectedPointIndex == idx
-                        val radius = if (isSelected) 7.dp.toPx() else 4.dp.toPx()
+                        val radius = if (isSelected) 8.dp.toPx() else 4.dp.toPx()
                         
+                        if (isSelected) {
+                            // Vertical dashed guide line
+                            drawLine(
+                                color = lineColor.copy(alpha = 0.6f),
+                                start = Offset(offset.x, 0f),
+                                end = Offset(offset.x, height),
+                                strokeWidth = 1.5.dp.toPx(),
+                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f), 0f)
+                            )
+                        }
+
                         drawCircle(
                             color = if (isSelected) theme.background else lineColor,
                             radius = radius,
@@ -212,7 +236,7 @@ fun BioHealthChart(
                         )
                         drawCircle(
                             color = lineColor,
-                            radius = if (isSelected) 5.dp.toPx() else 2.5.dp.toPx(),
+                            radius = if (isSelected) 6.dp.toPx() else 2.5.dp.toPx(),
                             center = offset,
                             style = Stroke(width = 2.dp.toPx())
                         )

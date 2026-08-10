@@ -14,6 +14,12 @@ data class CachedReadingEntity(
     val spo2: Double,
     val pasos: Int,
     val calorias: Double,
+    val accelX: Double = 0.0,
+    val accelY: Double = 0.0,
+    val accelZ: Double = 0.0,
+    val grasaCorporalPct: Double = 0.0,
+    val masaMuscularKg: Double = 0.0,
+    val faseSueno: String = "Sueño Profundo",
     val fechaHora: String,
     val timestamp: Long = System.currentTimeMillis()
 )

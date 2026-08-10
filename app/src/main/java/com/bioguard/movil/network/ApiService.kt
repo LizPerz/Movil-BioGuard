@@ -100,6 +100,12 @@ data class LecturaSensorRequest(
     @SerializedName("hrv") val hrv: Double? = null,
     @SerializedName("spo2") val spo2: Double? = null,
     @SerializedName("pasos") val pasos: Int? = null,
+    @SerializedName("accelX") val accelX: Double? = null,
+    @SerializedName("accelY") val accelY: Double? = null,
+    @SerializedName("accelZ") val accelZ: Double? = null,
+    @SerializedName("grasaCorporalPct") val grasaCorporalPct: Double? = null,
+    @SerializedName("masaMuscularKg") val masaMuscularKg: Double? = null,
+    @SerializedName("faseSueno") val faseSueno: String? = null,
     @SerializedName("timestamp") val timestamp: String,
     @SerializedName("sourceMessageId") val sourceMessageId: String? = null
 )
@@ -111,6 +117,13 @@ data class LecturaSensorResponse(
     @SerializedName("sudoracionGsr") val sudoracionGsr: Double,
     @SerializedName("hrv") val hrv: Double? = null,
     @SerializedName("spo2") val spo2: Double? = null,
+    @SerializedName("pasos") val pasos: Int? = null,
+    @SerializedName("accelX") val accelX: Double? = null,
+    @SerializedName("accelY") val accelY: Double? = null,
+    @SerializedName("accelZ") val accelZ: Double? = null,
+    @SerializedName("grasaCorporalPct") val grasaCorporalPct: Double? = null,
+    @SerializedName("masaMuscularKg") val masaMuscularKg: Double? = null,
+    @SerializedName("faseSueno") val faseSueno: String? = null,
     @SerializedName("probabilidadPico") val probabilidadPico: Double? = null,
     @SerializedName("nivelRiesgo") val nivelRiesgo: String? = null
 )

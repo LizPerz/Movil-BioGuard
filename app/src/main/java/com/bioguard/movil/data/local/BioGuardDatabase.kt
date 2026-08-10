@@ -13,7 +13,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         PendingReadingEntity::class, PendingGpsEntity::class, PendingEventEntity::class, PendingAlertEntity::class,
         CachedReadingEntity::class, CachedEventEntity::class, CachedAlertEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = true
 )
 abstract class BioGuardDatabase : RoomDatabase() {
@@ -121,6 +121,17 @@ abstract class BioGuardDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `cached_readings` ADD COLUMN `accelX` REAL NOT NULL DEFAULT 0.0")
+                db.execSQL("ALTER TABLE `cached_readings` ADD COLUMN `accelY` REAL NOT NULL DEFAULT 0.0")
+                db.execSQL("ALTER TABLE `cached_readings` ADD COLUMN `accelZ` REAL NOT NULL DEFAULT 0.0")
+                db.execSQL("ALTER TABLE `cached_readings` ADD COLUMN `grasaCorporalPct` REAL NOT NULL DEFAULT 0.0")
+                db.execSQL("ALTER TABLE `cached_readings` ADD COLUMN `masaMuscularKg` REAL NOT NULL DEFAULT 0.0")
+                db.execSQL("ALTER TABLE `cached_readings` ADD COLUMN `faseSueno` TEXT NOT NULL DEFAULT 'Sueño Profundo'")
+            }
+        }
+
         fun getInstance(context: Context): BioGuardDatabase {
             return INSTANCE ?: synchronized(this) {
                 val passphrase = com.bioguard.movil.util.SecurityUtils.getOrCreateDatabasePassphrase(context)
@@ -134,9 +145,10 @@ abstract class BioGuardDatabase : RoomDatabase() {
                 
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
-                BioGuardDatabase::class.java,
-                "bioguard_offline_db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                    BioGuardDatabase::class.java,
+                    "bioguard_offline_db"
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                    .fallbackToDestructiveMigration()
                     .openHelperFactory(factory)
                     .build()
                 INSTANCE = instance

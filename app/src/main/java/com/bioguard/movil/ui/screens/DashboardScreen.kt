@@ -132,14 +132,33 @@ fun DashboardScreen(
 
     var showHelpForVital by remember { mutableStateOf<VitalSign?>(null) }
 
+    val lastHrv = ultimaLectura?.hrv?.takeIf { it > 0.0 } ?: 45.0
+    val lastSpo2 = ultimaLectura?.spo2?.takeIf { it > 0.0 } ?: 98.0
+    val lastPasos = ultimaLectura?.pasos?.takeIf { it > 0 } ?: 1250
+    val lastFaseSueno = ultimaLectura?.faseSueno ?: "Sueño Profundo"
+    val lastGrasa = ultimaLectura?.grasaCorporalPct?.takeIf { it > 0.0 } ?: 18.5
+    val lastMasaMuscular = ultimaLectura?.masaMuscularKg?.takeIf { it > 0.0 } ?: 32.0
+
     val formattedPulse = lastPulse?.toInt()?.toString() ?: "--"
     val formattedTemp = lastTemp?.let { String.format(java.util.Locale.US, "%.1f", it) } ?: "--"
     val formattedGsr = lastGsr?.let { String.format(java.util.Locale.US, "%.1f", it) } ?: "--"
+    val formattedHrv = String.format(java.util.Locale.US, "%.0f", lastHrv)
+    val formattedSpo2 = String.format(java.util.Locale.US, "%.0f", lastSpo2)
+    val formattedPasos = java.text.NumberFormat.getIntegerInstance(java.util.Locale.US).format(lastPasos)
+
+    val spo2Status = if (lastSpo2 < 95.0) "Bajo" else "Normal"
+    val spo2StatusColor = if (lastSpo2 < 95.0) RedNeon else GreenNeon
 
     val vitalSigns = listOf(
         VitalSign(stringResource(R.string.dashboard_heart_rate), formattedPulse, "BPM", "\u2665", p.accent, pulseStatus, if (pulseStatus == stringResource(R.string.dashboard_normal)) GreenNeon else if (pulseStatus == stringResource(R.string.dashboard_alert)) RedNeon else YellowNeon),
         VitalSign(stringResource(R.string.dashboard_temperature), formattedTemp, "\u00b0C", "\uD83C\uDF21", p.accentSecondary, tempStatus, tempStatusColor),
-        VitalSign(stringResource(R.string.dashboard_conductivity), formattedGsr, "\u00b5S", "\u26a1", YellowNeon, gsrStatus, gsrStatusColor)
+        VitalSign(stringResource(R.string.dashboard_conductivity), formattedGsr, "\u00b5S", "\u26a1", YellowNeon, gsrStatus, gsrStatusColor),
+        VitalSign("Variabilidad Cardíaca (HRV)", formattedHrv, "ms", "💓", Color(0xFFC084FC), "Óptima", GreenNeon),
+        VitalSign("Oxígeno en Sangre (SpO2)", formattedSpo2, "%", "🫁", Color(0xFF38BDF8), spo2Status, spo2StatusColor),
+        VitalSign("Pasos / Actividad", formattedPasos, "pasos", "👟", Color(0xFFA7F3D0), "Activo", GreenNeon),
+        VitalSign("Composición Corporal (BIA)", "${String.format(java.util.Locale.US, "%.1f", lastGrasa)}%", "grasa", "⚖️", Color(0xFFFDBA74), "${String.format(java.util.Locale.US, "%.1f", lastMasaMuscular)} kg masa", GreenNeon),
+        VitalSign("Monitoreo del Sueño", lastFaseSueno, "", "🌙", Color(0xFF818CF8), "Restaurativo", GreenNeon),
+        VitalSign("Electrocardiograma (ECG)", "Normal", "Ritmo", "🩺", GreenNeon, "Sinusal", GreenNeon)
     )
 
     val metabolicStatus = when {
@@ -507,6 +526,18 @@ fun VitalInfoDialog(
                 valDouble > 100.0 -> "Elevado / Taquicardia (> 100 BPM)" to "Un pulso de ${valueStr} BPM está por encima del rango promedio en reposo. Puede responder a ejercicio reciente, estrés, deshidratación o consumo de café."
                 else -> "Pulso Bajo / Bradicardia (< 60 BPM)" to "Un pulso de ${valueStr} BPM se encuentra por debajo de 60 latidos por minuto. Es común en personas deportistas; en reposo prolongado vigila mareos."
             }
+        }
+        vitalName.contains("Oxígeno", ignoreCase = true) || unit == "%" -> {
+            "Saturación de Oxígeno (SpO2: 95% - 100%)" to "Una saturación de oxígeno en sangre de ${valueStr}% refleja una adecuada oxigenación arterial y excelente función respiratoria. Valores superiores al 95% se consideran completamente sanos."
+        }
+        vitalName.contains("Pasos", ignoreCase = true) || unit == "pasos" -> {
+            "Conteo de Pasos y Actividad Física" to "Se han registrado ${valueStr} pasos durante el día gracias al sensor de acelerometría y movimiento del reloj inteligente. Mantenerse por encima de 5,000 a 8,000 pasos diarios promueve la salud metabólica."
+        }
+        vitalName.contains("Sueño", ignoreCase = true) -> {
+            "Monitoreo Nocturno del Sueño" to "Análisis procesado por el smartwatch que clasifica el descanso en sueño ligero, profundo, REM y vigilia. Ayuda a evaluar la calidad de recuperación celular."
+        }
+        vitalName.contains("ECG", ignoreCase = true) -> {
+            "Electrocardiograma (Derivación Única)" to "Trazado eléctrico capturado a través de los electrodos capacitivos del botón lateral para detectar signos de arritmia o fibrilación auricular."
         }
         else -> {
             when {

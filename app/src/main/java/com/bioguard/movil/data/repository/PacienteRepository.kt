@@ -8,6 +8,7 @@ import com.bioguard.movil.network.CrearPacienteRequest
 import com.bioguard.movil.network.CrearPacienteResponse
 import com.bioguard.movil.network.ActualizarBiometriaRequest
 import com.bioguard.movil.network.DashboardSummary
+import com.bioguard.movil.network.PacienteResponse
 import kotlinx.coroutines.flow.first
 
 import javax.inject.Inject
@@ -35,6 +36,14 @@ class PacienteRepository @Inject constructor(
             Resource.Success(api.getDashboardSummary(pacienteId))
         } catch (e: Exception) {
             Resource.Error(e.toUserMessage("Error al obtener resumen del paciente"))
+        }
+    }
+
+    suspend fun getPaciente(pacienteId: String): Resource<PacienteResponse> {
+        return try {
+            Resource.Success(api.getPaciente(pacienteId))
+        } catch (e: Exception) {
+            Resource.Error(e.toUserMessage("Error al obtener datos del paciente"))
         }
     }
 

@@ -58,6 +58,21 @@ data class PacienteResumen(
     @SerializedName("esDiabetico") val esDiabetico: Boolean = false,
     @SerializedName("perfilCompletado") val perfilCompletado: Boolean = false
 )
+data class PacienteResponse(
+    @SerializedName("id") val id: String,
+    @SerializedName("nombre") val nombre: String? = null,
+    @SerializedName("apellidoPaterno") val apellidoPaterno: String? = null,
+    @SerializedName("apellidoMaterno") val apellidoMaterno: String? = null,
+    @SerializedName("correo") val correo: String? = null,
+    @SerializedName("fechaNacimiento") val fechaNacimiento: String? = null,
+    @SerializedName("sexo") val sexo: String? = null,
+    @SerializedName("pesoKg") val pesoKg: Double? = null,
+    @SerializedName("estaturaCm") val estaturaCm: Double? = null,
+    @SerializedName("esDiabetico") val esDiabetico: Boolean = false,
+    @SerializedName("familiaresDiabetes") val familiaresDiabetes: Boolean = false,
+    @SerializedName("actividadFisica") val actividadFisica: String? = null,
+    @SerializedName("perfilCompletado") val perfilCompletado: Boolean = false
+)
 data class CrearPacienteRequest(@SerializedName("nombre") val nombre: String, @SerializedName("esDiabetico") val esDiabetico: Boolean = false)
 data class CrearPacienteResponse(@SerializedName("pacienteId") val pacienteId: String, @SerializedName("codigoAccesoQr") val codigoAccesoQr: String, @SerializedName("message") val message: String)
 data class ActualizarBiometriaRequest(
@@ -90,6 +105,7 @@ data class LecturaSensorRequest(
     @SerializedName("sudoracionGsr") val sudoracionGsr: Double,
     @SerializedName("hrv") val hrv: Double? = null,
     @SerializedName("spo2") val spo2: Double? = null,
+    @SerializedName("pasos") val pasos: Int? = null,
     @SerializedName("timestamp") val timestamp: String
 )
 data class LecturaSensorResponse(
@@ -379,6 +395,9 @@ interface ApiService {
 
     @GET("api/Pacientes/{id}/dashboard-summary")
     suspend fun getDashboardSummary(@Path("id") id: String): DashboardSummary
+
+    @GET("api/Pacientes/{id}")
+    suspend fun getPaciente(@Path("id") id: String): PacienteResponse
 
     // =============================================
     // SENSORES

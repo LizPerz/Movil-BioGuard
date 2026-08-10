@@ -181,7 +181,10 @@ fun ProfileScreen(
                         Spacer(modifier = Modifier.height(12.dp))
 
                         val fullUser = uiState.perfil
-                        val displayName = fullUser?.nombre ?: "Usuario BioGuard"
+                        val paciente = uiState.paciente
+                        val displayName = fullUser?.nombre?.takeIf { it.isNotBlank() }
+                            ?: paciente?.nombre?.takeIf { it.isNotBlank() }
+                            ?: "Usuario BioGuard"
 
                         Text(
                             text = displayName,
@@ -191,7 +194,9 @@ fun ProfileScreen(
                         )
 
                         Text(
-                            text = fullUser?.correo ?: "Sin correo registrado",
+                            text = fullUser?.correo?.takeIf { it.isNotBlank() }
+                                ?: paciente?.correo?.takeIf { it.isNotBlank() }
+                                ?: "Sin correo registrado",
                             fontSize = 12.sp,
                             color = p.textSecondary
                         )

@@ -8,6 +8,7 @@ import com.bioguard.movil.data.repository.PacienteRepository
 import com.bioguard.movil.data.repository.UsuarioRepository
 import com.bioguard.movil.datastore.UserPreferences
 import com.bioguard.movil.network.MiPlanResponse
+import com.bioguard.movil.network.PacienteResponse
 import com.bioguard.movil.network.UsuarioWebResponse
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -31,6 +32,7 @@ data class BiometriaPacienteState(
 data class ProfileUiState(
     val isLoading: Boolean = false,
     val perfil: UsuarioWebResponse? = null,
+    val paciente: PacienteResponse? = null,
     val plan: MiPlanResponse? = null,
     val biometria: BiometriaPacienteState = BiometriaPacienteState(),
     val error: String? = null,
@@ -87,16 +89,51 @@ class ProfileViewModel @Inject constructor(
             val family = prefs.patientFamilyDiabetes.first()
             val activity = prefs.patientActivityLevel.first().orEmpty()
 
+            val prefsEmpty = birth.isBlank() && sex.isBlank() &&
+                weight <= 0.0 && height <= 0.0 && activity.isBlank()
+
+            // Respaldo: consume GET /api/Pacientes/{id} para traer los datos del paciente.
+            val pacienteId = pacienteRepository.resolvePatientId(prefs)
+            val paciente = if (pacienteId != null) {
+                when (val result = pacienteRepository.getPaciente(pacienteId)) {
+                    is Resource.Success -> result.data
+                    else -> null
+                }
+            } else null
+
+            val usePrefs = !prefsEmpty
+            val birthFinal = if (usePrefs) birth else paciente?.fechaNacimiento.orEmpty()
+            val sexFinal = if (usePrefs) sex else paciente?.sexo.orEmpty()
+            val weightFinal = if (usePrefs && weight > 0.0) weight else (paciente?.pesoKg ?: 0.0)
+            val heightFinal = if (usePrefs && height > 0.0) height else (paciente?.estaturaCm ?: 0.0)
+            val diabeticFinal = if (usePrefs) diabetic else (paciente?.esDiabetico ?: false)
+            val familyFinal = if (usePrefs) family else (paciente?.familiaresDiabetes ?: false)
+            val activityFinal = if (usePrefs) activity else paciente?.actividadFisica.orEmpty()
+
+            // Solo persiste en prefs cuando estas estaban vacías, para no pisar ediciones locales.
+            if (prefsEmpty && paciente != null) {
+                prefs.savePatientBiometrics(
+                    birthDate = birthFinal,
+                    sex = sexFinal,
+                    weight = weightFinal.toString(),
+                    height = heightFinal.toString(),
+                    isDiabetic = diabeticFinal,
+                    familyDiabetes = familyFinal,
+                    activityLevel = activityFinal
+                )
+            }
+
             _uiState.update {
                 it.copy(
+                    paciente = paciente,
                     biometria = BiometriaPacienteState(
-                        fechaNacimiento = birth,
-                        sexo = sex,
-                        pesoKg = weight,
-                        estaturaCm = height,
-                        esDiabetico = diabetic,
-                        familiaresDiabetes = family,
-                        actividadFisica = activity
+                        fechaNacimiento = birthFinal,
+                        sexo = sexFinal,
+                        pesoKg = weightFinal,
+                        estaturaCm = heightFinal,
+                        esDiabetico = diabeticFinal,
+                        familiaresDiabetes = familyFinal,
+                        actividadFisica = activityFinal
                     )
                 )
             }

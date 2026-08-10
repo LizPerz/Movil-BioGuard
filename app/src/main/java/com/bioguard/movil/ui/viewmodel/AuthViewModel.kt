@@ -8,6 +8,7 @@ import com.bioguard.movil.data.repository.AuthRepository
 import com.bioguard.movil.datastore.SecureTokenStorage
 import com.bioguard.movil.datastore.UserPreferences
 import com.bioguard.movil.ui.model.UserRole
+import com.bioguard.movil.ui.model.EffectiveAccess
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +22,7 @@ data class AuthUiState(
     val isLoading: Boolean = false,
     val isAuthenticated: Boolean = false,
     val role: UserRole? = null,
+    val access: EffectiveAccess = EffectiveAccess(),
     val error: String? = null,
     val successMessage: String? = null,
     val requiresVerification: Boolean = false,
@@ -46,7 +48,8 @@ class AuthViewModel @Inject constructor(
             val restored = repository.restoreSession()
             val role = UserRole.from(prefs.userRole.first())
             if (restored) {
-                _uiState.update { it.copy(isAuthenticated = true, role = role) }
+                val access = repository.getEffectiveAccess(role)
+                _uiState.update { it.copy(isAuthenticated = true, role = access.role, access = access) }
             }
         }
     }
@@ -55,8 +58,9 @@ class AuthViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             when (val result = repository.loginWithCode(codigoAcceso)) {
-                is Resource.Success -> _uiState.update {
-                    it.copy(isLoading = false, isAuthenticated = true, role = UserRole.from(result.data.rol))
+                is Resource.Success -> {
+                    val access = repository.getEffectiveAccess(UserRole.from(result.data.rol))
+                    _uiState.update { it.copy(isLoading = false, isAuthenticated = true, role = access.role, access = access) }
                 }
                 is Resource.Error -> _uiState.update {
                     it.copy(isLoading = false, error = result.message)
@@ -70,8 +74,9 @@ class AuthViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             when (val result = repository.login(email, password)) {
-                is Resource.Success -> _uiState.update {
-                    it.copy(isLoading = false, isAuthenticated = true, role = UserRole.from(result.data.rol))
+                is Resource.Success -> {
+                    val access = repository.getEffectiveAccess(UserRole.from(result.data.rol))
+                    _uiState.update { it.copy(isLoading = false, isAuthenticated = true, role = access.role, access = access) }
                 }
                 is Resource.Error -> _uiState.update {
                     it.copy(isLoading = false, error = result.message)
@@ -120,13 +125,17 @@ class AuthViewModel @Inject constructor(
                         }
                     } else {
                         when (val loginResult = repository.login(correo, password)) {
-                            is Resource.Success -> _uiState.update {
-                                it.copy(
-                                    isLoading = false,
-                                    isAuthenticated = true,
-                                    role = UserRole.from(loginResult.data.rol),
-                                    successMessage = "Cuenta creada. Bienvenido"
-                                )
+                            is Resource.Success -> {
+                                val access = repository.getEffectiveAccess(UserRole.from(loginResult.data.rol))
+                                _uiState.update {
+                                    it.copy(
+                                        isLoading = false,
+                                        isAuthenticated = true,
+                                        role = access.role,
+                                        access = access,
+                                        successMessage = "Cuenta creada. Bienvenido"
+                                    )
+                                }
                             }
                             is Resource.Error -> _uiState.update {
                                 it.copy(isLoading = false, error = loginResult.message)
@@ -192,14 +201,18 @@ class AuthViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             when (val result = repository.verificar2fa(correo, codigoOtp)) {
-                is Resource.Success -> _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        requiresVerification = false,
-                        isAuthenticated = true,
-                        role = UserRole.from(result.data.rol),
-                        successMessage = "Cuenta verificada exitosamente"
-                    )
+                is Resource.Success -> {
+                    val access = repository.getEffectiveAccess(UserRole.from(result.data.rol))
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            requiresVerification = false,
+                            isAuthenticated = true,
+                            role = access.role,
+                            access = access,
+                            successMessage = "Cuenta verificada exitosamente"
+                        )
+                    }
                 }
                 is Resource.Error -> _uiState.update {
                     it.copy(isLoading = false, error = result.message)

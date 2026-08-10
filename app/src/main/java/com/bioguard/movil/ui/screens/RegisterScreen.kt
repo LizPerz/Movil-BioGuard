@@ -199,7 +199,7 @@ fun RegisterScreen(
 
                     OutlinedTextField(
                         value = name,
-                        onValueChange = { name = it },
+                        onValueChange = { name = it.take(100) },
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("Tu primer y segundo nombre", color = TextTertiary) },
                         leadingIcon = {
@@ -231,7 +231,7 @@ fun RegisterScreen(
 
                     OutlinedTextField(
                         value = apellidoPaterno,
-                        onValueChange = { apellidoPaterno = it },
+                        onValueChange = { apellidoPaterno = it.take(100) },
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("Tu apellido paterno", color = TextTertiary) },
                         leadingIcon = {
@@ -263,7 +263,7 @@ fun RegisterScreen(
 
                     OutlinedTextField(
                         value = apellidoMaterno,
-                        onValueChange = { apellidoMaterno = it },
+                        onValueChange = { apellidoMaterno = it.take(100) },
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("Tu apellido materno", color = TextTertiary) },
                         leadingIcon = {
@@ -295,7 +295,7 @@ fun RegisterScreen(
 
                     OutlinedTextField(
                         value = email,
-                        onValueChange = { email = it },
+                        onValueChange = { email = it.take(254) },
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("correo@ejemplo.com", color = TextTertiary) },
                         leadingIcon = {
@@ -332,7 +332,7 @@ fun RegisterScreen(
 
                     OutlinedTextField(
                         value = password,
-                        onValueChange = { password = it },
+                        onValueChange = { password = it.take(128) },
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022", color = TextTertiary) },
                         leadingIcon = {
@@ -375,7 +375,7 @@ fun RegisterScreen(
 
                     OutlinedTextField(
                         value = confirmPassword,
-                        onValueChange = { confirmPassword = it },
+                        onValueChange = { confirmPassword = it.take(128) },
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022", color = TextTertiary) },
                         leadingIcon = {

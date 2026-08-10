@@ -38,16 +38,21 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.util.Locale
 import com.bioguard.movil.ui.theme.LocalThemeState
 import com.bioguard.movil.ui.theme.colorPalette
 import com.bioguard.movil.ui.viewmodel.SettingsViewModel
+import com.bioguard.movil.service.CloudSyncPhase
 import androidx.compose.ui.res.stringResource
 import com.bioguard.movil.R
+import com.bioguard.movil.ui.model.AppPermission
+import com.bioguard.movil.ui.model.EffectiveAccess
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     settingsViewModel: SettingsViewModel,
+    access: EffectiveAccess = EffectiveAccess(),
     onBack: () -> Unit = {}
 ) {
     val p = LocalThemeState.current.colorPalette()
@@ -179,12 +184,12 @@ fun SettingsScreen(
             ) {
                 Column {
                     Text(text = stringResource(R.string.settings_start_hour), fontSize = 12.sp, color = p.textSecondary)
-                    Text(text = "${String.format("%02d", uiState.batchStartHour)}:00 hrs", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = p.textPrimary)
+                    Text(text = "${String.format(Locale.ROOT, "%02d", uiState.batchStartHour)}:00 hrs", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = p.textPrimary)
                 }
 
                 Column(horizontalAlignment = Alignment.End) {
                     Text(text = stringResource(R.string.settings_end_hour), fontSize = 12.sp, color = p.textSecondary)
-                    Text(text = "${String.format("%02d", uiState.batchEndHour)}:00 hrs", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = p.textPrimary)
+                    Text(text = "${String.format(Locale.ROOT, "%02d", uiState.batchEndHour)}:00 hrs", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = p.textPrimary)
                 }
             }
 
@@ -210,7 +215,81 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(p.surface)
+                .border(1.dp, p.border, RoundedCornerShape(8.dp))
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.settings_local_intelligence_title),
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = p.textPrimary
+                    )
+                    Text(
+                        text = stringResource(R.string.settings_local_intelligence_desc),
+                        fontSize = 12.sp,
+                        color = p.textSecondary
+                    )
+                }
+                Switch(
+                    checked = uiState.isLocalAnalysisEnabled,
+                    onCheckedChange = settingsViewModel::updateLocalAnalysisEnabled,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = p.accent,
+                        checkedTrackColor = p.accent.copy(alpha = 0.5f),
+                        uncheckedThumbColor = p.textSecondary,
+                        uncheckedTrackColor = p.border
+                    )
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.settings_local_alerts_title),
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = p.textPrimary
+                    )
+                    Text(
+                        text = stringResource(R.string.settings_local_alerts_desc),
+                        fontSize = 12.sp,
+                        color = p.textSecondary
+                    )
+                }
+                Switch(
+                    checked = uiState.isLocalAlertsEnabled,
+                    onCheckedChange = settingsViewModel::updateLocalAlertsEnabled,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = p.accent,
+                        checkedTrackColor = p.accent.copy(alpha = 0.5f),
+                        uncheckedThumbColor = p.textSecondary,
+                        uncheckedTrackColor = p.border
+                    )
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
         // CARD DE GUARDIÁN NOCTURNO
+        if (access.allows(AppPermission.NIGHT_GUARDIAN)) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -259,7 +338,7 @@ fun SettingsScreen(
                     Column {
                         Text(text = stringResource(R.string.settings_sleep_range), fontSize = 12.sp, color = p.textSecondary)
                         Text(
-                            text = "De ${String.format("%02d", uiState.nightGuardianStartHour)}:00 a ${String.format("%02d", uiState.nightGuardianEndHour)}:00 hrs",
+                            text = "De ${String.format(Locale.ROOT, "%02d", uiState.nightGuardianStartHour)}:00 a ${String.format(Locale.ROOT, "%02d", uiState.nightGuardianEndHour)}:00 hrs",
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = p.textPrimary
@@ -278,6 +357,20 @@ fun SettingsScreen(
                 )
             }
         }
+        }
+
+        if (access.planName != null && !access.planName.contains("Premium", ignoreCase = true)) {
+            Spacer(modifier = Modifier.height(20.dp))
+            androidx.compose.material3.TextButton(
+                onClick = {
+                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://bioguard.app/planes"))
+                    context.startActivity(intent)
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Mejorar plan a Premium", color = p.accent, fontWeight = FontWeight.Bold)
+            }
+        }
 
         Spacer(modifier = Modifier.height(30.dp))
 
@@ -294,6 +387,22 @@ fun SettingsScreen(
             } else {
                 Text(text = "Sincronizar ahora (${uiState.pendingItems} pendientes)", color = p.textPrimary, fontWeight = FontWeight.Bold)
             }
+        }
+
+        if (uiState.cloudSyncPhase != CloudSyncPhase.IDLE &&
+            uiState.cloudSyncPhase != CloudSyncPhase.RUNNING
+        ) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = when (uiState.cloudSyncPhase) {
+                    CloudSyncPhase.SUCCESS -> stringResource(R.string.settings_sync_success)
+                    CloudSyncPhase.NO_NETWORK -> stringResource(R.string.settings_sync_no_network)
+                    CloudSyncPhase.FAILED -> stringResource(R.string.settings_sync_failed)
+                    else -> ""
+                },
+                color = if (uiState.cloudSyncPhase == CloudSyncPhase.SUCCESS) p.accent else p.textSecondary,
+                fontSize = 13.sp
+            )
         }
 
         Spacer(modifier = Modifier.height(12.dp))

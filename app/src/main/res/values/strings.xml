@@ -1,6 +1,6 @@
 <resources>
     <!-- App -->
-    <string name="app_name">BioGuard-Movil</string>
+    <string name="app_name">BioGuard</string>
     <string name="app_title">BIOGUARD</string>
 
     <!-- Register Screen -->
@@ -239,10 +239,17 @@
     <string name="settings_end_hour">Hora de fin</string>
     <string name="settings_night_guardian_title">Guardián Nocturno</string>
     <string name="settings_night_guardian_desc">Monitoreo más sensible y alarmas durante el sueño</string>
+    <string name="settings_local_intelligence_title">Análisis local personalizado</string>
+    <string name="settings_local_intelligence_desc">Aprende una línea base en este teléfono y detecta cambios sin Internet. No realiza diagnósticos.</string>
+    <string name="settings_local_alerts_title">Alertas locales</string>
+    <string name="settings_local_alerts_desc">Muestra avisos calculados en el teléfono aunque no exista conexión a Internet.</string>
     <string name="settings_sleep_range">Rango de sueño</string>
     <string name="settings_saving">Guardando...</string>
     <string name="settings_save_btn">Guardar Ajustes</string>
     <string name="settings_cancel_btn">Cancelar y volver</string>
+    <string name="settings_sync_success">Sincronización terminada. La cola local está actualizada.</string>
+    <string name="settings_sync_no_network">Sin Internet validado. Los datos permanecen protegidos en el dispositivo.</string>
+    <string name="settings_sync_failed">No se completó el envío. Los elementos pendientes se reintentarán sin perderse.</string>
     
     <!-- MedicationScreen -->
     <string name="medication_title">MEDICAMENTOS</string>
@@ -369,6 +376,7 @@
     <string name="qr_request_permission">SOLICITAR PERMISO</string>
     <string name="qr_cancel">✕ CANCELAR</string>
     <string name="qr_point_code">Apunta al codigo QR</string>
+    <string name="qr_permission_denied">Permiso de camara denegado. Activalo en Ajustes.</string>
 
     <!-- NotificationsScreen -->
     <string name="notifications_title">NOTIFICACIONES</string>

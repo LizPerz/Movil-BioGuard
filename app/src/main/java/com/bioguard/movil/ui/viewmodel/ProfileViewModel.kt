@@ -79,26 +79,77 @@ class ProfileViewModel @Inject constructor(
 
     fun loadBiometria() {
         viewModelScope.launch {
-            val birth = prefs.patientBirthDate.first().orEmpty()
-            val sex = prefs.patientSex.first().orEmpty()
-            val weight = prefs.patientWeight.first()?.toDoubleOrNull() ?: 0.0
-            val height = prefs.patientHeight.first()?.toDoubleOrNull() ?: 0.0
-            val diabetic = prefs.patientIsDiabetic.first()
-            val family = prefs.patientFamilyDiabetes.first()
-            val activity = prefs.patientActivityLevel.first().orEmpty()
+            val pacienteId = pacienteRepository.resolvePatientId(prefs)
 
-            _uiState.update {
-                it.copy(
-                    biometria = BiometriaPacienteState(
-                        fechaNacimiento = birth,
-                        sexo = sex,
-                        pesoKg = weight,
-                        estaturaCm = height,
-                        esDiabetico = diabetic,
-                        familiaresDiabetes = family,
-                        actividadFisica = activity
+            if (pacienteId != null) {
+                when (val result = pacienteRepository.getBiometria(pacienteId)) {
+                    is Resource.Success -> {
+                        val apiData = result.data
+                        val biometria = BiometriaPacienteState(
+                            fechaNacimiento = apiData.fechaNacimiento.orEmpty(),
+                            sexo = apiData.sexo.orEmpty(),
+                            pesoKg = apiData.pesoKg ?: 0.0,
+                            estaturaCm = apiData.estaturaCm ?: 0.0,
+                            esDiabetico = apiData.esDiabetico,
+                            familiaresDiabetes = apiData.familiaresDiabetes,
+                            actividadFisica = apiData.actividadFisica.orEmpty()
+                        )
+                        prefs.savePatientBiometrics(
+                            birthDate = biometria.fechaNacimiento,
+                            sex = biometria.sexo,
+                            weight = biometria.pesoKg.toString(),
+                            height = biometria.estaturaCm.toString(),
+                            isDiabetic = biometria.esDiabetico,
+                            familyDiabetes = biometria.familiaresDiabetes,
+                            activityLevel = biometria.actividadFisica
+                        )
+                        _uiState.update { it.copy(biometria = biometria) }
+                    }
+                    is Resource.Error -> {
+                        val birth = prefs.patientBirthDate.first().orEmpty()
+                        val sex = prefs.patientSex.first().orEmpty()
+                        val weight = prefs.patientWeight.first()?.toDoubleOrNull() ?: 0.0
+                        val height = prefs.patientHeight.first()?.toDoubleOrNull() ?: 0.0
+                        val diabetic = prefs.patientIsDiabetic.first()
+                        val family = prefs.patientFamilyDiabetes.first()
+                        val activity = prefs.patientActivityLevel.first().orEmpty()
+                        _uiState.update {
+                            it.copy(
+                                biometria = BiometriaPacienteState(
+                                    fechaNacimiento = birth,
+                                    sexo = sex,
+                                    pesoKg = weight,
+                                    estaturaCm = height,
+                                    esDiabetico = diabetic,
+                                    familiaresDiabetes = family,
+                                    actividadFisica = activity
+                                )
+                            )
+                        }
+                    }
+                    is Resource.Loading -> {}
+                }
+            } else {
+                val birth = prefs.patientBirthDate.first().orEmpty()
+                val sex = prefs.patientSex.first().orEmpty()
+                val weight = prefs.patientWeight.first()?.toDoubleOrNull() ?: 0.0
+                val height = prefs.patientHeight.first()?.toDoubleOrNull() ?: 0.0
+                val diabetic = prefs.patientIsDiabetic.first()
+                val family = prefs.patientFamilyDiabetes.first()
+                val activity = prefs.patientActivityLevel.first().orEmpty()
+                _uiState.update {
+                    it.copy(
+                        biometria = BiometriaPacienteState(
+                            fechaNacimiento = birth,
+                            sexo = sex,
+                            pesoKg = weight,
+                            estaturaCm = height,
+                            esDiabetico = diabetic,
+                            familiaresDiabetes = family,
+                            actividadFisica = activity
+                        )
                     )
-                )
+                }
             }
         }
     }
@@ -115,37 +166,75 @@ class ProfileViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
 
-            prefs.savePatientBiometrics(
-                birthDate = fechaNacimiento,
-                sex = sexo,
-                weight = pesoKg.toString(),
-                height = estaturaCm.toString(),
-                isDiabetic = esDiabetico,
-                familyDiabetes = familiaresDiabetes,
-                activityLevel = actividadFisica
-            )
-
             val pacienteId = pacienteRepository.resolvePatientId(prefs)
             if (pacienteId != null) {
                 when (val result = pacienteRepository.updateBiometria(
                     pacienteId, fechaNacimiento, sexo, pesoKg, estaturaCm, esDiabetico, familiaresDiabetes, actividadFisica
                 )) {
                     is Resource.Success -> {
-                        _uiState.update {
-                            it.copy(
-                                isLoading = false,
-                                successMessage = "Datos médicos del paciente actualizados con éxito",
-                                biometria = BiometriaPacienteState(
-                                    fechaNacimiento, sexo, pesoKg, estaturaCm, esDiabetico, familiaresDiabetes, actividadFisica
-                                )
+                        val verifyResult = pacienteRepository.getBiometria(pacienteId)
+                        if (verifyResult is Resource.Success) {
+                            val verified = verifyResult.data
+                            val confirmedBiometria = BiometriaPacienteState(
+                                fechaNacimiento = verified.fechaNacimiento ?: fechaNacimiento,
+                                sexo = verified.sexo ?: sexo,
+                                pesoKg = verified.pesoKg ?: pesoKg,
+                                estaturaCm = verified.estaturaCm ?: estaturaCm,
+                                esDiabetico = verified.esDiabetico,
+                                familiaresDiabetes = verified.familiaresDiabetes,
+                                actividadFisica = verified.actividadFisica ?: actividadFisica
                             )
+                            prefs.savePatientBiometrics(
+                                birthDate = confirmedBiometria.fechaNacimiento,
+                                sex = confirmedBiometria.sexo,
+                                weight = confirmedBiometria.pesoKg.toString(),
+                                height = confirmedBiometria.estaturaCm.toString(),
+                                isDiabetic = confirmedBiometria.esDiabetico,
+                                familyDiabetes = confirmedBiometria.familiaresDiabetes,
+                                activityLevel = confirmedBiometria.actividadFisica
+                            )
+                            _uiState.update {
+                                it.copy(
+                                    isLoading = false,
+                                    successMessage = "Datos médicos actualizados y verificados en servidor",
+                                    biometria = confirmedBiometria
+                                )
+                            }
+                        } else {
+                            prefs.savePatientBiometrics(
+                                birthDate = fechaNacimiento,
+                                sex = sexo,
+                                weight = pesoKg.toString(),
+                                height = estaturaCm.toString(),
+                                isDiabetic = esDiabetico,
+                                familyDiabetes = familiaresDiabetes,
+                                activityLevel = actividadFisica
+                            )
+                            _uiState.update {
+                                it.copy(
+                                    isLoading = false,
+                                    successMessage = "Datos guardados localmente (servidor no disponible)",
+                                    biometria = BiometriaPacienteState(
+                                        fechaNacimiento, sexo, pesoKg, estaturaCm, esDiabetico, familiaresDiabetes, actividadFisica
+                                    )
+                                )
+                            }
                         }
                     }
                     is Resource.Error -> {
+                        prefs.savePatientBiometrics(
+                            birthDate = fechaNacimiento,
+                            sex = sexo,
+                            weight = pesoKg.toString(),
+                            height = estaturaCm.toString(),
+                            isDiabetic = esDiabetico,
+                            familyDiabetes = familiaresDiabetes,
+                            activityLevel = actividadFisica
+                        )
                         _uiState.update {
                             it.copy(
                                 isLoading = false,
-                                successMessage = "Datos médicos guardados en almacenamiento local",
+                                successMessage = "Datos guardados solo localmente: ${result.message}",
                                 biometria = BiometriaPacienteState(
                                     fechaNacimiento, sexo, pesoKg, estaturaCm, esDiabetico, familiaresDiabetes, actividadFisica
                                 )
@@ -155,10 +244,19 @@ class ProfileViewModel @Inject constructor(
                     is Resource.Loading -> {}
                 }
             } else {
+                prefs.savePatientBiometrics(
+                    birthDate = fechaNacimiento,
+                    sex = sexo,
+                    weight = pesoKg.toString(),
+                    height = estaturaCm.toString(),
+                    isDiabetic = esDiabetico,
+                    familyDiabetes = familiaresDiabetes,
+                    activityLevel = actividadFisica
+                )
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        successMessage = "Perfil médico guardado",
+                        successMessage = "Perfil médico guardado localmente (sin paciente vinculado)",
                         biometria = BiometriaPacienteState(
                             fechaNacimiento, sexo, pesoKg, estaturaCm, esDiabetico, familiaresDiabetes, actividadFisica
                         )

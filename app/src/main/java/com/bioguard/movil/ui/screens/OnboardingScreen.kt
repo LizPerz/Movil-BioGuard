@@ -236,7 +236,7 @@ fun BiometricProfileStep(
             )
 
             Text(text = "NOMBRE COMPLETO", fontSize = 10.sp, color = p.accent, letterSpacing = 2.sp, modifier = Modifier.padding(bottom = 6.dp))
-            OutlinedTextField(value = nombre, onValueChange = { nombre = it }, modifier = Modifier.fillMaxWidth(), placeholder = { Text("Tu nombre", color = p.textTertiary) }, singleLine = true, shape = RoundedCornerShape(10.dp), colors = tfColors())
+            OutlinedTextField(value = nombre, onValueChange = { nombre = it.take(120) }, modifier = Modifier.fillMaxWidth(), placeholder = { Text("Tu nombre", color = p.textTertiary) }, singleLine = true, shape = RoundedCornerShape(10.dp), colors = tfColors())
 
             Spacer(modifier = Modifier.height(14.dp))
 
@@ -245,14 +245,7 @@ fun BiometricProfileStep(
                     Text(text = "FECHA DE NACIMIENTO", fontSize = 10.sp, color = p.accent, letterSpacing = 2.sp, modifier = Modifier.padding(bottom = 6.dp))
                     OutlinedTextField(
                         value = birthDate,
-                        onValueChange = { input ->
-                            val digits = input.filter { it.isDigit() }.take(8)
-                            birthDate = when {
-                                digits.length >= 5 -> "${digits.substring(0, 2)}/${digits.substring(2, 4)}/${digits.substring(4)}"
-                                digits.length >= 3 -> "${digits.substring(0, 2)}/${digits.substring(2)}"
-                                else -> digits
-                            }
-                        },
+                        onValueChange = { birthDate = Formatters.formatDateInput(it) },
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("dd/mm/aaaa", color = p.textTertiary) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -279,11 +272,11 @@ fun BiometricProfileStep(
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(text = "PESO (KG)", fontSize = 10.sp, color = p.accent, letterSpacing = 2.sp, modifier = Modifier.padding(bottom = 6.dp))
-                    OutlinedTextField(value = weight, onValueChange = { weight = it }, modifier = Modifier.fillMaxWidth(), placeholder = { Text("70", color = p.textTertiary) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, shape = RoundedCornerShape(10.dp), colors = tfColors())
+                    OutlinedTextField(value = weight, onValueChange = { weight = it.filter(Char::isDigit).take(3) }, modifier = Modifier.fillMaxWidth(), placeholder = { Text("70", color = p.textTertiary) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, shape = RoundedCornerShape(10.dp), colors = tfColors())
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(text = "ESTATURA (CM)", fontSize = 10.sp, color = p.accent, letterSpacing = 2.sp, modifier = Modifier.padding(bottom = 6.dp))
-                    OutlinedTextField(value = height, onValueChange = { height = it }, modifier = Modifier.fillMaxWidth(), placeholder = { Text("175", color = p.textTertiary) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, shape = RoundedCornerShape(10.dp), colors = tfColors())
+                    OutlinedTextField(value = height, onValueChange = { height = it.filter(Char::isDigit).take(3) }, modifier = Modifier.fillMaxWidth(), placeholder = { Text("175", color = p.textTertiary) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, shape = RoundedCornerShape(10.dp), colors = tfColors())
                 }
             }
 
@@ -732,6 +725,4 @@ fun BluetoothPairingStep(
         }
     }
 }
-
-
 

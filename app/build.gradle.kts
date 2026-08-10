@@ -16,6 +16,20 @@ val keystoreProperties = Properties().apply {
     System.getenv("BIOGUARD_MOVIL_STORE_PASSWORD")?.let { setProperty("storePassword", it) }
     System.getenv("BIOGUARD_MOVIL_KEY_ALIAS")?.let { setProperty("keyAlias", it) }
     System.getenv("BIOGUARD_MOVIL_KEY_PASSWORD")?.let { setProperty("keyPassword", it) }
+    System.getenv("BIOGUARD_STORE_FILE")?.let { setProperty("storeFile", it) }
+    System.getenv("BIOGUARD_STORE_PASSWORD")?.let { setProperty("storePassword", it) }
+    System.getenv("BIOGUARD_KEY_ALIAS")?.let { setProperty("keyAlias", it) }
+    System.getenv("BIOGUARD_KEY_PASSWORD")?.let { setProperty("keyPassword", it) }
+}
+
+val releaseRequested = gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }
+val releaseVersionCode = System.getenv("BIOGUARD_VERSION_CODE")?.toIntOrNull() ?: 1
+val releaseVersionName = System.getenv("BIOGUARD_VERSION_NAME")?.takeIf { it.isNotBlank() } ?: "1.0"
+if (releaseRequested) {
+    val requiredSigningKeys = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+    check(requiredSigningKeys.all { !keystoreProperties.getProperty(it).isNullOrBlank() }) {
+        "Release builds require the shared BioGuard signing keystore configuration"
+    }
 }
 
 android {
@@ -26,15 +40,10 @@ android {
         applicationId = "com.bioguard.movil"
         minSdk = 28
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = releaseVersionCode
+        versionName = releaseVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        buildConfigField(
-            "String",
-            "BIOGUARD_PAIRING_SECRET",
-            "\"${System.getenv("BIOGUARD_PAIRING_SECRET") ?: "dev-only-change-me-bioguard-pairing-secret-32"}\""
-        )
     }
 
     signingConfigs {
@@ -50,13 +59,6 @@ android {
 
     buildTypes {
         release {
-            val pairingSecret = System.getenv("BIOGUARD_PAIRING_SECRET")
-                ?: if (gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }) {
-                    throw GradleException("BIOGUARD_PAIRING_SECRET is required for release builds")
-                } else {
-                    "release-secret-not-configured"
-                }
-            buildConfigField("String", "BIOGUARD_PAIRING_SECRET", "\"$pairingSecret\"")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -86,9 +88,9 @@ android {
     }
 }
 
-// ksp {
-//     arg("room.schemaLocation", "$projectDir/schemas")
-// }
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
 
 kotlin {
     compilerOptions {
@@ -114,6 +116,7 @@ dependencies {
     implementation(libs.okhttp.logging)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
@@ -124,9 +127,10 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
+    implementation(libs.sqlcipher.android)
+    implementation(libs.androidx.sqlite)
     
     // Firebase Cloud Messaging
-    implementation(libs.firebase.messaging)
     
     // Play Services Wearable
     implementation(libs.play.services.wearable)
@@ -136,8 +140,7 @@ dependencies {
     ksp(libs.hilt.compiler)
     implementation(libs.hilt.navigation.compose)
 
-    // WorkManager & Paging 3
-    implementation(libs.androidx.work.runtime.ktx)
+    // Paging 3
     implementation(libs.androidx.paging.runtime)
     implementation(libs.androidx.paging.compose)
 

@@ -239,10 +239,10 @@ fun MedicationScreen(
             title = { Text(stringResource(R.string.medication_new_title), color = p.textPrimary, fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedTextField(value = nombre, onValueChange = { nombre = it }, label = { Text(stringResource(R.string.medication_name), color = p.textSecondary) }, singleLine = true, modifier = Modifier.fillMaxWidth(), colors = tfColors())
-                    OutlinedTextField(value = dosis, onValueChange = { dosis = it }, label = { Text(stringResource(R.string.medication_dose), color = p.textSecondary) }, singleLine = true, modifier = Modifier.fillMaxWidth(), colors = tfColors())
-                    OutlinedTextField(value = frecuencia, onValueChange = { frecuencia = it }, label = { Text(stringResource(R.string.medication_freq), color = p.textSecondary) }, singleLine = true, modifier = Modifier.fillMaxWidth(), colors = tfColors())
-                    OutlinedTextField(value = notas, onValueChange = { notas = it }, label = { Text(stringResource(R.string.medication_notes), color = p.textSecondary) }, modifier = Modifier.fillMaxWidth(), colors = tfColors())
+                    OutlinedTextField(value = nombre, onValueChange = { nombre = it.take(120) }, label = { Text(stringResource(R.string.medication_name), color = p.textSecondary) }, singleLine = true, modifier = Modifier.fillMaxWidth(), colors = tfColors())
+                    OutlinedTextField(value = dosis, onValueChange = { dosis = it.take(80) }, label = { Text(stringResource(R.string.medication_dose), color = p.textSecondary) }, singleLine = true, modifier = Modifier.fillMaxWidth(), colors = tfColors())
+                    OutlinedTextField(value = frecuencia, onValueChange = { frecuencia = it.take(80) }, label = { Text(stringResource(R.string.medication_freq), color = p.textSecondary) }, singleLine = true, modifier = Modifier.fillMaxWidth(), colors = tfColors())
+                    OutlinedTextField(value = notas, onValueChange = { notas = it.take(1000) }, label = { Text(stringResource(R.string.medication_notes), color = p.textSecondary) }, modifier = Modifier.fillMaxWidth(), colors = tfColors())
                 }
             },
             confirmButton = {

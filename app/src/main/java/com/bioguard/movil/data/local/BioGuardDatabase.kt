@@ -6,14 +6,15 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
 @Database(
     entities = [
         PendingReadingEntity::class, PendingGpsEntity::class, PendingEventEntity::class, PendingAlertEntity::class,
         CachedReadingEntity::class, CachedEventEntity::class, CachedAlertEntity::class
     ],
-    version = 4,
-    exportSchema = false
+    version = 6,
+    exportSchema = true
 )
 abstract class BioGuardDatabase : RoomDatabase() {
 
@@ -104,16 +105,39 @@ abstract class BioGuardDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `pending_readings` ADD COLUMN `sourceMessageId` TEXT")
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_pending_readings_sourceMessageId` " +
+                        "ON `pending_readings` (`sourceMessageId`)"
+                )
+            }
+        }
+
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `pending_readings` ADD COLUMN `pasos` INTEGER")
+            }
+        }
+
         fun getInstance(context: Context): BioGuardDatabase {
             return INSTANCE ?: synchronized(this) {
-                // Ensure MasterKey and encrypted DB passphrase are created in Keystore
                 val passphrase = com.bioguard.movil.util.SecurityUtils.getOrCreateDatabasePassphrase(context)
+                System.loadLibrary("sqlcipher")
+                EncryptedRoomMigration.migratePlaintextIfNeeded(
+                    context.applicationContext,
+                    "bioguard_offline_db",
+                    passphrase
+                )
+                val factory = SupportOpenHelperFactory(passphrase)
                 
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                 BioGuardDatabase::class.java,
                 "bioguard_offline_db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                    .openHelperFactory(factory)
                     .build()
                 INSTANCE = instance
                 instance

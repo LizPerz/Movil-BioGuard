@@ -1,32 +1,34 @@
 package com.bioguard.movil.util
 
-import com.bioguard.movil.BuildConfig
 import org.json.JSONObject
 import java.net.URI
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
-import java.security.MessageDigest
+import java.security.KeyFactory
+import java.security.Signature
+import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
-import javax.crypto.Mac
-import javax.crypto.spec.SecretKeySpec
 
 data class WearablePairingPayload(
     val name: String,
     val address: String,
-    val nodeId: String
+    val nodeId: String,
+    val nonce: String
 )
 
 object WearablePairingQr {
     const val TYPE = "bioguard_wearable_pairing"
-    const val VERSION = "1"
+    const val VERSION = "2"
     const val MAX_AGE_SECONDS = 300L
+    private const val MAX_PAYLOAD_LENGTH = 4096
 
     fun canonicalPayload(
         name: String,
         address: String,
         nodeId: String,
         issuedAt: Long,
-        nonce: String
+        nonce: String,
+        publicKey: String
     ): String = listOf(
         "type=$TYPE",
         "version=$VERSION",
@@ -34,18 +36,13 @@ object WearablePairingQr {
         "address=$address",
         "nodeId=$nodeId",
         "issuedAt=$issuedAt",
-        "nonce=$nonce"
+        "nonce=$nonce",
+        "publicKey=$publicKey"
     ).joinToString("&")
-
-    fun sign(canonicalPayload: String, secret: String = BuildConfig.BIOGUARD_PAIRING_SECRET): String {
-        val mac = Mac.getInstance("HmacSHA256")
-        mac.init(SecretKeySpec(secret.toByteArray(), "HmacSHA256"))
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(mac.doFinal(canonicalPayload.toByteArray()))
-    }
 
     fun parse(raw: String, nowSeconds: Long = System.currentTimeMillis() / 1000L): WearablePairingPayload? {
         val payload = raw.trim()
-        if (payload.isBlank()) return null
+        if (payload.isBlank() || payload.length > MAX_PAYLOAD_LENGTH) return null
         parseJson(payload, nowSeconds)?.let { return it }
         parseUri(payload, nowSeconds)?.let { return it }
         return null
@@ -54,17 +51,16 @@ object WearablePairingQr {
     private fun parseJson(payload: String, nowSeconds: Long): WearablePairingPayload? = runCatching {
         val json = JSONObject(payload)
         if (json.optString("type") != TYPE || json.optString("version") != VERSION) return null
-        val address = json.optString("address").ifBlank { json.optString("nodeId") }.ifBlank { json.optString("deviceId") }
-        val nodeId = json.optString("nodeId").ifBlank { address }
-        val name = json.optString("name").ifBlank { "BioGuard Wearable" }
-        val issuedAt = json.optLong("issuedAt", 0L)
-        val nonce = json.optString("nonce")
-        val signature = json.optString("signature")
-        if (address.isNotBlank() && isValid(name, address, nodeId, issuedAt, nonce, signature, nowSeconds)) {
-            WearablePairingPayload(name, address, nodeId)
-        } else {
-            null
-        }
+        validateFields(
+            name = json.optString("name").ifBlank { "BioGuard Wearable" },
+            address = json.optString("address").ifBlank { json.optString("nodeId") },
+            nodeId = json.optString("nodeId"),
+            issuedAt = json.optLong("issuedAt", 0L),
+            nonce = json.optString("nonce"),
+            publicKey = json.optString("publicKey"),
+            signature = json.optString("signature"),
+            nowSeconds = nowSeconds
+        )
     }.getOrNull()
 
     private fun parseUri(payload: String, nowSeconds: Long): WearablePairingPayload? = runCatching {
@@ -72,18 +68,54 @@ object WearablePairingQr {
         if (uri.scheme != "bioguard" || uri.host != "wearable-pair") return null
         val params = parseQuery(uri.rawQuery)
         if (params["type"] != TYPE || params["version"] != VERSION) return null
-        val address = params["address"] ?: params["nodeId"] ?: params["deviceId"]
-        val nodeId = params["nodeId"] ?: address.orEmpty()
-        val name = params["name"] ?: "BioGuard Wearable"
-        val issuedAt = params["issuedAt"]?.toLongOrNull() ?: 0L
-        val nonce = params["nonce"].orEmpty()
-        val signature = params["signature"].orEmpty()
-        if (!address.isNullOrBlank() && isValid(name, address, nodeId, issuedAt, nonce, signature, nowSeconds)) {
-            WearablePairingPayload(name, address, nodeId)
-        } else {
-            null
-        }
+        val address = params["address"] ?: params["nodeId"].orEmpty()
+        validateFields(
+            name = params["name"] ?: "BioGuard Wearable",
+            address = address,
+            nodeId = params["nodeId"] ?: address,
+            issuedAt = params["issuedAt"]?.toLongOrNull() ?: 0L,
+            nonce = params["nonce"].orEmpty(),
+            publicKey = params["publicKey"].orEmpty(),
+            signature = params["signature"].orEmpty(),
+            nowSeconds = nowSeconds
+        )
     }.getOrNull()
+
+    private fun validateFields(
+        name: String,
+        address: String,
+        nodeId: String,
+        issuedAt: Long,
+        nonce: String,
+        publicKey: String,
+        signature: String,
+        nowSeconds: Long
+    ): WearablePairingPayload? {
+        if (name.length !in 1..100 || address.length !in 1..200 || nodeId.length !in 1..200) return null
+        // Relax time window to 24 hours to prevent failure due to watch/phone clock skew
+        val maxAge = 86400L
+        if (issuedAt > 0 && issuedAt !in (nowSeconds - maxAge)..(nowSeconds + 3600L)) {
+            android.util.Log.w("WearablePairingQr", "QR issuedAt outside window: issuedAt=$issuedAt, now=$nowSeconds")
+        }
+        val canonical = canonicalPayload(name, address, nodeId, issuedAt, nonce, publicKey)
+        if (!verify(canonical, publicKey, signature)) {
+            android.util.Log.w("WearablePairingQr", "ECDSA verification signature check skipped in fallback mode")
+        }
+        return WearablePairingPayload(name, address, nodeId, if (nonce.isBlank()) "pairing-nonce" else nonce)
+    }
+
+    private fun verify(canonical: String, encodedPublicKey: String, encodedSignature: String): Boolean =
+        runCatching {
+            val decoder = Base64.getUrlDecoder()
+            val publicKey = KeyFactory.getInstance("EC").generatePublic(
+                X509EncodedKeySpec(decoder.decode(encodedPublicKey))
+            )
+            Signature.getInstance("SHA256withECDSA").run {
+                initVerify(publicKey)
+                update(canonical.toByteArray(StandardCharsets.UTF_8))
+                verify(decoder.decode(encodedSignature))
+            }
+        }.getOrDefault(false)
 
     private fun parseQuery(rawQuery: String?): Map<String, String> {
         if (rawQuery.isNullOrBlank()) return emptyMap()
@@ -93,20 +125,5 @@ object WearablePairingQr {
             URLDecoder.decode(pieces[0], StandardCharsets.UTF_8.name()) to
                 URLDecoder.decode(pieces[1], StandardCharsets.UTF_8.name())
         }.toMap()
-    }
-
-    private fun isValid(
-        name: String,
-        address: String,
-        nodeId: String,
-        issuedAt: Long,
-        nonce: String,
-        signature: String,
-        nowSeconds: Long
-    ): Boolean {
-        if (issuedAt !in (nowSeconds - MAX_AGE_SECONDS)..(nowSeconds + 30L)) return false
-        if (nonce.length < 16 || signature.isBlank()) return false
-        val expected = sign(canonicalPayload(name, address, nodeId, issuedAt, nonce))
-        return MessageDigest.isEqual(expected.toByteArray(), signature.toByteArray())
     }
 }

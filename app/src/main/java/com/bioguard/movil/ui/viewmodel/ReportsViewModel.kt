@@ -37,11 +37,10 @@ class ReportsViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ReportsUiState())
     val uiState: StateFlow<ReportsUiState> = _uiState.asStateFlow()
 
-    init {
-        loadReportes()
-    }
+    private var includeHistory = false
 
-    fun loadReportes() {
+    fun loadReportes(includeHistory: Boolean = this.includeHistory) {
+        this.includeHistory = includeHistory
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             val pacienteId = pacienteRepository.resolvePatientId(prefs)
@@ -55,14 +54,18 @@ class ReportsViewModel @Inject constructor(
                 }
                 is Resource.Loading -> {}
             }
-            when (val result = sensorRepository.getEventos(pacienteId, 10)) {
-                is Resource.Success -> _uiState.update {
-                    it.copy(eventos = result.data, isLoading = false)
+            if (includeHistory) {
+                when (val result = sensorRepository.getEventos(pacienteId, 10)) {
+                    is Resource.Success -> _uiState.update {
+                        it.copy(eventos = result.data, isLoading = false)
+                    }
+                    is Resource.Error -> _uiState.update {
+                        it.copy(isLoading = false, error = result.message)
+                    }
+                    is Resource.Loading -> {}
                 }
-                is Resource.Error -> _uiState.update {
-                    it.copy(isLoading = false, error = result.message)
-                }
-                is Resource.Loading -> {}
+            } else {
+                _uiState.update { it.copy(eventos = emptyList(), isLoading = false) }
             }
         }
     }

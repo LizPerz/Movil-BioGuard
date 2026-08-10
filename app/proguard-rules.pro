@@ -60,5 +60,3 @@
 -dontwarn androidx.room.paging.**
 
 # Firebase Cloud Messaging
--keep class com.google.firebase.messaging.** { *; }
--dontwarn com.google.firebase.**

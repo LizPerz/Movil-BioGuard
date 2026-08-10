@@ -223,7 +223,7 @@ fun LoginScreen(
                         Column(modifier = Modifier.fillMaxWidth()) {
                             OutlinedTextField(
                                 value = email,
-                                onValueChange = { email = it },
+                                onValueChange = { email = it.take(254) },
                                 modifier = Modifier.fillMaxWidth(),
                                 placeholder = { Text("correo@ejemplo.com", color = TextTertiary, fontSize = 12.sp) },
                                 singleLine = true,
@@ -242,7 +242,7 @@ fun LoginScreen(
                             Spacer(modifier = Modifier.height(12.dp))
                             OutlinedTextField(
                                 value = password,
-                                onValueChange = { password = it },
+                                onValueChange = { password = it.take(128) },
                                 modifier = Modifier.fillMaxWidth(),
                                 placeholder = { Text("Contrase\u00f1a", color = TextTertiary, fontSize = 12.sp) },
                                 singleLine = true,

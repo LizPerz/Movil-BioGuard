@@ -1,6 +1,5 @@
 package com.bioguard.movil.navigation
 
-import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,17 +16,15 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navDeepLink
-import com.bioguard.movil.datastore.UserPreferences
 import com.bioguard.movil.service.BioGuardMonitoringService
 import com.bioguard.movil.ui.components.BioGuardBottomNavBar
 import com.bioguard.movil.ui.components.BottomNavItem
-import com.bioguard.movil.ui.model.UserRole
+import com.bioguard.movil.ui.model.AppPermission
+import com.bioguard.movil.ui.model.EffectiveAccess
 import com.bioguard.movil.ui.screens.*
 import com.bioguard.movil.ui.theme.ThemeState
 import com.bioguard.movil.ui.theme.colorPalette
 import com.bioguard.movil.ui.viewmodel.*
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 
 @Composable
 fun BioGuardApp(
@@ -41,46 +38,42 @@ fun BioGuardApp(
 
     val authViewModel: AuthViewModel = hiltViewModel()
     val authState by authViewModel.uiState.collectAsState()
-    val role = authState.role
+    val access = authState.access
 
     val context = LocalContext.current
-    val appPrefs = remember { UserPreferences(context) }
-    val scope = rememberCoroutineScope()
-
     val navigateAfterAuth: () -> Unit = {
-        scope.launch {
-            val hasPatient = appPrefs.patientId.first() != null
-            val destination = if (hasPatient) Screen.DASHBOARD else Screen.ONBOARDING
-            navController.navigate(destination) {
-                popUpTo(0) { inclusive = true }
-            }
+        navController.navigate(access.homeRoute()) {
+            popUpTo(0) { inclusive = true }
         }
     }
 
     var alertAutoShown by remember { mutableStateOf(false) }
 
-    LaunchedEffect(authState.isAuthenticated, role) {
-        if (authState.isAuthenticated && role != UserRole.CUIDADOR) {
+    LaunchedEffect(authState.isAuthenticated, access.permissions) {
+        if (authState.isAuthenticated && access.allows(AppPermission.DEVICE_PAIR)) {
             BioGuardMonitoringService.start(context)
         } else {
             BioGuardMonitoringService.stop(context)
         }
     }
 
-    val bottomNavItems = remember(role) {
-        when (role) {
-            UserRole.CUIDADOR -> listOf(
-                BottomNavItem("Inicio", "\uD83C\uDFE0", Screen.DASHBOARD),
-                BottomNavItem("Reportes", "\uD83D\uDCCB", Screen.REPORTS),
-                BottomNavItem("Perfil", "\uD83D\uDC75", Screen.PROFILE)
-            )
-            else -> listOf(
-                BottomNavItem("Inicio", "\uD83C\uDFE0", Screen.DASHBOARD),
-                BottomNavItem("Análisis", "\uD83D\uDCCA", Screen.ANALYSIS),
-                BottomNavItem("Reportes", "\uD83D\uDCCB", Screen.REPORTS),
-                BottomNavItem("Dispositivo", "\u23EC", Screen.DEVICE),
-                BottomNavItem("Perfil", "\uD83D\uDC75", Screen.PROFILE)
-            )
+    val bottomNavItems = remember(access.permissions) {
+        buildList {
+            if (access.allowsAny(AppPermission.PATIENT_CREATE, AppPermission.PATIENT_READ, AppPermission.ALERT_READ)) {
+                add(BottomNavItem("Inicio", "\uD83C\uDFE0", Screen.DASHBOARD))
+            }
+            if (access.allows(AppPermission.HEALTH_HISTORY)) {
+                add(BottomNavItem("Análisis", "\uD83D\uDCCA", Screen.ANALYSIS))
+            }
+            if (access.allows(AppPermission.HEALTH_SUMMARY)) {
+                add(BottomNavItem("Reportes", "\uD83D\uDCCB", Screen.REPORTS))
+            }
+            if (access.allowsAny(AppPermission.DEVICE_READ, AppPermission.DEVICE_PAIR)) {
+                add(BottomNavItem("Dispositivo", "\u23EC", Screen.DEVICE))
+            }
+            if (access.allows(AppPermission.ACCOUNT_PROFILE)) {
+                add(BottomNavItem("Perfil", "\uD83D\uDC75", Screen.PROFILE))
+            }
         }
     }
     val navRoutes = bottomNavItems.map { it.route }
@@ -140,17 +133,8 @@ fun BioGuardApp(
                         isAuthenticated = authState.isAuthenticated,
                         onFinished = { authenticated ->
                             if (authenticated) {
-                                val currentRole = authState.role
-                                if (currentRole == UserRole.CUIDADOR) {
-                                    navController.navigate(Screen.DASHBOARD) {
-                                        popUpTo(Screen.SPLASH) { inclusive = true }
-                                    }
-                                } else {
-                                    scope.launch {
-                                        val hasPatient = appPrefs.patientId.first() != null
-                                        val dest = if (hasPatient) Screen.DASHBOARD else Screen.ONBOARDING
-                                        navController.navigate(dest) { popUpTo(Screen.SPLASH) { inclusive = true } }
-                                    }
+                                navController.navigate(access.homeRoute()) {
+                                    popUpTo(Screen.SPLASH) { inclusive = true }
                                 }
                             } else {
                                 navController.navigate(Screen.LOGIN) {
@@ -196,7 +180,7 @@ fun BioGuardApp(
                 composable(Screen.ONBOARDING) {
                     OnboardingScreen(
                         onComplete = {
-                            navController.navigate(Screen.DASHBOARD) { popUpTo(Screen.ONBOARDING) { inclusive = true } }
+                            navController.navigate(access.homeRoute()) { popUpTo(Screen.ONBOARDING) { inclusive = true } }
                         },
                         themeState = themeState,
                         onThemeChange = onThemeChange
@@ -211,19 +195,25 @@ fun BioGuardApp(
                         navDeepLink { uriPattern = "https://bioguard.app/dashboard" }
                     )
                 ) {
-                    val dashboardViewModel: DashboardViewModel = hiltViewModel()
+                    AuthorizedContent(
+                        access = access,
+                        anyOf = setOf(AppPermission.PATIENT_CREATE, AppPermission.PATIENT_READ, AppPermission.ALERT_READ),
+                        onDenied = { navController.navigate(access.homeRoute()) { launchSingleTop = true } }
+                    ) {
+                        val dashboardViewModel: DashboardViewModel = hiltViewModel()
 
-                    LaunchedEffect(openAlert, alertAutoShown) {
-                        if (openAlert && !alertAutoShown) {
-                            alertAutoShown = true
-                            navController.navigate(Screen.ALERT)
+                        LaunchedEffect(openAlert, alertAutoShown) {
+                            if (openAlert && !alertAutoShown && access.allows(AppPermission.ALERT_READ)) {
+                                alertAutoShown = true
+                                navController.navigate(Screen.ALERT)
+                            }
                         }
-                    }
 
-                    DashboardScreen(
-                        dashboardViewModel = dashboardViewModel,
-                        onPendingAlert = { navController.navigate(Screen.ALERT) }
-                    )
+                        DashboardScreen(
+                            dashboardViewModel = dashboardViewModel,
+                            onPendingAlert = { if (access.allows(AppPermission.ALERT_READ)) navController.navigate(Screen.ALERT) }
+                        )
+                    }
                 }
 
                 // ── Analysis ──
@@ -234,34 +224,46 @@ fun BioGuardApp(
                         navDeepLink { uriPattern = "https://bioguard.app/analysis" }
                     )
                 ) {
-                    val analysisViewModel: AnalysisViewModel = hiltViewModel()
-                    AnalysisScreen(analysisViewModel = analysisViewModel)
+                    AuthorizedContent(access, setOf(AppPermission.HEALTH_HISTORY), { navController.navigate(access.homeRoute()) }) {
+                        val analysisViewModel: AnalysisViewModel = hiltViewModel()
+                        AnalysisScreen(analysisViewModel = analysisViewModel)
+                    }
                 }
 
                 // ── Reports ──
                 composable(Screen.REPORTS) {
-                    val reportsViewModel: ReportsViewModel = hiltViewModel()
-                    ReportsScreen(
-                        reportsViewModel = reportsViewModel,
-                        onNavigateToHistory = { navController.navigate(Screen.HISTORY) }
-                    )
+                    AuthorizedContent(access, setOf(AppPermission.HEALTH_SUMMARY), { navController.navigate(access.homeRoute()) }) {
+                        val reportsViewModel: ReportsViewModel = hiltViewModel()
+                        ReportsScreen(
+                            reportsViewModel = reportsViewModel,
+                            canReadHistory = access.allows(AppPermission.HEALTH_HISTORY),
+                            onNavigateToHistory = {
+                                if (access.allows(AppPermission.HEALTH_HISTORY)) navController.navigate(Screen.HISTORY)
+                            }
+                        )
+                    }
                 }
 
                 // ── Device ──
                 composable(Screen.DEVICE) {
-                    val deviceViewModel: DeviceViewModel = hiltViewModel()
-                    DeviceScreen(
-                        deviceViewModel = deviceViewModel,
-                        onNavigateToWearableQr = { navController.navigate(Screen.WEARABLE_QR_SCANNER) }
-                    )
+                    AuthorizedContent(access, setOf(AppPermission.DEVICE_READ, AppPermission.DEVICE_PAIR), { navController.navigate(access.homeRoute()) }) {
+                        val deviceViewModel: DeviceViewModel = hiltViewModel()
+                        DeviceScreen(
+                            deviceViewModel = deviceViewModel,
+                            onNavigateToWearableQr = {
+                                if (access.allows(AppPermission.DEVICE_PAIR)) navController.navigate(Screen.WEARABLE_QR_SCANNER)
+                            }
+                        )
+                    }
                 }
 
                 // ── Profile ──
                 composable(Screen.PROFILE) {
-                    val profileViewModel: ProfileViewModel = hiltViewModel()
-                    ProfileScreen(
+                    AuthorizedContent(access, setOf(AppPermission.ACCOUNT_PROFILE), { navController.navigate(Screen.LOGIN) }) {
+                        val profileViewModel: ProfileViewModel = hiltViewModel()
+                        ProfileScreen(
                         profileViewModel = profileViewModel,
-                        role = role ?: UserRole.UNKNOWN,
+                        access = access,
                         onLogout = {
                             authViewModel.logout()
                             navController.navigate(Screen.LOGIN) { popUpTo(0) { inclusive = true } }
@@ -274,7 +276,8 @@ fun BioGuardApp(
                         onNavigateToSupport = { navController.navigate(Screen.SUPPORT) },
                         onNavigateToSettings = { navController.navigate(Screen.SETTINGS) },
                         onNavigateToDevice = { navController.navigate(Screen.DEVICE) }
-                    )
+                        )
+                    }
                 }
 
                 // ── Alert ──
@@ -285,20 +288,24 @@ fun BioGuardApp(
                         navDeepLink { uriPattern = "https://bioguard.app/alert" }
                     )
                 ) {
-                    val alertViewModel: AlertViewModel = hiltViewModel()
-                    AlertScreen(
-                        alertViewModel = alertViewModel,
-                        onDismiss = { navController.popBackStack() }
-                    )
+                    AuthorizedContent(access, setOf(AppPermission.ALERT_READ), { navController.navigate(access.homeRoute()) }) {
+                        val alertViewModel: AlertViewModel = hiltViewModel()
+                        AlertScreen(
+                            alertViewModel = alertViewModel,
+                            onDismiss = { navController.popBackStack() }
+                        )
+                    }
                 }
 
                 // ── History ──
                 composable(Screen.HISTORY) {
-                    val historyViewModel: HistoryViewModel = hiltViewModel()
-                    HistoryScreen(
-                        historyViewModel = historyViewModel,
-                        onBack = { navController.popBackStack() }
-                    )
+                    AuthorizedContent(access, setOf(AppPermission.HEALTH_HISTORY), { navController.navigate(access.homeRoute()) }) {
+                        val historyViewModel: HistoryViewModel = hiltViewModel()
+                        HistoryScreen(
+                            historyViewModel = historyViewModel,
+                            onBack = { navController.popBackStack() }
+                        )
+                    }
                 }
 
                 // ── QR Scanner ──
@@ -311,6 +318,10 @@ fun BioGuardApp(
                 }
 
                 composable(Screen.WEARABLE_QR_SCANNER) { backStackEntry ->
+                    if (!access.allows(AppPermission.DEVICE_PAIR)) {
+                        LaunchedEffect(Unit) { navController.navigate(access.homeRoute()) }
+                        return@composable
+                    }
                     val parentEntry = remember(backStackEntry) {
                         navController.getBackStackEntry(Screen.DEVICE)
                     }
@@ -337,11 +348,13 @@ fun BioGuardApp(
                         navDeepLink { uriPattern = "https://bioguard.app/notifications" }
                     )
                 ) {
-                    val notifViewModel: NotificacionViewModel = hiltViewModel()
-                    NotificationsScreen(
-                        notificacionViewModel = notifViewModel,
-                        onBack = { navController.popBackStack() }
-                    )
+                    AuthorizedContent(access, setOf(AppPermission.ACCOUNT_PROFILE, AppPermission.ALERT_READ), { navController.navigate(access.homeRoute()) }) {
+                        val notifViewModel: NotificacionViewModel = hiltViewModel()
+                        NotificationsScreen(
+                            notificacionViewModel = notifViewModel,
+                            onBack = { navController.popBackStack() }
+                        )
+                    }
                 }
 
                 // ── Medications ──
@@ -352,40 +365,71 @@ fun BioGuardApp(
                         navDeepLink { uriPattern = "https://bioguard.app/medications" }
                     )
                 ) {
-                    val medViewModel: MedicationViewModel = hiltViewModel()
-                    MedicationScreen(
-                        medicationViewModel = medViewModel,
-                        onBack = { navController.popBackStack() }
-                    )
+                    AuthorizedContent(access, setOf(AppPermission.MEDICATION_READ), { navController.navigate(access.homeRoute()) }) {
+                        val medViewModel: MedicationViewModel = hiltViewModel()
+                        MedicationScreen(
+                            medicationViewModel = medViewModel,
+                            onBack = { navController.popBackStack() }
+                        )
+                    }
                 }
 
                 // ── Cuidadores ──
                 composable(Screen.CUIDADORES) {
-                    val cuidadorViewModel: CuidadorViewModel = hiltViewModel()
-                    CuidadorScreen(
-                        cuidadorViewModel = cuidadorViewModel,
-                        onBack = { navController.popBackStack() }
-                    )
+                    AuthorizedContent(access, setOf(AppPermission.CAREGIVER_MANAGE), { navController.navigate(access.homeRoute()) }) {
+                        val cuidadorViewModel: CuidadorViewModel = hiltViewModel()
+                        CuidadorScreen(
+                            cuidadorViewModel = cuidadorViewModel,
+                            onBack = { navController.popBackStack() }
+                        )
+                    }
                 }
 
                 // ── Support ──
                 composable(Screen.SUPPORT) {
-                    val supportViewModel: SupportViewModel = hiltViewModel()
-                    SupportScreen(
-                        supportViewModel = supportViewModel,
-                        onBack = { navController.popBackStack() }
-                    )
+                    AuthorizedContent(access, setOf(AppPermission.ACCOUNT_PROFILE), { navController.navigate(access.homeRoute()) }) {
+                        val supportViewModel: SupportViewModel = hiltViewModel()
+                        SupportScreen(
+                            supportViewModel = supportViewModel,
+                            onBack = { navController.popBackStack() }
+                        )
+                    }
                 }
 
                 // ── Settings ──
                 composable(Screen.SETTINGS) {
-                    val settingsViewModel: SettingsViewModel = hiltViewModel()
-                    SettingsScreen(
-                        settingsViewModel = settingsViewModel,
-                        onBack = { navController.popBackStack() }
-                    )
+                    AuthorizedContent(access, setOf(AppPermission.ACCOUNT_PROFILE), { navController.navigate(access.homeRoute()) }) {
+                        val settingsViewModel: SettingsViewModel = hiltViewModel()
+                        SettingsScreen(
+                            settingsViewModel = settingsViewModel,
+                            access = access,
+                            onBack = { navController.popBackStack() }
+                        )
+                    }
                 }
             }
         }
+    }
+}
+
+private fun EffectiveAccess.allowsAny(vararg requested: AppPermission): Boolean = requested.any(::allows)
+
+private fun EffectiveAccess.homeRoute(): String = when {
+    allowsAny(AppPermission.PATIENT_CREATE, AppPermission.PATIENT_READ, AppPermission.ALERT_READ) -> Screen.DASHBOARD
+    allows(AppPermission.ACCOUNT_PROFILE) -> Screen.PROFILE
+    else -> Screen.LOGIN
+}
+
+@Composable
+private fun AuthorizedContent(
+    access: EffectiveAccess,
+    anyOf: Set<AppPermission>,
+    onDenied: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    if (anyOf.any(access::allows)) {
+        content()
+    } else {
+        LaunchedEffect(access.permissions, anyOf) { onDenied() }
     }
 }

@@ -21,6 +21,55 @@ object RetrofitClient {
 
     private val gson = Gson()
     private val refreshLock = Any()
+    private const val PROACTIVE_REFRESH_MARGIN_MS = 5 * 60 * 1000L
+
+    private fun jwtExpirationMillis(token: String): Long? {
+        return try {
+            val parts = token.split('.')
+            if (parts.size < 2) return null
+            val payload = parts[1].let { base64 ->
+                val padded = base64 + "=".repeat((4 - base64.length % 4) % 4)
+                android.util.Base64.decode(padded, android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP)
+            }
+            val json = org.json.JSONObject(String(payload, java.nio.charset.StandardCharsets.UTF_8))
+            json.optLong("exp", 0L).takeIf { it > 0L }?.times(1000L)
+        } catch (_: Exception) { null }
+    }
+
+    private val proactiveRefreshInterceptor = Interceptor { chain ->
+        val token = authToken
+        if (token != null) {
+            val expiresAt = jwtExpirationMillis(token)
+            val nowMs = System.currentTimeMillis()
+            if (expiresAt != null && expiresAt - nowMs < PROACTIVE_REFRESH_MARGIN_MS) {
+                val refreshToken = refreshTokenProvider()
+                if (refreshToken != null) {
+                    synchronized(refreshLock) {
+                        val currentExp = jwtExpirationMillis(authToken ?: "") ?: 0L
+                        if (currentExp - System.currentTimeMillis() < PROACTIVE_REFRESH_MARGIN_MS) {
+                            try {
+                                val jsonBody = gson.toJson(RefreshTokenRequest(authToken!!, refreshToken))
+                                    .toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull())
+                                refreshClient.newCall(
+                                    okhttp3.Request.Builder()
+                                        .url("${Constants.BASE_URL}api/Auth/refresh")
+                                        .post(jsonBody)
+                                        .build()
+                                ).execute().use { res ->
+                                    if (res.isSuccessful) {
+                                        val parsed = gson.fromJson(res.body?.string(), RefreshTokenResponse::class.java)
+                                        authToken = parsed.accessToken
+                                        onTokenRefreshed(parsed.accessToken, parsed.refreshToken)
+                                    }
+                                }
+                            } catch (_: Exception) { }
+                        }
+                    }
+                }
+            }
+        }
+        chain.proceed(chain.request())
+    }
 
     fun setToken(token: String?) {
         authToken = token
@@ -89,9 +138,13 @@ object RetrofitClient {
     }
 
     private val certificatePinner = okhttp3.CertificatePinner.Builder()
+        // Certificados del servidor (DigitalOcean App Platform / actual)
         .add("bioguard-api-lkvnq.ondigitalocean.app", "sha256/uuKzISd/FcyjVL3SJqZuUhdK1CAHK2A6pswUQQrED34=")
         .add("bioguard-api-lkvnq.ondigitalocean.app", "sha256/kIdp6NNEd8wsugYyyIYFsi1ylMCED3hZbSR8ZFsa/A4=")
         .add("bioguard-api-lkvnq.ondigitalocean.app", "sha256/mEflZT5enoR1FuXLgYYGqnVEoZvmf9c2bVBpiOjYQ0c=")
+        // Backup pins: CA raíz Let's Encrypt (ISRG Root X1) y R10/E5/E6 intermedios
+        .add("bioguard-api-lkvnq.ondigitalocean.app", "sha256/C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M=")
+        .add("bioguard-api-lkvnq.ondigitalocean.app", "sha256/hxqRlPTu1bMS/0DITB1SSu0vd4u/8l8TjPgfaAp63Vg=")
         .build()
 
     private val okHttpClient = OkHttpClient.Builder()
@@ -99,6 +152,7 @@ object RetrofitClient {
         .readTimeout(15, TimeUnit.SECONDS)
         .writeTimeout(15, TimeUnit.SECONDS)
         .addInterceptor(RetryInterceptor(maxRetries = 3))
+        .addInterceptor(proactiveRefreshInterceptor)
         .addInterceptor(authInterceptor)
         .addInterceptor(loggingInterceptor)
         .authenticator(authenticator)
@@ -123,6 +177,7 @@ object RetrofitClient {
         }
 
         return builder
+            .addInterceptor(proactiveRefreshInterceptor)
             .addInterceptor(authInterceptor)
             .addInterceptor(loggingInterceptor)
             .authenticator(authenticator)

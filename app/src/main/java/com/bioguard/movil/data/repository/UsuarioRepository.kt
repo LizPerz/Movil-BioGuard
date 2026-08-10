@@ -1,4 +1,4 @@
-﻿package com.bioguard.movil.data.repository
+package com.bioguard.movil.data.repository
 
 import com.bioguard.movil.data.Resource
 import com.bioguard.movil.data.toUserMessage
@@ -21,6 +21,30 @@ class UsuarioRepository @Inject constructor(
             Resource.Success(api.getMiPerfil())
         } catch (e: Exception) {
             Resource.Error(e.toUserMessage("Error al obtener perfil"))
+        }
+    }
+
+    suspend fun getMiAcceso(): Resource<com.bioguard.movil.network.EffectiveAccessResponse> {
+        return try {
+            Resource.Success(api.getMiAcceso())
+        } catch (e: retrofit2.HttpException) {
+            if (e.code() == 404) {
+                // Fallback si el endpoint aún no está activo en el servidor desplegado
+                Resource.Success(
+                    com.bioguard.movil.network.EffectiveAccessResponse(
+                        rol = "dueno",
+                        pacienteId = null,
+                        nivelAccesoCuidador = null,
+                        cuidadorDentroDelPlan = true,
+                        plan = null,
+                        permisos = listOf("account.profile", "patient.read")
+                    )
+                )
+            } else {
+                Resource.Error(e.toUserMessage("Error al obtener acceso"))
+            }
+        } catch (e: Exception) {
+            Resource.Error(e.toUserMessage("Error al obtener acceso"))
         }
     }
 

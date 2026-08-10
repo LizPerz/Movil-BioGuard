@@ -149,7 +149,7 @@ fun SupportScreen(
                         // Asunto
                         OutlinedTextField(
                             value = asunto,
-                            onValueChange = { asunto = it },
+                            onValueChange = { asunto = it.take(160) },
                             label = { Text(stringResource(R.string.support_subject_label), fontSize = 11.sp) },
                             modifier = Modifier.fillMaxWidth(),
                             colors = OutlinedTextFieldDefaults.colors(
@@ -248,7 +248,7 @@ fun SupportScreen(
                         // Descripcion
                         OutlinedTextField(
                             value = descripcion,
-                            onValueChange = { descripcion = it },
+                            onValueChange = { descripcion = it.take(4000) },
                             label = { Text(stringResource(R.string.support_detail_label), fontSize = 11.sp) },
                             modifier = Modifier
                                 .fillMaxWidth()

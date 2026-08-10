@@ -219,10 +219,10 @@ fun CuidadorScreen(
             title = { Text(stringResource(R.string.cuidador_new_title), color = p.textPrimary, fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedTextField(value = nombre, onValueChange = { nombre = it }, label = { Text(stringResource(R.string.cuidador_name), color = p.textSecondary) }, singleLine = true, modifier = Modifier.fillMaxWidth(), colors = tfColors())
-                    OutlinedTextField(value = parentesco, onValueChange = { parentesco = it }, label = { Text(stringResource(R.string.cuidador_relationship), color = p.textSecondary) }, singleLine = true, modifier = Modifier.fillMaxWidth(), colors = tfColors())
-                    OutlinedTextField(value = telefono, onValueChange = { telefono = it }, label = { Text(stringResource(R.string.cuidador_phone), color = p.textSecondary) }, singleLine = true, modifier = Modifier.fillMaxWidth(), colors = tfColors())
-                    OutlinedTextField(value = correo, onValueChange = { correo = it }, label = { Text(stringResource(R.string.cuidador_email), color = p.textSecondary) }, singleLine = true, modifier = Modifier.fillMaxWidth(), colors = tfColors())
+                    OutlinedTextField(value = nombre, onValueChange = { nombre = it.take(120) }, label = { Text(stringResource(R.string.cuidador_name), color = p.textSecondary) }, singleLine = true, modifier = Modifier.fillMaxWidth(), colors = tfColors())
+                    OutlinedTextField(value = parentesco, onValueChange = { parentesco = it.take(80) }, label = { Text(stringResource(R.string.cuidador_relationship), color = p.textSecondary) }, singleLine = true, modifier = Modifier.fillMaxWidth(), colors = tfColors())
+                    OutlinedTextField(value = telefono, onValueChange = { telefono = it.filter { ch -> ch.isDigit() || ch in "+- ()" }.take(20) }, label = { Text(stringResource(R.string.cuidador_phone), color = p.textSecondary) }, singleLine = true, modifier = Modifier.fillMaxWidth(), colors = tfColors())
+                    OutlinedTextField(value = correo, onValueChange = { correo = it.take(254) }, label = { Text(stringResource(R.string.cuidador_email), color = p.textSecondary) }, singleLine = true, modifier = Modifier.fillMaxWidth(), colors = tfColors())
                     ExposedDropdownMenuBox(
                         expanded = nivelExpanded,
                         onExpandedChange = { nivelExpanded = it }

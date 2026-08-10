@@ -238,11 +238,32 @@ fun DashboardScreen(
                         )
                     }
 
+                    val lastSyncMillis = ultimaLectura?.timestamp?.let { timestamp ->
+                        runCatching { java.time.Instant.parse(timestamp).toEpochMilli() }.getOrNull()
+                    } ?: 0L
+
+                    val unifiedState = when {
+                        uiState.connectionState == com.bioguard.movil.service.WearableConnectionState.STREAMING || isRecentData -> com.bioguard.movil.service.WearableConnectionState.STREAMING
+                        uiState.connectionState == com.bioguard.movil.service.WearableConnectionState.PAIRED || uiState.connectionState == com.bioguard.movil.service.WearableConnectionState.CONNECTED -> com.bioguard.movil.service.WearableConnectionState.PAIRED
+                        uiState.connectionState == com.bioguard.movil.service.WearableConnectionState.SYNCHRONIZED || ultimaLectura != null -> com.bioguard.movil.service.WearableConnectionState.SYNCHRONIZED
+                        uiState.isLoading -> com.bioguard.movil.service.WearableConnectionState.SEARCHING
+                        else -> com.bioguard.movil.service.WearableConnectionState.DISCONNECTED
+                    }
+
+                    val statusText = unifiedState.toDisplayString(lastSyncMillis)
+                    val statusColor = when (unifiedState) {
+                        com.bioguard.movil.service.WearableConnectionState.STREAMING -> GreenNeon
+                        com.bioguard.movil.service.WearableConnectionState.SYNCHRONIZED -> YellowNeon
+                        com.bioguard.movil.service.WearableConnectionState.PAIRED -> Color(0xFF38BDF8)
+                        com.bioguard.movil.service.WearableConnectionState.SEARCHING -> YellowNeon
+                        com.bioguard.movil.service.WearableConnectionState.DISCONNECTED -> RedNeon
+                        else -> p.textSecondary
+                    }
+
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        val hasLiveData = isRecentData
                         Row(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(16.dp))
@@ -256,10 +277,10 @@ fun DashboardScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Box(
-                                modifier = Modifier.size(7.dp).clip(CircleShape).background(if (hasLiveData) GreenNeon else p.textSecondary)
+                                modifier = Modifier.size(7.dp).clip(CircleShape).background(statusColor)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text(text = if (hasLiveData) stringResource(R.string.dashboard_online) else stringResource(R.string.dashboard_no_data), fontSize = 9.sp, color = if (hasLiveData) GreenNeon else p.textSecondary, letterSpacing = 1.sp, fontWeight = FontWeight.Medium)
+                            Text(text = statusText, fontSize = 9.sp, color = statusColor, letterSpacing = 1.sp, fontWeight = FontWeight.Medium)
                         }
                     }
                 }

@@ -1,7 +1,6 @@
 package com.bioguard.movil.service
 
 import android.content.Context
-import android.provider.Settings
 import android.util.Log
 import com.bioguard.movil.network.LecturaSensorRequest
 import com.bioguard.movil.network.CrearEventoRequest
@@ -9,16 +8,13 @@ import com.bioguard.movil.network.CrearAlertaRequest
 import com.bioguard.movil.network.HeartbeatRequest
 import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.wearable.CapabilityClient
-import com.google.android.gms.wearable.DataClient
-import com.google.android.gms.wearable.DataEvent
-import com.google.android.gms.wearable.DataEventBuffer
-import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.MessageClient
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
 import com.google.gson.Gson
 import com.google.gson.JsonSyntaxException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -32,6 +28,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 import java.nio.charset.StandardCharsets
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import org.json.JSONObject
 
 data class WatchEventDto(
     val bpm: Float,
@@ -65,10 +64,31 @@ data class RiskThresholds(
 
 enum class WearableConnectionState {
     DISCONNECTED,
+    SEARCHING,
+    PAIRED,
+    STREAMING,
+    SYNCHRONIZED,
     CONNECTING,
     CONNECTED,
     UNAVAILABLE,
-    ERROR
+    ERROR;
+
+    fun toDisplayString(lastSyncMillis: Long = 0L): String {
+        return when (this) {
+            DISCONNECTED -> "Desconectado"
+            SEARCHING, CONNECTING -> "Buscando..."
+            PAIRED, CONNECTED -> "Emparejado"
+            STREAMING -> "Transmitiendo"
+            SYNCHRONIZED -> {
+                val mins = if (lastSyncMillis > 0L) {
+                    ((System.currentTimeMillis() - lastSyncMillis) / 60_000L).coerceAtLeast(1L)
+                } else 1L
+                "Sincronizado hace $mins min"
+            }
+            UNAVAILABLE -> "Wear OS no disponible"
+            ERROR -> "Error de conexión"
+        }
+    }
 }
 
 data class WearableDeviceInfo(
@@ -81,12 +101,13 @@ data class WearableDeviceInfo(
 
 class WearableConnector(
     private val context: Context,
-    private val onReadingReceived: suspend (LecturaSensorRequest) -> Boolean,
+    private val onReadingReceived: suspend (LecturaSensorRequest, String?) -> Boolean,
     private val onEventReceived: (CrearEventoRequest) -> Unit,
     private val onAlertReceived: (CrearAlertaRequest) -> Unit,
     private val onHeartbeatReceived: (HeartbeatRequest) -> Unit,
-    private val trustedNodeIdProvider: suspend () -> String? = { null }
-) : MessageClient.OnMessageReceivedListener, CapabilityClient.OnCapabilityChangedListener, DataClient.OnDataChangedListener {
+    private val trustedNodeIdProvider: suspend () -> String? = { null },
+    private val pacienteIdProvider: suspend () -> String? = { null }
+) : MessageClient.OnMessageReceivedListener, CapabilityClient.OnCapabilityChangedListener {
 
     private val gson = Gson()
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -95,7 +116,6 @@ class WearableConnector(
 
     private val messageClient: MessageClient by lazy { Wearable.getMessageClient(context) }
     private val capabilityClient by lazy { Wearable.getCapabilityClient(context) }
-    private val dataClient: DataClient by lazy { Wearable.getDataClient(context) }
 
     private val _connectionState = MutableStateFlow(WearableConnectionState.DISCONNECTED)
     val connectionState: StateFlow<WearableConnectionState> = _connectionState.asStateFlow()
@@ -103,13 +123,13 @@ class WearableConnector(
     private val _connectedDevice = MutableStateFlow<WearableDeviceInfo?>(null)
     val connectedDevice: StateFlow<WearableDeviceInfo?> = _connectedDevice.asStateFlow()
 
-    @Volatile private var lastHeartbeatMillis: Long = 0L
-    private val heartbeatTimeoutMillis = 120_000L
+    @Volatile private var lastHeartbeatMillis: Long = System.currentTimeMillis()
+    private val heartbeatTimeoutMillis = 180_000L
     @Volatile private var wearOsApiUnavailableUntilMillis: Long = 0L
+    private val pendingPairingAcks = ConcurrentHashMap<String, CompletableDeferred<Boolean>>()
 
     private val dispositivoMac: String by lazy {
-        Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
-            ?.takeIf { it.isNotBlank() } ?: "telefono-bioguard"
+        com.bioguard.movil.util.InstallationIdentity.getOrCreate(context)
     }
 
     private var isRegistered = false
@@ -122,9 +142,8 @@ class WearableConnector(
         try {
             messageClient.addListener(this)
             capabilityClient.addListener(this, BIOGUARD_CAPABILITY)
-            dataClient.addListener(this)
             isRegistered = true
-            Log.d(TAG, "Listeners registered successfully (Message, Capability, Data)")
+            Log.d(TAG, "Listeners registered successfully (Message, Capability)")
             scope.launch {
                 discoverAndConnect()
             }
@@ -141,7 +160,6 @@ class WearableConnector(
         try {
             messageClient.removeListener(this)
             capabilityClient.removeListener(this)
-            dataClient.removeListener(this)
             isRegistered = false
             monitorJob?.cancel()
             heartbeatCheckJob?.cancel()
@@ -195,8 +213,9 @@ class WearableConnector(
                     CapabilityClient.FILTER_REACHABLE
                 ).await()
 
-                val candidates = capability.nodes.filter { trustedNodeId == null || it.id == trustedNodeId }
-                val node = candidates.firstOrNull { it.isNearby } ?: candidates.firstOrNull()
+                val node = capability.nodes.firstOrNull {
+                    it.isNearby && (trustedNodeId == null || it.id == trustedNodeId)
+                }
                 if (node != null) {
                     return@withTimeoutOrNull WearableDeviceInfo(
                         nodeId = node.id,
@@ -233,7 +252,7 @@ class WearableConnector(
                     BIOGUARD_CAPABILITY,
                     CapabilityClient.FILTER_REACHABLE
                 ).await()
-                for (node in capability.nodes) {
+                for (node in capability.nodes.filter { it.isNearby }) {
                     devices.add(
                         WearableDeviceInfo(
                             nodeId = node.id,
@@ -331,6 +350,53 @@ class WearableConnector(
         return false
     }
 
+    suspend fun pairWithNode(nodeId: String, pairingNonce: String? = null): Boolean {
+        if (nodeId.isBlank() || isWearOsApiInCooldown()) return false
+        return try {
+            val target = Wearable.getNodeClient(context).connectedNodes.await()
+                .firstOrNull { it.id == nodeId && it.isNearby }
+                ?: run {
+                    Log.w(TAG, "Vinculacion rechazada: el nodo no esta conectado por proximidad")
+                    return false
+                }
+            val requestId = UUID.randomUUID().toString()
+            val ack = CompletableDeferred<Boolean>()
+            pendingPairingAcks[requestId] = ack
+            val request = JSONObject()
+                .put("requestedAt", System.currentTimeMillis())
+                .put("protocolVersion", 2)
+                .put("requestId", requestId)
+            pairingNonce?.takeIf { it.isNotBlank() }?.let { request.put("nonce", it) }
+            try {
+                messageClient.sendMessage(
+                    target.id,
+                    PAIR_PATH,
+                    request.toString().toByteArray(StandardCharsets.UTF_8)
+                ).await()
+                val confirmed = withTimeoutOrNull(PAIR_ACK_TIMEOUT_MILLIS) { ack.await() } == true
+                if (!confirmed) {
+                    Log.w(TAG, "Vinculacion rechazada: el reloj no confirmo la persistencia de confianza")
+                    return false
+                }
+            } finally {
+                pendingPairingAcks.remove(requestId)
+            }
+            _connectedDevice.value = WearableDeviceInfo(
+                nodeId = nodeId,
+                displayName = _connectedDevice.value?.displayName ?: "BioGuard Wearable",
+                isNearby = true,
+                hasApp = true,
+                lastSeenMillis = System.currentTimeMillis()
+            )
+            _connectionState.value = WearableConnectionState.CONNECTED
+            lastHeartbeatMillis = System.currentTimeMillis()
+            true
+        } catch (e: Exception) {
+            Log.w(TAG, "No se pudo confirmar la vinculacion local con el reloj", e)
+            false
+        }
+    }
+
     fun sendAlertCommandToWatch(bpm: Float, temperatura: Float, gsr: Float, probability: Float) {
         val payload = """
             {
@@ -370,76 +436,126 @@ class WearableConnector(
 
     override fun onMessageReceived(event: MessageEvent) {
         scope.launch {
-            val trustedNodeId = trustedNodeIdProvider()
-            if (trustedNodeId != null && event.sourceNodeId != trustedNodeId) {
-                Log.w(TAG, "Ignored message from untrusted node ${event.sourceNodeId}")
+            if (event.data.size > WearablePayloadValidator.MAX_PAYLOAD_BYTES ||
+                !WearablePayloadValidator.isAllowedPath(event.path)
+            ) {
+                Log.w(TAG, "Ignored invalid wearable envelope for ${event.path}")
                 return@launch
             }
-            try {
+
+            if (event.path == "/bioguard/pair/ack") {
+                handlePairingAck(event)
+                return@launch
+            }
+
+            val trustedNodeId = trustedNodeIdProvider()
+            val pacienteId = pacienteIdProvider() ?: ""
+            if (!trustedNodeId.isNullOrBlank() && event.sourceNodeId != trustedNodeId) {
+                Log.w(TAG, "Ignored wearable message because sourceNodeId != trustedNodeId")
+                return@launch
+            }
+            if (_connectedDevice.value == null) {
+                _connectedDevice.value = WearableDeviceInfo(
+                    nodeId = event.sourceNodeId,
+                    displayName = "SmartWatch WearOS",
+                    isNearby = true,
+                    hasApp = true,
+                    lastSeenMillis = System.currentTimeMillis()
+                )
+            }
+            _connectionState.value = WearableConnectionState.STREAMING
             lastHeartbeatMillis = System.currentTimeMillis()
-            val jsonString = String(event.data, StandardCharsets.UTF_8)
-            when (event.path) {
-                "/sensors/readings" -> {
-                    val request = gson.fromJson(jsonString, LecturaSensorRequest::class.java)
-                    onReadingReceived(request)
-                }
-                "/sensors/events" -> {
-                    val dto = gson.fromJson(jsonString, WatchEventDto::class.java)
-                    val request = CrearEventoRequest(
-                        pacienteId = "",
-                        dispositivoMac = dispositivoMac,
-                        nivelRiesgo = dto.nivelRiesgo,
-                        probabilidadMl = dto.probabilidadMl ?: 0.0,
-                        descripcion = "${dto.tipoEvento}: ${dto.descripcion}"
-                    )
-                    onEventReceived(request)
-                }
-                "/sensors/alerts" -> {
-                    val dto = gson.fromJson(jsonString, WatchAlertDto::class.java)
-                    val request = CrearAlertaRequest(
-                        pacienteId = "",
-                        tipoAlerta = dto.tipoAlerta,
-                        descripcion = dto.mensaje,
-                        latitud = null,
-                        longitud = null
-                    )
-                    onAlertReceived(request)
-                }
-                "/sensors/heartbeat" -> {
-                    val request = gson.fromJson(jsonString, HeartbeatRequest::class.java)
-                    onHeartbeatReceivedFromWatch()
-                    onHeartbeatReceived(request)
-                }
-                else -> when {
-                    event.path.startsWith("/bioguard/telemetry") -> {
+            try {
+                val jsonString = String(event.data, StandardCharsets.UTF_8)
+                when (event.path) {
+                    "/sensors/readings" -> {
                         val request = gson.fromJson(jsonString, LecturaSensorRequest::class.java)
-                        if (onReadingReceived(request)) {
+                        if (WearablePayloadValidator.isValid(request)) onReadingReceived(request, null)
+                        else Log.w(TAG, "Rejected invalid live telemetry")
+                    }
+                    "/sensors/events" -> {
+                        val dto = gson.fromJson(jsonString, WatchEventDto::class.java)
+                        if (!WearablePayloadValidator.isValid(dto)) return@launch
+                        onEventReceived(
+                            CrearEventoRequest(
+                                pacienteId = pacienteId,
+                                dispositivoMac = dispositivoMac,
+                                nivelRiesgo = dto.nivelRiesgo,
+                                probabilidadMl = dto.probabilidadMl ?: 0.0,
+                                descripcion = "${dto.tipoEvento}: ${dto.descripcion}"
+                            )
+                        )
+                    }
+                    "/sensors/alerts" -> {
+                        val dto = gson.fromJson(jsonString, WatchAlertDto::class.java)
+                        if (!WearablePayloadValidator.isValid(dto)) return@launch
+                        onAlertReceived(
+                            CrearAlertaRequest(
+                                pacienteId = pacienteId,
+                                tipoAlerta = dto.tipoAlerta,
+                                descripcion = dto.mensaje,
+                                latitud = null,
+                                longitud = null
+                            )
+                        )
+                    }
+                    "/sensors/heartbeat", "/bioguard/heartbeat" -> {
+                        val request = gson.fromJson(jsonString, HeartbeatRequest::class.java)
+                        if (!WearablePayloadValidator.isValid(request)) return@launch
+                        onHeartbeatReceivedFromWatch()
+                        onHeartbeatReceived(request)
+                    }
+                    "/commands/dismiss", "/sensors/dismiss" -> {
+                        Log.w(TAG, "Recibido comando de descarte desde el reloj. Cancelando notificaciones locales.")
+                        LocalAlertNotifier(context).cancelAllNotifications()
+                    }
+                    else -> {
+                        val request = gson.fromJson(jsonString, LecturaSensorRequest::class.java)
+                        if (!WearablePayloadValidator.isValid(request)) {
+                            Log.w(TAG, "Rejected invalid durable telemetry")
+                            return@launch
+                        }
+                        if (onReadingReceived(request, event.path)) {
+                            lastHeartbeatMillis = System.currentTimeMillis()
                             sendAckToWatch(event.path, event.sourceNodeId)
                         } else {
                             Log.w(TAG, "Reading was not persisted; ACK withheld for ${event.path}")
                         }
                     }
-                    event.path.startsWith("/bioguard/heartbeat") -> {
-                        val request = gson.fromJson(jsonString, HeartbeatRequest::class.java)
-                        onHeartbeatReceivedFromWatch()
-                        onHeartbeatReceived(request)
-                    }
-                    else -> {
-                        Log.w(TAG, "Unknown message path: ${event.path}")
-                    }
                 }
+            } catch (e: JsonSyntaxException) {
+                Log.w(TAG, "JSON malformado del reloj en ${event.path}")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error procesando mensaje del reloj en ${event.path}", e)
             }
-        } catch (e: JsonSyntaxException) {
-            Log.w(TAG, "JSON malformado del reloj en ${event.path}: ${e.message}")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error procesando mensaje del reloj en ${event.path}", e)
         }
+    }
+
+    private fun handlePairingAck(event: MessageEvent) {
+        try {
+            val ack = JSONObject(String(event.data, StandardCharsets.UTF_8))
+            val requestId = ack.optString("requestId")
+            val pendingAck = pendingPairingAcks[requestId]
+            if (requestId.matches(Regex("^[0-9a-fA-F-]{36}$")) &&
+                ack.optInt("protocolVersion") == 2 &&
+                ack.optBoolean("accepted", false) &&
+                pendingAck != null
+            ) {
+                pendingAck.complete(true)
+                lastHeartbeatMillis = System.currentTimeMillis()
+                Log.d(TAG, "Pairing ACK accepted from ${event.sourceNodeId}")
+            } else {
+                Log.w(TAG, "Ignored unexpected pairing ACK from ${event.sourceNodeId}")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Invalid pairing ACK from ${event.sourceNodeId}: ${e.message}")
         }
     }
 
     override fun onCapabilityChanged(capabilityInfo: com.google.android.gms.wearable.CapabilityInfo) {
         scope.launch {
-            val node = capabilityInfo.nodes.firstOrNull { it.isNearby } ?: capabilityInfo.nodes.firstOrNull()
+            val trustedNodeId = trustedNodeIdProvider()
+            val node = capabilityInfo.nodes.firstOrNull { it.isNearby && it.id == trustedNodeId }
             if (node != null) {
                 _connectedDevice.value = WearableDeviceInfo(
                     nodeId = node.id,
@@ -455,43 +571,6 @@ class WearableConnector(
                 _connectionState.value = WearableConnectionState.DISCONNECTED
                 Log.d(TAG, "Capability changed: no wearables reachable")
             }
-        }
-    }
-
-    override fun onDataChanged(dataEvents: DataEventBuffer) {
-        try {
-            for (event in dataEvents) {
-                if (event.type == DataEvent.TYPE_CHANGED) {
-                    val path = event.dataItem.uri.path ?: continue
-                    val dataMap = DataMapItem.fromDataItem(event.dataItem).dataMap
-                    val payloadJson = dataMap.getString("payload") ?: continue
-
-                    lastHeartbeatMillis = System.currentTimeMillis()
-                    Log.d(TAG, "DataClient Item recibido en $path")
-
-                    when {
-                        path.startsWith("/bioguard/telemetry") -> {
-                            // MessageClient is the authoritative path because it identifies the source node
-                            // and can acknowledge only after the local transaction succeeds.
-                            Log.w(TAG, "Ignoring legacy DataClient telemetry without authenticated source: $path")
-                        }
-                        path.startsWith("/bioguard/heartbeat") -> {
-                            try {
-                                val request = gson.fromJson(payloadJson, HeartbeatRequest::class.java)
-                                onHeartbeatReceivedFromWatch()
-                                onHeartbeatReceived(request)
-                                sendAckToWatch(path)
-                            } catch (e: Exception) {
-                                Log.w(TAG, "Error deserializando heartbeat DataClient: ${e.message}")
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error procesando DataEvent del reloj", e)
-        } finally {
-            dataEvents.release()
         }
     }
 
@@ -534,6 +613,8 @@ class WearableConnector(
     companion object {
         private const val TAG = "WearableConnector"
         private const val BIOGUARD_CAPABILITY = "bioguard_watch"
+        private const val PAIR_PATH = "/bioguard/pair"
+        private const val PAIR_ACK_TIMEOUT_MILLIS = 8_000L
         private const val WEAR_OS_API_UNAVAILABLE_STATUS = 17
         private const val WEAR_OS_API_RETRY_COOLDOWN_MILLIS = 10 * 60 * 1000L
     }
@@ -553,7 +634,7 @@ class WearableConnector(
         Log.w(
             TAG,
             "Wear OS API unavailable during $source (status=${error.statusCode}). " +
-                "Install/configure the watch companion app or use Bluetooth QR/BLE pairing; retry is throttled."
+                "Install or configure the system companion app; retry is throttled."
         )
     }
 }

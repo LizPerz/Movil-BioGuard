@@ -1,50 +1,34 @@
-# BioGuard Móvil
+# BioGuard Movil
 
-Aplicación Android (minSdk 28, targetSdk 36) de monitoreo del Guardián Nocturno: recibe lecturas biométricas del reloj Wear OS, las sincroniza con el backend y mantiene una cola offline local (Room).
+Aplicacion Android local-first (minSdk 28, targetSdk 36). Recibe telemetria del reloj Wear OS exclusivamente mediante el canal local del Wearable Data Layer, persiste primero en Room cifrado y sincroniza con la API de produccion cuando existe conectividad.
 
-## Estructura
+## Componentes
 
-- `app/src/main/java/com/example/bioguard_movil/` — código fuente
-- `app/schemas/` — esquemas exportados de Room (se versionan para poder testear migraciones)
-- `app/src/test/java/com/example/bioguard_movil/data/local/BioGuardMigrationTest.kt` — test de migración Room v1→v3
+- `app/src/main/java/com/bioguard/movil/`: codigo de la aplicacion.
+- `app/schemas/`: contratos Room versionados y validados mediante pruebas de migracion.
+- `app/src/test/`: pruebas unitarias, de seguridad de payloads, ML, notificaciones y persistencia.
+- `ON_DEVICE_ANALYSIS.md`: modelo, limites y controles del analisis local.
+- `APK_DISTRIBUTION.md`: firma, verificacion y distribucion temporal por APK.
 
 ## Build y firma
 
-La firma de release se resuelve en `app/build.gradle.kts` desde `keystore.properties` (no versionado) o variables de entorno (CI):
+La firma release se configura mediante `keystore.properties` no versionado o estas variables de entorno:
 
-| Propiedad | Variable de entorno |
+| Propiedad | Variable |
 |---|---|
-| `storeFile` | `BIOGUARD_MOVIL_STORE_FILE` |
-| `storePassword` | `BIOGUARD_MOVIL_STORE_PASSWORD` |
-| `keyAlias` | `BIOGUARD_MOVIL_KEY_ALIAS` |
-| `keyPassword` | `BIOGUARD_MOVIL_KEY_PASSWORD` |
+| `storeFile` | `BIOGUARD_STORE_FILE` |
+| `storePassword` | `BIOGUARD_STORE_PASSWORD` |
+| `keyAlias` | `BIOGUARD_KEY_ALIAS` |
+| `keyPassword` | `BIOGUARD_KEY_PASSWORD` |
 
-Ejemplo local (`keystore.properties`, no commiteado):
+Las tareas `assembleRelease` y `bundleRelease` fallan si faltan credenciales. Movil y wearable deben usar el mismo certificado para el Data Layer de Wear OS.
 
-```properties
-storeFile=C:/ruta/bioguard-release.jks
-storePassword=***
-keyAlias=bioguard
-keyPassword=***
-```
+## Alertas locales y ML
 
-Sin ese archivo, `assembleRelease`/`bundleRelease` generan artefactos sin firmar (los tests y debug builds no se ven afectados).
+Las alertas se calculan y muestran completamente en el telefono, incluso sin Internet. No se utiliza Firebase ni otro proveedor push. El servicio procesa lecturas autenticadas del reloj, guarda primero en Room cifrado y aplica reglas conservadoras junto con un modelo personalizado de deteccion de anomalias.
 
-## Firebase Cloud Messaging (notificaciones push)
+Este analisis no es un diagnostico medico ni sustituye un dispositivo clinico. Consulte `ON_DEVICE_ANALYSIS.md` para sus limites y criterios de liberacion.
 
-El código de FCM ya existe (`service/BioGuardMessagingService.kt`), pero para que funcione en runtime hace falta:
+## CI y DevSecOps
 
-1. Descargar `google-services.json` desde Firebase Console (proyecto de BioGuard) y colocarlo en la raíz del módulo: `app/google-services.json`.
-2. Aplicar el plugin de Google Services en `app/build.gradle.kts` (root `plugins` + `alias(libs.plugins.google.services)`), y registrarlo en `gradle/libs.versions.toml`:
-
-   ```toml
-   google-services = { id = "com.google.gms.google-services", version = "4.4.2" }
-   ```
-
-3. Crear el canal de notificaciones y solicitar `POST_NOTIFICATIONS` en runtime (ya se pide en `MainActivity.requestRuntimePermissions()`).
-
-**Advertencia:** mientras `google-services.json` no esté presente NO se debe aplicar el plugin `com.google.gms.google-services`, porque el build falla al no encontrar el archivo.
-
-## CI
-
-`.github/workflows/ci.yml` corre unit tests y compila el release AAB. Los secretos `BIOGUARD_MOVIL_*` se configuran en GitHub → Settings → Secrets.
+`.github/workflows/ci.yml` ejecuta tests, lint, SBOM y genera APK/AAB firmados. `.github/workflows/security.yml` agrega CodeQL, deteccion de secretos, revision de dependencias y escaneo Trivy del SBOM.

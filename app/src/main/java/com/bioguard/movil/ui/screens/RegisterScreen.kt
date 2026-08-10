@@ -23,9 +23,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -203,7 +209,7 @@ fun RegisterScreen(
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("Tu primer y segundo nombre", color = TextTertiary) },
                         leadingIcon = {
-                            Text(text = "\uD83D\uDC64", color = TextTertiary, fontSize = 16.sp)
+                            Icon(imageVector = Icons.Filled.Person, contentDescription = null, tint = TextTertiary, modifier = Modifier.size(18.dp))
                         },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                         singleLine = true,
@@ -235,7 +241,7 @@ fun RegisterScreen(
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("Tu apellido paterno", color = TextTertiary) },
                         leadingIcon = {
-                            Text(text = "\uD83D\uDC64", color = TextTertiary, fontSize = 16.sp)
+                            Icon(imageVector = Icons.Filled.Person, contentDescription = null, tint = TextTertiary, modifier = Modifier.size(18.dp))
                         },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                         singleLine = true,
@@ -267,7 +273,7 @@ fun RegisterScreen(
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("Tu apellido materno", color = TextTertiary) },
                         leadingIcon = {
-                            Text(text = "\uD83D\uDC64", color = TextTertiary, fontSize = 16.sp)
+                            Icon(imageVector = Icons.Filled.Person, contentDescription = null, tint = TextTertiary, modifier = Modifier.size(18.dp))
                         },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                         singleLine = true,
@@ -336,7 +342,7 @@ fun RegisterScreen(
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022", color = TextTertiary) },
                         leadingIcon = {
-                            Text(text = "\uD83D\uDD12", color = TextTertiary, fontSize = 16.sp)
+                            Icon(imageVector = Icons.Filled.Lock, contentDescription = null, tint = TextTertiary, modifier = Modifier.size(18.dp))
                         },
                         visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -353,7 +359,12 @@ fun RegisterScreen(
                         ),
                             trailingIcon = {
                                 IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                    Text(text = if (passwordVisible) "\uD83D\uDC41" else "\uD83D\uDC41\u200D\uD83D\uDDE3", color = CyanNeon, fontSize = 14.sp)
+                                    Icon(
+                                        imageVector = if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                        contentDescription = null,
+                                        tint = CyanNeon,
+                                        modifier = Modifier.size(18.dp)
+                                    )
                                 }
                             }
                         )
@@ -379,7 +390,7 @@ fun RegisterScreen(
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022", color = TextTertiary) },
                         leadingIcon = {
-                            Text(text = "\uD83D\uDD12", color = TextTertiary, fontSize = 16.sp)
+                            Icon(imageVector = Icons.Filled.Lock, contentDescription = null, tint = TextTertiary, modifier = Modifier.size(18.dp))
                         },
                         visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -396,7 +407,12 @@ fun RegisterScreen(
                         ),
                         trailingIcon = {
                             IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
-                                Text(text = if (confirmPasswordVisible) "\uD83D\uDC41" else "\uD83D\uDC41\u200D\uD83D\uDDE3", color = CyanNeon, fontSize = 14.sp)
+                                Icon(
+                                        imageVector = if (confirmPasswordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                        contentDescription = null,
+                                        tint = CyanNeon,
+                                        modifier = Modifier.size(18.dp)
+                                    )
                             }
                         }
                     )

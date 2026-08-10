@@ -164,7 +164,7 @@ class LocalAlertNotifier(private val context: Context) {
 
     fun notifyEmergencySos(description: String) {
         if (!canPostNotifications()) return
-        val title = "🚨 ¡SOLICITUD DE AUXILIO / SOS!"
+        val title = "[SOS] SOLICITUD DE AUXILIO"
         val message = if (description.isNotBlank()) description else "El paciente presionó el botón de pánico en el reloj para solicitar ayuda inmediata."
 
         val notification = NotificationCompat.Builder(context, CHANNEL_CRITICAL)

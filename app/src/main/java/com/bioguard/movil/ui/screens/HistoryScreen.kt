@@ -18,7 +18,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DeviceThermostat
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -331,10 +336,40 @@ fun HistoryScreen(
                                             fontWeight = FontWeight.Medium
                                         )
                                         Spacer(modifier = Modifier.height(4.dp))
-                                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                            Text(text = "\u2665 ${entry.pulse}", fontSize = 11.sp, color = p.accent)
-                                            Text(text = "\uD83C\uDF21 ${entry.temp}", fontSize = 11.sp, color = p.textSecondary)
-                                            Text(text = "\uD83C\uDF0A GSR ${entry.gsr}", fontSize = 11.sp, color = p.textSecondary)
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    imageVector = Icons.Filled.Favorite,
+                                                    contentDescription = null,
+                                                    tint = p.accent,
+                                                    modifier = Modifier.size(11.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(3.dp))
+                                                Text(text = entry.pulse, fontSize = 11.sp, color = p.accent)
+                                            }
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    imageVector = Icons.Filled.DeviceThermostat,
+                                                    contentDescription = null,
+                                                    tint = p.textSecondary,
+                                                    modifier = Modifier.size(11.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(3.dp))
+                                                Text(text = entry.temp, fontSize = 11.sp, color = p.textSecondary)
+                                            }
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    imageVector = Icons.Filled.WaterDrop,
+                                                    contentDescription = null,
+                                                    tint = p.textSecondary,
+                                                    modifier = Modifier.size(11.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(3.dp))
+                                                Text(text = "GSR ${entry.gsr}", fontSize = 11.sp, color = p.textSecondary)
+                                            }
                                         }
                                     }
 

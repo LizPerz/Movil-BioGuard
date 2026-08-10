@@ -23,6 +23,7 @@ data class AuthUiState(
     val isAuthenticated: Boolean = false,
     val role: UserRole? = null,
     val access: EffectiveAccess = EffectiveAccess(),
+    val userName: String? = null,
     val error: String? = null,
     val successMessage: String? = null,
     val requiresVerification: Boolean = false,
@@ -49,7 +50,7 @@ class AuthViewModel @Inject constructor(
             val role = UserRole.from(prefs.userRole.first())
             if (restored) {
                 val access = repository.getEffectiveAccess(role)
-                _uiState.update { it.copy(isAuthenticated = true, role = access.role, access = access) }
+                _uiState.update { it.copy(isAuthenticated = true, role = access.role, access = access, userName = prefs.userName.first()) }
             }
         }
     }
@@ -60,7 +61,7 @@ class AuthViewModel @Inject constructor(
             when (val result = repository.loginWithCode(codigoAcceso)) {
                 is Resource.Success -> {
                     val access = repository.getEffectiveAccess(UserRole.from(result.data.rol))
-                    _uiState.update { it.copy(isLoading = false, isAuthenticated = true, role = access.role, access = access) }
+                    _uiState.update { it.copy(isLoading = false, isAuthenticated = true, role = access.role, access = access, userName = result.data.nombre) }
                 }
                 is Resource.Error -> _uiState.update {
                     it.copy(isLoading = false, error = result.message)
@@ -76,7 +77,7 @@ class AuthViewModel @Inject constructor(
             when (val result = repository.login(email, password)) {
                 is Resource.Success -> {
                     val access = repository.getEffectiveAccess(UserRole.from(result.data.rol))
-                    _uiState.update { it.copy(isLoading = false, isAuthenticated = true, role = access.role, access = access) }
+                    _uiState.update { it.copy(isLoading = false, isAuthenticated = true, role = access.role, access = access, userName = result.data.nombre) }
                 }
                 is Resource.Error -> _uiState.update {
                     it.copy(isLoading = false, error = result.message)
@@ -133,6 +134,7 @@ class AuthViewModel @Inject constructor(
                                         isAuthenticated = true,
                                         role = access.role,
                                         access = access,
+                                        userName = loginResult.data.nombre,
                                         successMessage = "Cuenta creada. Bienvenido"
                                     )
                                 }
@@ -210,6 +212,7 @@ class AuthViewModel @Inject constructor(
                             isAuthenticated = true,
                             role = access.role,
                             access = access,
+                            userName = result.data.nombre,
                             successMessage = "Cuenta verificada exitosamente"
                         )
                     }

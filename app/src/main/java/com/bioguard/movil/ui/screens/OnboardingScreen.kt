@@ -20,6 +20,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Smartphone
+import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
@@ -30,6 +34,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -611,7 +616,21 @@ fun BluetoothPairingStep(
                         .border(width = 2.dp, color = if (pairedDeviceName != null) GreenNeon else p.accent, shape = CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = if (pairedDeviceName != null) "✅" else "⌚", fontSize = 26.sp)
+                    if (pairedDeviceName != null) {
+                        Icon(
+                            imageVector = Icons.Filled.CheckCircle,
+                            contentDescription = "Vinculado",
+                            tint = GreenNeon,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Filled.Watch,
+                            contentDescription = "Wearable",
+                            tint = p.accent,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
                 }
             }
 
@@ -649,7 +668,12 @@ fun BluetoothPairingStep(
                             Spacer(modifier = Modifier.height(10.dp))
                             Text(text = "Escaneando dispositivos cercanos...", fontSize = 13.sp, color = p.textPrimary)
                         } else {
-                            Text(text = "📲", fontSize = 30.sp)
+                            Icon(
+                                imageVector = Icons.Filled.Smartphone,
+                                contentDescription = "Dispositivo",
+                                tint = p.accent,
+                                modifier = Modifier.size(28.dp)
+                            )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 text = "Toca para buscar dispositivos cercanos",

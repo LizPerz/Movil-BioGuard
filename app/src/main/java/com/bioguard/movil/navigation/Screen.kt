@@ -14,6 +14,8 @@ object Screen {
     const val ALERT = "alert"
     const val HISTORY = "history"
     const val QR_SCANNER = "qr_scanner"
+    const val WELCOME = "welcome"
+    const val WEARABLE_PAIRING = "wearable_pairing"
     const val WEARABLE_QR_SCANNER = "wearable_qr_scanner"
     const val NOTIFICATIONS = "notifications"
     const val MEDICATIONS = "medications"

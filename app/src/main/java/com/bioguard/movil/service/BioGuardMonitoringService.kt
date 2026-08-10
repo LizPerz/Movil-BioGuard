@@ -227,7 +227,7 @@ class BioGuardMonitoringService : Service() {
                             longitud = ultimaLongitud, timestamp = Instant.now().toString()
                         )
                     )
-                    localAlertNotifier.notifyEmergencySos("🚨 ¡BOTÓN DE PÁNICO PRESIONADO! ${conUbicacion.mensaje}")
+                    localAlertNotifier.notifyEmergencySos("[SOS] BOTÓN DE PÁNICO PRESIONADO. ${conUbicacion.mensaje}")
                     localAlertNotifier.notifyAssessment(
                         LocalRiskAssessment(
                             score = 95.0,

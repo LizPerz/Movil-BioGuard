@@ -29,10 +29,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -238,7 +241,12 @@ fun DeviceScreen(
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(text = "⌚", fontSize = 40.sp)
+                            Icon(
+                                imageVector = Icons.Filled.Watch,
+                                contentDescription = null,
+                                tint = if (isConnected) p.accent else p.textSecondary,
+                                modifier = Modifier.size(38.dp)
+                            )
                         }
 
                         Spacer(modifier = Modifier.height(16.dp))
@@ -489,7 +497,12 @@ fun DispositivoScanCard(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(text = "⌚", fontSize = 28.sp)
+            Icon(
+                imageVector = Icons.Filled.Watch,
+                contentDescription = null,
+                tint = p.accent,
+                modifier = Modifier.size(26.dp)
+            )
             Spacer(modifier = Modifier.width(12.dp))
             Column {
                 Text(

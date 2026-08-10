@@ -4,6 +4,12 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -21,6 +27,7 @@ import com.bioguard.movil.ui.components.BioGuardBottomNavBar
 import com.bioguard.movil.ui.components.BottomNavItem
 import com.bioguard.movil.ui.model.AppPermission
 import com.bioguard.movil.ui.model.EffectiveAccess
+import com.bioguard.movil.ui.model.UserRole
 import com.bioguard.movil.ui.screens.*
 import com.bioguard.movil.ui.theme.ThemeState
 import com.bioguard.movil.ui.theme.colorPalette
@@ -42,7 +49,8 @@ fun BioGuardApp(
 
     val context = LocalContext.current
     val navigateAfterAuth: () -> Unit = {
-        navController.navigate(access.homeRoute()) {
+        val route = if (access.role == UserRole.PACIENTE) Screen.WELCOME else access.homeRoute()
+        navController.navigate(route) {
             popUpTo(0) { inclusive = true }
         }
     }
@@ -60,19 +68,19 @@ fun BioGuardApp(
     val bottomNavItems = remember(access.permissions) {
         buildList {
             if (access.allowsAny(AppPermission.PATIENT_CREATE, AppPermission.PATIENT_READ, AppPermission.ALERT_READ)) {
-                add(BottomNavItem("Inicio", "\uD83C\uDFE0", Screen.DASHBOARD))
+                add(BottomNavItem("Inicio", Icons.Filled.Home, Screen.DASHBOARD))
             }
             if (access.allows(AppPermission.HEALTH_HISTORY)) {
-                add(BottomNavItem("Análisis", "\uD83D\uDCCA", Screen.ANALYSIS))
+                add(BottomNavItem("Análisis", Icons.Filled.Insights, Screen.ANALYSIS))
             }
             if (access.allows(AppPermission.HEALTH_SUMMARY)) {
-                add(BottomNavItem("Reportes", "\uD83D\uDCCB", Screen.REPORTS))
+                add(BottomNavItem("Reportes", Icons.Filled.Description, Screen.REPORTS))
             }
             if (access.allowsAny(AppPermission.DEVICE_READ, AppPermission.DEVICE_PAIR)) {
-                add(BottomNavItem("Dispositivo", "\u23EC", Screen.DEVICE))
+                add(BottomNavItem("Dispositivo", Icons.Filled.Watch, Screen.DEVICE))
             }
             if (access.allows(AppPermission.ACCOUNT_PROFILE)) {
-                add(BottomNavItem("Perfil", "\uD83D\uDC75", Screen.PROFILE))
+                add(BottomNavItem("Perfil", Icons.Filled.Person, Screen.PROFILE))
             }
         }
     }
@@ -87,7 +95,7 @@ fun BioGuardApp(
     }
 
     BackHandler(enabled = !showBottomBar && currentRoute in listOf(
-        Screen.REGISTER, Screen.PASSWORD_RECOVERY, Screen.ONBOARDING
+        Screen.REGISTER, Screen.PASSWORD_RECOVERY, Screen.ONBOARDING, Screen.WELCOME, Screen.WEARABLE_PAIRING
     )) {
         navController.navigate(Screen.LOGIN) {
             popUpTo(Screen.LOGIN) { inclusive = true }
@@ -314,6 +322,34 @@ fun BioGuardApp(
                         authViewModel = authViewModel,
                         onLoginSuccess = { navigateAfterAuth() },
                         onBack = { navController.popBackStack() }
+                    )
+                }
+
+                // ── Welcome (perfil biometrico + foto) tras login-codigo ──
+                composable(Screen.WELCOME) {
+                    WelcomeScreen(
+                        userName = authState.userName,
+                        onContinue = {
+                            navController.navigate(Screen.WEARABLE_PAIRING) {
+                                popUpTo(Screen.WELCOME) { inclusive = true }
+                            }
+                        },
+                        onSkip = {
+                            navController.navigate(access.homeRoute()) {
+                                popUpTo(Screen.WELCOME) { inclusive = true }
+                            }
+                        }
+                    )
+                }
+
+                // ── Wearable pairing (BLE) con Omitir ──
+                composable(Screen.WEARABLE_PAIRING) {
+                    WearablePairingScreen(
+                        onComplete = {
+                            navController.navigate(access.homeRoute()) {
+                                popUpTo(Screen.WEARABLE_PAIRING) { inclusive = true }
+                            }
+                        }
                     )
                 }
 

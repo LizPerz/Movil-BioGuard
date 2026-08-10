@@ -18,7 +18,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.DeviceThermostat
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -55,9 +60,9 @@ fun AnalysisScreen(analysisViewModel: AnalysisViewModel) {
 
     val timeFilters = listOf("1h", "4h", "Hoy", "7 d\u00edas")
     val metrics = listOf(
-        MetricOption("Pulso", p.accent, "\u2665"),
-        MetricOption("Temperatura", p.accentSecondary, "\uD83C\uDF21"),
-        MetricOption("Conductividad", YellowNeon, "\u26a1")
+        MetricOption("Pulso", p.accent, Icons.Filled.Favorite),
+        MetricOption("Temperatura", p.accentSecondary, Icons.Filled.DeviceThermostat),
+        MetricOption("Conductividad", YellowNeon, Icons.Filled.Bolt)
     )
 
     val chartPoints = uiState.lecturas.map { it ->
@@ -174,7 +179,12 @@ fun AnalysisScreen(analysisViewModel: AnalysisViewModel) {
                                 },
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(text = metric.icon, fontSize = 18.sp)
+                            Icon(
+                                imageVector = metric.icon,
+                                contentDescription = metric.name,
+                                tint = metric.color,
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
                     }
                 }

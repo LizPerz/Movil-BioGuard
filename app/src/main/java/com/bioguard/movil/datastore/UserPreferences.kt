@@ -52,6 +52,7 @@ class UserPreferences(private val context: Context) {
         val PATIENT_IS_DIABETIC = booleanPreferencesKey("patient_is_diabetic")
         val PATIENT_FAMILY_DIABETES = booleanPreferencesKey("patient_family_diabetes")
         val PATIENT_ACTIVITY_LEVEL = stringPreferencesKey("patient_activity_level")
+        val PATIENT_PHOTO = stringPreferencesKey("patient_photo")
     }
 
     val userId: Flow<String?> = context.dataStore.data.map { it[Keys.USER_ID] }
@@ -94,6 +95,7 @@ class UserPreferences(private val context: Context) {
     val patientIsDiabetic: Flow<Boolean> = context.dataStore.data.map { it[Keys.PATIENT_IS_DIABETIC] ?: false }
     val patientFamilyDiabetes: Flow<Boolean> = context.dataStore.data.map { it[Keys.PATIENT_FAMILY_DIABETES] ?: false }
     val patientActivityLevel: Flow<String?> = context.dataStore.data.map { it[Keys.PATIENT_ACTIVITY_LEVEL] }
+    val patientPhoto: Flow<String?> = context.dataStore.data.map { it[Keys.PATIENT_PHOTO] }
 
     suspend fun savePatientBiometrics(
         birthDate: String,
@@ -112,6 +114,12 @@ class UserPreferences(private val context: Context) {
             prefs[Keys.PATIENT_IS_DIABETIC] = isDiabetic
             prefs[Keys.PATIENT_FAMILY_DIABETES] = familyDiabetes
             prefs[Keys.PATIENT_ACTIVITY_LEVEL] = activityLevel
+        }
+    }
+
+    suspend fun savePatientPhoto(base64Photo: String) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.PATIENT_PHOTO] = base64Photo
         }
     }
 
@@ -231,6 +239,7 @@ class UserPreferences(private val context: Context) {
             prefs.remove(Keys.PATIENT_IS_DIABETIC)
             prefs.remove(Keys.PATIENT_FAMILY_DIABETES)
             prefs.remove(Keys.PATIENT_ACTIVITY_LEVEL)
+            prefs.remove(Keys.PATIENT_PHOTO)
         }
     }
 }

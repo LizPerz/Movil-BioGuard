@@ -12,11 +12,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -25,7 +28,7 @@ import com.bioguard.movil.ui.theme.colorPalette
 
 data class BottomNavItem(
     val label: String,
-    val icon: String,
+    val icon: ImageVector,
     val route: String
 )
 
@@ -59,10 +62,13 @@ fun BioGuardBottomNavBar(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    Text(
-                        text = item.icon,
-                        fontSize = 22.sp,
-                        modifier = Modifier.padding(bottom = 4.dp)
+                    Icon(
+                        imageVector = item.icon,
+                        contentDescription = item.label,
+                        tint = if (isSelected) p.accent else p.textSecondary,
+                        modifier = Modifier
+                            .padding(bottom = 4.dp)
+                            .size(22.dp)
                     )
                     Text(
                         text = item.label,

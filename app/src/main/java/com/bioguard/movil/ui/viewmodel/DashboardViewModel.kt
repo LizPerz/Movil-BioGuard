@@ -50,7 +50,7 @@ class DashboardViewModel @Inject constructor(
             val patientId = prefs.patientId.first() ?: "paciente-local"
             _uiState.update { it.copy(isLoading = false, error = null, pacienteId = patientId) }
 
-            cachedDataDao.getAllCachedReadings(10).collectLatest { cachedReadings ->
+            cachedDataDao.getAllCachedReadings(2000).collectLatest { cachedReadings ->
                 val latest = cachedReadings.firstOrNull()?.toResponse()
                 val connState = if (cachedReadings.isNotEmpty()) WearableConnectionState.STREAMING else WearableConnectionState.PAIRED
                 _uiState.update {

@@ -173,27 +173,35 @@ fun DashboardScreen(
         )
     }
 
-    val pulseChartPoints = uiState.lecturasRecientes.takeLast(10).map {
+    val sortedReadings = uiState.lecturasRecientes.reversed()
+
+    val pulseChartPoints = sortedReadings.map {
+        val tsMs = runCatching { java.time.Instant.parse(it.timestamp).toEpochMilli() }.getOrDefault(0L)
         ChartPoint(
             label = it.timestamp.substringAfter("T", "").take(5),
             value = it.pulsoBpm.toFloat(),
-            time = it.timestamp.substringAfter("T", "").take(8)
+            time = it.timestamp.substringAfter("T", "").take(8),
+            timestampMs = tsMs
         )
     }
 
-    val tempChartPoints = uiState.lecturasRecientes.takeLast(10).map {
+    val tempChartPoints = sortedReadings.map {
+        val tsMs = runCatching { java.time.Instant.parse(it.timestamp).toEpochMilli() }.getOrDefault(0L)
         ChartPoint(
             label = it.timestamp.substringAfter("T", "").take(5),
             value = it.temperaturaC.toFloat(),
-            time = it.timestamp.substringAfter("T", "").take(8)
+            time = it.timestamp.substringAfter("T", "").take(8),
+            timestampMs = tsMs
         )
     }
 
-    val gsrChartPoints = uiState.lecturasRecientes.takeLast(10).map {
+    val gsrChartPoints = sortedReadings.map {
+        val tsMs = runCatching { java.time.Instant.parse(it.timestamp).toEpochMilli() }.getOrDefault(0L)
         ChartPoint(
             label = it.timestamp.substringAfter("T", "").take(5),
             value = it.sudoracionGsr.toFloat(),
-            time = it.timestamp.substringAfter("T", "").take(8)
+            time = it.timestamp.substringAfter("T", "").take(8),
+            timestampMs = tsMs
         )
     }
 

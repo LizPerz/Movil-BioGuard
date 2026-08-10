@@ -106,6 +106,7 @@ data class LecturaSensorRequest(
     @SerializedName("grasaCorporalPct") val grasaCorporalPct: Double? = null,
     @SerializedName("masaMuscularKg") val masaMuscularKg: Double? = null,
     @SerializedName("faseSueno") val faseSueno: String? = null,
+    @SerializedName("glucosaEstimadaMgDl") val glucosaEstimadaMgDl: Double? = null,
     @SerializedName("timestamp") val timestamp: String,
     @SerializedName("sourceMessageId") val sourceMessageId: String? = null
 )
@@ -124,6 +125,7 @@ data class LecturaSensorResponse(
     @SerializedName("grasaCorporalPct") val grasaCorporalPct: Double? = null,
     @SerializedName("masaMuscularKg") val masaMuscularKg: Double? = null,
     @SerializedName("faseSueno") val faseSueno: String? = null,
+    @SerializedName("glucosaEstimadaMgDl") val glucosaEstimadaMgDl: Double? = null,
     @SerializedName("probabilidadPico") val probabilidadPico: Double? = null,
     @SerializedName("nivelRiesgo") val nivelRiesgo: String? = null
 )

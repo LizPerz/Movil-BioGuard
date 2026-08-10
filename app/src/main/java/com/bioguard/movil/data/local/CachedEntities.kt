@@ -20,6 +20,7 @@ data class CachedReadingEntity(
     val grasaCorporalPct: Double = 0.0,
     val masaMuscularKg: Double = 0.0,
     val faseSueno: String = "Sueño Profundo",
+    val glucosaEstimadaMgDl: Double = 0.0,
     val fechaHora: String,
     val timestamp: Long = System.currentTimeMillis()
 )

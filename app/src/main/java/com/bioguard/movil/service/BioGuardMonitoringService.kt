@@ -160,6 +160,14 @@ class BioGuardMonitoringService : Service() {
                     )
                     val validSpo2 = if (request.spo2 != null && request.spo2 > 0.0) request.spo2 else 98.0
                     val validPasos = if (request.pasos != null && request.pasos > 0) request.pasos else (request.pulsoBpm.toInt() * 15 % 1500 + 450)
+                    val validHrv = request.hrv ?: 45.0
+                    val calculatedGlucose = (95.0 +
+                            (request.pulsoBpm - 72.0) * 0.45 +
+                            (request.temperaturaC - 36.5) * 12.0 +
+                            kotlin.math.max(0.0, request.sudoracionGsr - 45.0) * 0.5 +
+                            kotlin.math.max(0.0, 45.0 - validHrv) * 0.4
+                    ).coerceIn(70.0, 220.0)
+
                     database.cachedDataDao().insertReadings(
                         listOf(
                             CachedReadingEntity(
@@ -168,7 +176,7 @@ class BioGuardMonitoringService : Service() {
                                 pulsoBpm = request.pulsoBpm,
                                 temperaturaC = request.temperaturaC,
                                 sudoracionGsr = request.sudoracionGsr,
-                                hrv = request.hrv ?: 45.0,
+                                hrv = validHrv,
                                 spo2 = validSpo2,
                                 pasos = validPasos,
                                 calorias = (validPasos * 0.04),
@@ -178,6 +186,7 @@ class BioGuardMonitoringService : Service() {
                                 grasaCorporalPct = request.grasaCorporalPct ?: 18.5,
                                 masaMuscularKg = request.masaMuscularKg ?: 32.0,
                                 faseSueno = request.faseSueno ?: "Sueño Profundo",
+                                glucosaEstimadaMgDl = calculatedGlucose,
                                 fechaHora = request.timestamp
                             )
                         )

@@ -149,7 +149,22 @@ fun DashboardScreen(
     val spo2Status = if (lastSpo2 < 95.0) "Bajo" else "Normal"
     val spo2StatusColor = if (lastSpo2 < 95.0) RedNeon else GreenNeon
 
+    val lastGlucose = (ultimaLectura?.glucosaEstimadaMgDl?.takeIf { it > 0.0 }
+        ?: (95.0 + ((lastPulse ?: 72.0) - 72.0) * 0.45 + ((lastTemp ?: 36.5) - 36.5) * 12.0 + kotlin.math.max(0.0, (lastGsr ?: 45.0) - 45.0) * 0.5)).coerceIn(70.0, 220.0)
+    val formattedGlucose = String.format(java.util.Locale.US, "%.0f", lastGlucose)
+    val glucoseStatus = when {
+        lastGlucose > 140.0 -> "Pico Elevado (>140 mg/dL)"
+        lastGlucose < 70.0 -> "Hipoglucemia (<70 mg/dL)"
+        else -> "Normal / Estable"
+    }
+    val glucoseStatusColor = when {
+        lastGlucose > 140.0 -> RedNeon
+        lastGlucose < 70.0 -> YellowNeon
+        else -> GreenNeon
+    }
+
     val vitalSigns = listOf(
+        VitalSign("Estimación Picos de Glucosa", formattedGlucose, "mg/dL", "🩸", Color(0xFFF43F5E), glucoseStatus, glucoseStatusColor),
         VitalSign(stringResource(R.string.dashboard_heart_rate), formattedPulse, "BPM", "\u2665", p.accent, pulseStatus, if (pulseStatus == stringResource(R.string.dashboard_normal)) GreenNeon else if (pulseStatus == stringResource(R.string.dashboard_alert)) RedNeon else YellowNeon),
         VitalSign(stringResource(R.string.dashboard_temperature), formattedTemp, "\u00b0C", "\uD83C\uDF21", p.accentSecondary, tempStatus, tempStatusColor),
         VitalSign(stringResource(R.string.dashboard_conductivity), formattedGsr, "\u00b5S", "\u26a1", YellowNeon, gsrStatus, gsrStatusColor),
@@ -251,6 +266,31 @@ fun DashboardScreen(
         )
     }
 
+    val glucoseChartPoints = sortedReadings.map {
+        val tsMs = runCatching { java.time.Instant.parse(it.timestamp).toEpochMilli() }.getOrDefault(0L)
+        val (labelStr, timeStr) = try {
+            val instant = java.time.Instant.parse(it.timestamp)
+            val zdt = instant.atZone(java.time.ZoneId.systemDefault())
+            val lbl = zdt.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+            val full = zdt.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"))
+            lbl to full
+        } catch (_: Exception) {
+            it.timestamp.substringAfter("T", "").take(5) to it.timestamp.substringAfter("T", "").take(8)
+        }
+        val gVal = it.glucosaEstimadaMgDl ?: 0.0
+        val calculatedGlucose = if (gVal > 0.0) {
+            gVal
+        } else {
+            (95.0 + (it.pulsoBpm - 72.0) * 0.45 + (it.temperaturaC - 36.5) * 12.0 + kotlin.math.max(0.0, it.sudoracionGsr - 45.0) * 0.5).coerceIn(70.0, 220.0)
+        }
+        ChartPoint(
+            label = labelStr,
+            value = calculatedGlucose.toFloat(),
+            time = timeStr,
+            timestampMs = tsMs
+        )
+    }
+
     if (uiState.isLoading) {
         Box(
             modifier = Modifier
@@ -345,12 +385,21 @@ fun DashboardScreen(
                     }
                 }
 
-                // Interactive Health Vector Chart
+                // Interactive Glucose Spike Vector Chart
+                BioHealthChart(
+                    points = glucoseChartPoints,
+                    lineColor = Color(0xFFF43F5E),
+                    unit = "mg/dL",
+                    title = "🩸 Tendencia y Picos de Glucosa Estimados",
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                // Interactive Heart Rate Vector Chart
                 BioHealthChart(
                     points = pulseChartPoints,
                     lineColor = p.accent,
                     unit = "BPM",
-                    title = "Ritmo Cardíaco en Tiempo Real",
+                    title = "❤️ Ritmo Cardíaco en Tiempo Real",
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
 

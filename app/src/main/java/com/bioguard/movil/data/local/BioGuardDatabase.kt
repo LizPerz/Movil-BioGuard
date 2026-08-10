@@ -13,7 +13,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         PendingReadingEntity::class, PendingGpsEntity::class, PendingEventEntity::class, PendingAlertEntity::class,
         CachedReadingEntity::class, CachedEventEntity::class, CachedAlertEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = true
 )
 abstract class BioGuardDatabase : RoomDatabase() {
@@ -132,6 +132,12 @@ abstract class BioGuardDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `cached_readings` ADD COLUMN `glucosaEstimadaMgDl` REAL NOT NULL DEFAULT 0.0")
+            }
+        }
+
         fun getInstance(context: Context): BioGuardDatabase {
             return INSTANCE ?: synchronized(this) {
                 val passphrase = com.bioguard.movil.util.SecurityUtils.getOrCreateDatabasePassphrase(context)
@@ -147,7 +153,7 @@ abstract class BioGuardDatabase : RoomDatabase() {
                     context.applicationContext,
                     BioGuardDatabase::class.java,
                     "bioguard_offline_db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                     .fallbackToDestructiveMigration()
                     .openHelperFactory(factory)
                     .build()

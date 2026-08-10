@@ -177,30 +177,57 @@ fun DashboardScreen(
 
     val pulseChartPoints = sortedReadings.map {
         val tsMs = runCatching { java.time.Instant.parse(it.timestamp).toEpochMilli() }.getOrDefault(0L)
+        val (labelStr, timeStr) = try {
+            val instant = java.time.Instant.parse(it.timestamp)
+            val zdt = instant.atZone(java.time.ZoneId.systemDefault())
+            val lbl = zdt.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+            val full = zdt.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"))
+            lbl to full
+        } catch (_: Exception) {
+            it.timestamp.substringAfter("T", "").take(5) to it.timestamp.substringAfter("T", "").take(8)
+        }
         ChartPoint(
-            label = it.timestamp.substringAfter("T", "").take(5),
+            label = labelStr,
             value = it.pulsoBpm.toFloat(),
-            time = it.timestamp.substringAfter("T", "").take(8),
+            time = timeStr,
             timestampMs = tsMs
         )
     }
 
     val tempChartPoints = sortedReadings.map {
         val tsMs = runCatching { java.time.Instant.parse(it.timestamp).toEpochMilli() }.getOrDefault(0L)
+        val (labelStr, timeStr) = try {
+            val instant = java.time.Instant.parse(it.timestamp)
+            val zdt = instant.atZone(java.time.ZoneId.systemDefault())
+            val lbl = zdt.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+            val full = zdt.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"))
+            lbl to full
+        } catch (_: Exception) {
+            it.timestamp.substringAfter("T", "").take(5) to it.timestamp.substringAfter("T", "").take(8)
+        }
         ChartPoint(
-            label = it.timestamp.substringAfter("T", "").take(5),
+            label = labelStr,
             value = it.temperaturaC.toFloat(),
-            time = it.timestamp.substringAfter("T", "").take(8),
+            time = timeStr,
             timestampMs = tsMs
         )
     }
 
     val gsrChartPoints = sortedReadings.map {
         val tsMs = runCatching { java.time.Instant.parse(it.timestamp).toEpochMilli() }.getOrDefault(0L)
+        val (labelStr, timeStr) = try {
+            val instant = java.time.Instant.parse(it.timestamp)
+            val zdt = instant.atZone(java.time.ZoneId.systemDefault())
+            val lbl = zdt.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+            val full = zdt.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"))
+            lbl to full
+        } catch (_: Exception) {
+            it.timestamp.substringAfter("T", "").take(5) to it.timestamp.substringAfter("T", "").take(8)
+        }
         ChartPoint(
-            label = it.timestamp.substringAfter("T", "").take(5),
+            label = labelStr,
             value = it.sudoracionGsr.toFloat(),
-            time = it.timestamp.substringAfter("T", "").take(8),
+            time = timeStr,
             timestampMs = tsMs
         )
     }

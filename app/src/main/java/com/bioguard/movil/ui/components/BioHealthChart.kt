@@ -124,6 +124,16 @@ fun BioHealthChart(
         }
     }
 
+    val firstTs = currentDisplayPoints.firstOrNull()?.timestampMs ?: 0L
+    val lastTs = currentDisplayPoints.lastOrNull()?.timestampMs ?: 0L
+    val spanMs = if (lastTs > firstTs) lastTs - firstTs else 0L
+    val spanMin = (spanMs / 60_000L).coerceAtLeast(1)
+    val spanText = if (spanMin < 60) {
+        "${currentDisplayPoints.size} lecturas en últimos ${spanMin} min"
+    } else {
+        "${currentDisplayPoints.size} lecturas en últimas ${spanMin / 60} h"
+    }
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -136,32 +146,56 @@ fun BioHealthChart(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            if (title != null) {
+            Column {
+                if (title != null) {
+                    Text(
+                        text = title,
+                        color = theme.textPrimary,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
                 Text(
-                    text = title,
-                    color = theme.textPrimary,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
+                    text = "📊 $spanText",
+                    color = theme.textTertiary,
+                    fontSize = 10.sp
                 )
             }
+
             selectedPointIndex?.let { idx ->
                 val pt = currentDisplayPoints.getOrNull(idx) ?: currentDisplayPoints.last()
                 val formattedVal = formatVal(pt.value)
                 val timeStr = pt.time.ifEmpty { pt.label }
-                Text(
-                    text = "📍 $formattedVal $unit ($timeStr)",
-                    color = lineColor,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = "📍 $formattedVal $unit",
+                        color = lineColor,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    Text(
+                        text = timeStr,
+                        color = theme.textSecondary,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             } ?: run {
                 val last = currentDisplayPoints.last()
                 val formattedVal = formatVal(last.value)
-                Text(
-                    text = "Último: $formattedVal $unit",
-                    color = theme.textSecondary,
-                    fontSize = 12.sp
-                )
+                val timeStr = last.time.ifEmpty { last.label }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = "Último: $formattedVal $unit",
+                        color = theme.textSecondary,
+                        fontSize = 12.sp
+                    )
+                    Text(
+                        text = timeStr,
+                        color = theme.textTertiary,
+                        fontSize = 9.sp
+                    )
+                }
             }
         }
 

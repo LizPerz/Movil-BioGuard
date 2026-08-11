@@ -99,7 +99,8 @@ private fun encodeToBase64(src: Bitmap): String {
 
 private fun decodeBase64ToBitmap(base64: String): Bitmap? {
     return try {
-        val bytes = Base64.decode(base64, Base64.NO_WRAP)
+        val data = base64.substringAfter(";base64,").trim()
+        val bytes = Base64.decode(data, Base64.NO_WRAP)
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
     } catch (_: Exception) {
         null

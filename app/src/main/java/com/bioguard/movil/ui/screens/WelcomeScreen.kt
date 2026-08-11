@@ -140,7 +140,7 @@ fun WelcomeScreen(
 
     LaunchedEffect(Unit) {
         photoBase64 = prefs.patientPhoto.first()
-        birthDate = prefs.patientBirthDate.first() ?: ""
+        birthDate = Formatters.toDisplayDigits(Formatters.toIsoDate(prefs.patientBirthDate.first() ?: "") ?: "")
         selectedSex = when (prefs.patientSex.first()) {
             "F" -> "Femenino"
             else -> "Masculino"
@@ -346,7 +346,8 @@ fun WelcomeScreen(
                     Text(text = "FECHA DE NACIMIENTO", fontSize = 10.sp, color = p.accent, letterSpacing = 2.sp, modifier = Modifier.padding(bottom = 6.dp))
                     OutlinedTextField(
                         value = birthDate,
-                        onValueChange = { birthDate = Formatters.formatDateInput(it) },
+                        onValueChange = { birthDate = Formatters.toDisplayDigits(it) },
+                        visualTransformation = Formatters.dateMaskTransformation,
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("dd/mm/aaaa", color = p.textTertiary) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -373,16 +374,38 @@ fun WelcomeScreen(
                         colors = tfColors()
                     )
                     if (computedAge != null) {
-                        Text(
-                            text = "Edad calculada: $computedAge anos",
-                            fontSize = 11.sp,
-                            color = p.accent,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 6.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(p.accent.copy(alpha = 0.12f))
+                                .border(width = 1.dp, color = p.accent, shape = RoundedCornerShape(8.dp))
+                                .padding(horizontal = 10.dp, vertical = 8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.CalendarMonth,
+                                    contentDescription = null,
+                                    tint = p.accent,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Edad calculada: $computedAge años",
+                                    fontSize = 12.sp,
+                                    color = p.accent,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
                     } else {
                         Text(
-                            text = "La edad se calcula automaticamente",
+                            text = "La edad se calcula automáticamente al escribir la fecha",
                             fontSize = 11.sp,
                             color = p.textTertiary,
                             modifier = Modifier.padding(top = 4.dp)
@@ -442,7 +465,7 @@ fun WelcomeScreen(
                             datePickerState.selectedDateMillis?.let { millis ->
                                 val day = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
                                 if (!day.isAfter(LocalDate.now())) {
-                                    birthDate = Formatters.toDisplayDate(day.toString())
+                                    birthDate = Formatters.toDisplayDigits(day.toString())
                                 }
                             }
                             showDatePicker = false

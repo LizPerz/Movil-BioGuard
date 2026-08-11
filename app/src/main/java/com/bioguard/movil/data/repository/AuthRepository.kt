@@ -100,6 +100,7 @@ class AuthRepository @Inject constructor(
     }
 
     private suspend fun persistSession(response: LoginWebResponse) {
+        guardAccountSwitch(response.userId)
         RetrofitClient.setToken(response.token)
         tokenStorage.saveAuthToken(response.token)
         response.refreshToken?.let { tokenStorage.saveRefreshToken(it) }
@@ -110,12 +111,21 @@ class AuthRepository @Inject constructor(
     }
 
     private suspend fun persistSession(response: LoginCodigoResponse) {
+        guardAccountSwitch(response.userId)
         RetrofitClient.setToken(response.effectiveAccessToken)
         tokenStorage.saveAuthToken(response.effectiveAccessToken)
         tokenStorage.saveRefreshToken(response.refreshToken)
         prefs.saveUserData(response.userId, response.nombre, response.rol)
         if (response.rol.equals("paciente", ignoreCase = true)) {
             prefs.savePatientId(response.userId)
+        }
+    }
+
+    // Si se inicia sesión con una cuenta distinta, se descarta la biometría local de la anterior.
+    private suspend fun guardAccountSwitch(newUserId: String) {
+        val prevUserId = prefs.userId.first()
+        if (!prevUserId.isNullOrBlank() && prevUserId != newUserId) {
+            prefs.clearPatientBiometrics()
         }
     }
 

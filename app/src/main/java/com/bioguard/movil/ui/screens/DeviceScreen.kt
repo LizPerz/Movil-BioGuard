@@ -30,6 +30,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BluetoothDisabled
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -339,8 +343,15 @@ fun DeviceScreen(
                             shape = RoundedCornerShape(10.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = p.accent)
                         ) {
+                            Icon(
+                                imageVector = Icons.Filled.Refresh,
+                                contentDescription = null,
+                                tint = p.background,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "🔄 ${stringResource(R.string.device_change_btn)}",
+                                text = stringResource(R.string.device_change_btn),
                                 color = p.background,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 12.sp
@@ -355,8 +366,15 @@ fun DeviceScreen(
                             shape = RoundedCornerShape(10.dp),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = RedNeon)
                         ) {
+                            Icon(
+                                imageVector = Icons.Filled.BluetoothDisabled,
+                                contentDescription = null,
+                                tint = RedNeon,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "🚫 ${stringResource(R.string.device_disconnect)}",
+                                text = stringResource(R.string.device_disconnect),
                                 color = RedNeon,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 12.sp
@@ -373,8 +391,15 @@ fun DeviceScreen(
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = p.accent)
                     ) {
+                        Icon(
+                            imageVector = Icons.Filled.Bolt,
+                            contentDescription = null,
+                            tint = p.background,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "⚡ Conectar automáticamente",
+                            text = "Conectar automáticamente",
                             color = p.background,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.sp,
@@ -411,8 +436,15 @@ fun DeviceScreen(
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = p.accent)
                     ) {
+                        Icon(
+                            imageVector = Icons.Filled.Search,
+                            contentDescription = null,
+                            tint = p.background,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "🔍 ${stringResource(R.string.device_scan_btn)}",
+                            text = stringResource(R.string.device_scan_btn),
                             color = p.background,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.sp,

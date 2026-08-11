@@ -49,7 +49,11 @@ fun BioGuardApp(
 
     val context = LocalContext.current
     val navigateAfterAuth: () -> Unit = {
-        val route = if (access.role == UserRole.PACIENTE) Screen.WELCOME else access.homeRoute()
+        val route = if (access.role == UserRole.PACIENTE && !authState.biometriaCompletada) {
+            Screen.WELCOME
+        } else {
+            access.homeRoute()
+        }
         navController.navigate(route) {
             popUpTo(0) { inclusive = true }
         }
@@ -141,7 +145,12 @@ fun BioGuardApp(
                         isAuthenticated = authState.isAuthenticated,
                         onFinished = { authenticated ->
                             if (authenticated) {
-                                navController.navigate(access.homeRoute()) {
+                                val route = if (access.role == UserRole.PACIENTE && !authState.biometriaCompletada) {
+                                    Screen.WELCOME
+                                } else {
+                                    access.homeRoute()
+                                }
+                                navController.navigate(route) {
                                     popUpTo(Screen.SPLASH) { inclusive = true }
                                 }
                             } else {
@@ -272,6 +281,7 @@ fun BioGuardApp(
                         ProfileScreen(
                         profileViewModel = profileViewModel,
                         access = access,
+                        userName = authState.userName,
                         onLogout = {
                             authViewModel.logout()
                             navController.navigate(Screen.LOGIN) { popUpTo(0) { inclusive = true } }

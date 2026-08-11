@@ -232,6 +232,13 @@ class UserPreferences(private val context: Context) {
             prefs.remove(Keys.ACCESS_PERMISSIONS)
             prefs.remove(Keys.CAREGIVER_ACCESS_LEVEL)
             prefs.remove(Keys.PLAN_NAME)
+            // La biometría del paciente se conserva para que al volver a iniciar sesión
+            // no se repita el formulario (el usuario es el mismo en este dispositivo).
+        }
+    }
+
+    suspend fun clearPatientBiometrics() {
+        context.dataStore.edit { prefs ->
             prefs.remove(Keys.PATIENT_BIRTH_DATE)
             prefs.remove(Keys.PATIENT_SEX)
             prefs.remove(Keys.PATIENT_WEIGHT)

@@ -250,7 +250,8 @@ fun BiometricProfileStep(
                     Text(text = "FECHA DE NACIMIENTO", fontSize = 10.sp, color = p.accent, letterSpacing = 2.sp, modifier = Modifier.padding(bottom = 6.dp))
                     OutlinedTextField(
                         value = birthDate,
-                        onValueChange = { birthDate = Formatters.formatDateInput(it) },
+                        onValueChange = { birthDate = Formatters.toDisplayDigits(it) },
+                        visualTransformation = Formatters.dateMaskTransformation,
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("dd/mm/aaaa", color = p.textTertiary) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),

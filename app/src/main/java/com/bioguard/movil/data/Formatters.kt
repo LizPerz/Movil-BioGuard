@@ -1,7 +1,12 @@
 package com.bioguard.movil.data
 
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.ResolverStyle
@@ -9,18 +14,25 @@ import java.time.format.ResolverStyle
 object Formatters {
 
     /**
-     * Convierte cualquier formato de fecha (DD/MM/AAAA, AAAA-MM-DD, DD-MM-AAAA, AAAA/MM/DD)
-     * a formato ISO estándar "YYYY-MM-DD" de manera ultra segura sin lanzar excepciones.
+     * Convierte cualquier formato de fecha (DD/MM/AAAA, AAAA-MM-DD, DD-MM-AAAA, AAAA/MM/DD
+     * y timestamps como "AAAA-MM-DDTHH:mm:ss" o con zona horaria) a ISO "YYYY-MM-DD".
+     * Tolerante a la fecha con hora que devuelve el backend.
      */
     fun toIsoDate(input: String): String? {
         val clean = input.trim()
         if (clean.isBlank()) return null
-        val normalized = clean.replace('.', '/').replace('-', '/')
+
+        val day = runCatching { OffsetDateTime.parse(clean).toLocalDate() }.getOrNull()
+            ?: runCatching { LocalDateTime.parse(clean).toLocalDate() }.getOrNull()
+
         val parsed = when {
+            day != null -> day
             clean.matches(Regex("""^\d{4}-\d{2}-\d{2}$""")) ->
                 runCatching { LocalDate.parse(clean, ISO_DATE) }.getOrNull()
-            normalized.matches(Regex("""^\d{2}/\d{2}/\d{4}$""")) ->
-                runCatching { LocalDate.parse(normalized, DISPLAY_DATE) }.getOrNull()
+            clean.replace('.', '/').replace('-', '/').matches(Regex("""^\d{2}/\d{2}/\d{4}$""")) ->
+                runCatching {
+                    LocalDate.parse(clean.replace('.', '/').replace('-', '/'), DISPLAY_DATE)
+                }.getOrNull()
             clean.matches(Regex("""^\d{8}$""")) ->
                 runCatching { LocalDate.parse(clean, COMPACT_DATE) }.getOrNull()
             else -> null
@@ -28,6 +40,54 @@ object Formatters {
 
         if (parsed.year !in 1900..LocalDate.now().year || parsed.isAfter(LocalDate.now())) return null
         return parsed.format(ISO_DATE)
+    }
+
+    /**
+     * Extrae solo los dígitos de una fecha escrita (max 8) para usarla como estado de un campo.
+     * Si viene en ISO (YYYY-MM-DD) la convierte primero a DDMMYYYY para mantener el orden visible.
+     * La mascara visual inserta las barras sin romper el cursor.
+     */
+    fun toDisplayDigits(display: String): String {
+        val clean = display.trim()
+        val iso = if (clean.length >= 8 && clean.indexOf('-') == 4) {
+            toIsoDate(clean)
+        } else null
+        val source = iso?.let { toDisplayDate(it) } ?: display
+        return source.filter(Char::isDigit).take(8)
+    }
+
+    /**
+     * VisualTransformation que muestra "dd/mm/aaaa" a partir de dígitos puros.
+     * El cursor nunca salta porque el estado del campo solo contiene dígitos.
+     */
+    val dateMaskTransformation: VisualTransformation = VisualTransformation { text ->
+        val digits = text.text.filter(Char::isDigit).take(8)
+        val formatted = formatDigitsAsDate(digits)
+        TransformedText(
+            text = AnnotatedString(formatted),
+            offsetMapping = object : OffsetMapping {
+                override fun originalToTransformed(offset: Int): Int {
+                    val n = offset.coerceIn(0, digits.length)
+                    val slashes = (if (n > 2) 1 else 0) + (if (n > 4) 1 else 0)
+                    return (n + slashes).coerceIn(0, formatted.length)
+                }
+
+                override fun transformedToOriginal(offset: Int): Int {
+                    val p = offset.coerceIn(0, formatted.length)
+                    val slashes = formatted.substring(0, p).count { it == '/' }
+                    return (p - slashes).coerceIn(0, digits.length)
+                }
+            }
+        )
+    }
+
+    private fun formatDigitsAsDate(digits: String): String {
+        return buildString {
+            digits.forEachIndexed { index, c ->
+                if (index == 2 || index == 4) append('/')
+                append(c)
+            }
+        }
     }
 
     fun formatDateInput(input: String): String {

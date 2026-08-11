@@ -64,6 +64,9 @@ import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 
 enum class QrScannerMode {
     LOGIN,
@@ -89,12 +92,14 @@ private fun analyzeImageProxy(
                     android.util.Log.d("QrScanner", "QR detectado: ${value?.take(50)}...")
                     if (value != null) {
                         onBarcodeDetected(value)
+                    } else {
+                        // Sin contenido utilizable: rearmar sin bloquear el escáner
+                        isScanning.set(true)
                     }
                 }
             }
             .addOnFailureListener { e ->
                 android.util.Log.e("QrScanner", "Error escaneando QR: ${e.message}")
-                imageProxy.close()
             }
             .addOnCompleteListener {
                 imageProxy.close()
@@ -239,69 +244,64 @@ private fun QrScannerScreenContent(
         }
     }
 
-    DisposableEffect(lifecycleOwner, hasPermission) {
-        var cameraProvider: androidx.camera.lifecycle.ProcessCameraProvider? = null
-        var bound = false
+    LaunchedEffect(hasPermission) {
+        if (!hasPermission) return@LaunchedEffect
+        try {
+            // Enlaza la cámara en corrutina: .get() se ejecuta en un dispatcher
+            // secundario para no bloquear la UI (el binding síncrono en main
+            // dejaba la pantalla en negro).
+            val cameraProvider = withContext(Dispatchers.Default) {
+                ProcessCameraProvider.getInstance(context).get()
+            }
+            if (!coroutineContext.isActive) return@LaunchedEffect
+            cameraProvider.unbindAll()
 
-        if (hasPermission) {
+            val preview = Preview.Builder().build().also {
+                it.setSurfaceProvider(previewView.surfaceProvider)
+            }
+
+            val analysis = ImageAnalysis.Builder()
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .build()
+
+            analysis.setAnalyzer(analysisExecutor) { imageProxy ->
+                if (isScanning.get()) {
+                    analyzeImageProxy(imageProxy, barcodeScanner, isScanning) { value ->
+                        onCodeDetected(value)
+                    }
+                } else {
+                    imageProxy.close()
+                }
+            }
+
+            val camera = cameraProvider.bindToLifecycle(
+                lifecycleOwner,
+                CameraSelector.DEFAULT_BACK_CAMERA,
+                preview,
+                analysis
+            )
             try {
-                cameraProvider = ProcessCameraProvider.getInstance(context).get()
-                cameraProvider.unbindAll()
-
-                val preview = Preview.Builder().build().also {
-                    it.setSurfaceProvider(previewView.surfaceProvider)
+                if (previewView.width > 0 && previewView.height > 0) {
+                    val factory = previewView.meteringPointFactory
+                    val point = factory.createPoint(previewView.width / 2f, previewView.height / 2f)
+                    val action = androidx.camera.core.FocusMeteringAction.Builder(point)
+                        .setAutoCancelDuration(3, java.util.concurrent.TimeUnit.SECONDS)
+                        .build()
+                    camera.cameraControl.startFocusAndMetering(action)
                 }
-
-                val analysis = ImageAnalysis.Builder()
-                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                    .build()
-
-                analysis.setAnalyzer(analysisExecutor) { imageProxy ->
-                    if (isScanning.get()) {
-                        analyzeImageProxy(imageProxy, barcodeScanner, isScanning) { value ->
-                            onCodeDetected(value)
-                        }
-                    } else {
-                        imageProxy.close()
-                    }
-                }
-
-                val camera = cameraProvider.bindToLifecycle(
-                    lifecycleOwner,
-                    CameraSelector.DEFAULT_BACK_CAMERA,
-                    preview,
-                    analysis
-                )
-                // Enable auto focus metering for close-up QR scans (once the view is laid out)
-                try {
-                    if (previewView.width > 0 && previewView.height > 0) {
-                        val factory = previewView.meteringPointFactory
-                        val point = factory.createPoint(previewView.width / 2f, previewView.height / 2f)
-                        val action = androidx.camera.core.FocusMeteringAction.Builder(point)
-                            .setAutoCancelDuration(3, java.util.concurrent.TimeUnit.SECONDS)
-                            .build()
-                        camera.cameraControl.startFocusAndMetering(action)
-                    }
-                } catch (_: Exception) { }
-                bound = true
-            } catch (e: Exception) {
-                cameraError = cameraErrorMessage
-            }
-        }
-
-        onDispose {
-            isScanning.set(false)
-            if (bound) {
-                try {
-                    ProcessCameraProvider.getInstance(context).get().unbindAll()
-                } catch (_: Exception) { }
-            }
+            } catch (_: Exception) { }
+        } catch (e: Exception) {
+            android.util.Log.e("QrScanner", "Error iniciando cámara: ${e.message}")
+            cameraError = cameraErrorMessage
         }
     }
 
     DisposableEffect(Unit) {
         onDispose {
             isScanning.set(false)
+            try {
+                ProcessCameraProvider.getInstance(context).get().unbindAll()
+            } catch (_: Exception) { }
             analysisExecutor.shutdown()
             try {
                 barcodeScanner.close()

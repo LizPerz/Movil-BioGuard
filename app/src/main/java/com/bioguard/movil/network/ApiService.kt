@@ -165,7 +165,8 @@ data class UsuarioWebResponse(
     @SerializedName("correo") val correo: String,
     @SerializedName("fechaRegistro") val fechaRegistro: String,
     @SerializedName("planId") val planId: String? = null,
-    @SerializedName("planNombre") val planNombre: String? = null
+    @SerializedName("planNombre") val planNombre: String? = null,
+    @SerializedName("fotoPerfil") val fotoPerfil: String? = null
 )
 data class UpdatePerfilRequest(@SerializedName("nombre") val nombre: String?, @SerializedName("apellidoPaterno") val apellidoPaterno: String?, @SerializedName("apellidoMaterno") val apellidoMaterno: String?)
 data class UpdateCorreoRequest(@SerializedName("nuevoCorreo") val nuevoCorreo: String, @SerializedName("passwordActual") val passwordActual: String)

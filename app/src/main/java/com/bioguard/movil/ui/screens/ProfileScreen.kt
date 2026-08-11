@@ -1,8 +1,16 @@
 package com.bioguard.movil.ui.screens
 
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.provider.MediaStore
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.Person
@@ -50,6 +59,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -67,11 +79,14 @@ import com.bioguard.movil.ui.theme.RedNeon
 import com.bioguard.movil.ui.theme.ThemeState
 import com.bioguard.movil.ui.theme.colorPalette
 import com.bioguard.movil.ui.viewmodel.ProfileViewModel
+import java.io.ByteArrayOutputStream
+import java.util.Base64
 
 @Composable
 fun ProfileScreen(
     profileViewModel: ProfileViewModel,
     access: EffectiveAccess = EffectiveAccess(),
+    userName: String? = null,
     onLogout: () -> Unit = {},
     themeState: ThemeState = ThemeState(),
     onThemeChange: (ThemeState) -> Unit = {},
@@ -83,6 +98,7 @@ fun ProfileScreen(
     onNavigateToDevice: () -> Unit = {}
 ) {
     val p = LocalThemeState.current.colorPalette()
+    val context = LocalContext.current
     val uiState by profileViewModel.uiState.collectAsState()
     var isDarkMode by remember(themeState) {
         mutableStateOf(themeState.theme != AppTheme.CLARO)
@@ -92,6 +108,20 @@ fun ProfileScreen(
     var successDialogMessage by remember { mutableStateOf<String?>(null) }
     var showLogoutConfirm by remember { mutableStateOf(false) }
     var showEditBiometriaModal by remember { mutableStateOf(false) }
+    var uploadingPhoto by remember { mutableStateOf(false) }
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val bitmap = runCatching {
+                MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+            }.getOrNull() ?: return@rememberLauncherForActivityResult
+            val resized = resizeBitmap(bitmap, maxDim = 512)
+            uploadingPhoto = true
+            profileViewModel.updateFotoPerfil(encodeToBase64(resized))
+        }
+    }
 
     LaunchedEffect(uiState.error) {
         uiState.error?.let {
@@ -105,6 +135,10 @@ fun ProfileScreen(
             successDialogMessage = it
             profileViewModel.clearMessages()
         }
+    }
+
+    LaunchedEffect(uiState.isLoading) {
+        if (!uiState.isLoading) uploadingPhoto = false
     }
 
     if (showEditBiometriaModal && access.allows(AppPermission.PATIENT_MANAGE)) {
@@ -173,26 +207,79 @@ fun ProfileScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        val fotoBase64 = uiState.perfil?.fotoPerfil
                         Box(
                             modifier = Modifier
-                                .size(70.dp)
+                                .size(88.dp)
                                 .clip(CircleShape)
                                 .background(p.accentDark.copy(alpha = 0.2f))
                                 .border(width = 2.dp, color = p.accent, shape = CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.Person,
-                                contentDescription = null,
-                                tint = p.accent,
-                                modifier = Modifier.size(36.dp)
-                            )
+                            if (fotoBase64?.isNotBlank() == true) {
+                                val bitmap = remember(fotoBase64) { decodeBase64ToBitmap(fotoBase64) }
+                                if (bitmap != null) {
+                                    Image(
+                                        bitmap = bitmap.asImageBitmap(),
+                                        contentDescription = "Foto de perfil",
+                                        modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Filled.Person,
+                                        contentDescription = null,
+                                        tint = p.accent,
+                                        modifier = Modifier.size(40.dp)
+                                    )
+                                }
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Filled.Person,
+                                    contentDescription = null,
+                                    tint = p.accent,
+                                    modifier = Modifier.size(40.dp)
+                                )
+                            }
                         }
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        if (uploadingPhoto) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                color = p.accent,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            OutlinedButton(
+                                onClick = { galleryLauncher.launch("image/*") },
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.height(34.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.AddAPhoto,
+                                    contentDescription = null,
+                                    tint = p.accent,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = if (fotoBase64?.isNotBlank() == true) "CAMBIAR FOTO" else "AGREGAR FOTO",
+                                    color = p.accent,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.sp
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
 
                         val fullUser = uiState.perfil
-                        val displayName = fullUser?.nombre ?: "Usuario BioGuard"
+                        val displayName = fullUser?.nombre?.takeIf { it.isNotBlank() }
+                            ?: userName?.takeIf { it.isNotBlank() }
+                            ?: "Usuario BioGuard"
 
                         Text(
                             text = displayName,
@@ -438,7 +525,7 @@ fun EditBiometriaDialog(
     val p = LocalThemeState.current.colorPalette()
 
     var birthDate by remember(currentBirth) {
-        mutableStateOf(com.bioguard.movil.data.Formatters.toDisplayDate(currentBirth))
+        mutableStateOf(com.bioguard.movil.data.Formatters.toDisplayDigits(currentBirth))
     }
     var weight by remember { mutableStateOf(currentWeight) }
     var height by remember { mutableStateOf(currentHeight) }
@@ -488,15 +575,35 @@ fun EditBiometriaDialog(
                 OutlinedTextField(
                     value = birthDate,
                     onValueChange = {
-                        birthDate = com.bioguard.movil.data.Formatters.formatDateInput(it)
-                        validationError = null 
+                        birthDate = com.bioguard.movil.data.Formatters.toDisplayDigits(it)
+                        validationError = null
                     },
+                    visualTransformation = com.bioguard.movil.data.Formatters.dateMaskTransformation,
                     label = { Text("Fecha de nacimiento (dd/mm/aaaa)", fontSize = 11.sp) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = p.accent, unfocusedBorderColor = p.border)
                 )
+
+                val editAge = com.bioguard.movil.data.Formatters.toIsoDate(birthDate)
+                    ?.let { com.bioguard.movil.data.Formatters.calculateAge(it) }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(p.accent.copy(alpha = 0.12f))
+                        .border(width = 1.dp, color = p.accent, shape = RoundedCornerShape(8.dp))
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = editAge?.let { "Edad calculada: $it años" } ?: "Escribe una fecha para calcular la edad",
+                        fontSize = 12.sp,
+                        color = p.accent,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
@@ -619,6 +726,11 @@ fun EditBiometriaDialog(
                         validationError = "Ingresa una fecha válida en formato dd/mm/aaaa"
                         return@Button
                     }
+                    val birthAge = com.bioguard.movil.data.Formatters.calculateAge(isoBirth)
+                    if (birthAge == null || birthAge <= 0 || birthAge > 120) {
+                        validationError = "Ingresa una fecha de nacimiento prudente (1 a 120 años)"
+                        return@Button
+                    }
                     onSave(isoBirth, com.bioguard.movil.data.Formatters.toSexoCode(selectedSex), weight, height, isDiabetic, hasFamilyDiabetes, selectedActivity)
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = p.accent)
@@ -675,4 +787,28 @@ fun ProfileMenuRow(text: String, subtitle: String, onClick: (() -> Unit)? = null
         Text(text = "›", fontSize = 18.sp, color = p.textSecondary)
     }
     Spacer(modifier = Modifier.height(6.dp))
+}
+
+private fun resizeBitmap(src: Bitmap, maxDim: Int = 512): Bitmap {
+    val width = src.width
+    val height = src.height
+    if (width <= maxDim && height <= maxDim) return src
+    val scale = maxDim.toFloat() / maxOf(width, height)
+    val newWidth = (width * scale).toInt().coerceAtLeast(1)
+    val newHeight = (height * scale).toInt().coerceAtLeast(1)
+    return Bitmap.createScaledBitmap(src, newWidth, newHeight, true)
+}
+
+private fun encodeToBase64(src: Bitmap): String {
+    val stream = ByteArrayOutputStream()
+    src.compress(Bitmap.CompressFormat.JPEG, 80, stream)
+    val bytes = stream.toByteArray()
+    return Base64.getEncoder().encodeToString(bytes)
+}
+
+private fun decodeBase64ToBitmap(base64: String): Bitmap? {
+    return runCatching {
+        val bytes = Base64.getDecoder().decode(base64)
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+    }.getOrNull()
 }

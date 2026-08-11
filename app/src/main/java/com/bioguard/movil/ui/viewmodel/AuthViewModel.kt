@@ -27,7 +27,8 @@ data class AuthUiState(
     val error: String? = null,
     val successMessage: String? = null,
     val requiresVerification: Boolean = false,
-    val pendingEmail: String? = null
+    val pendingEmail: String? = null,
+    val biometriaCompletada: Boolean = false
 )
 
 @HiltViewModel
@@ -50,10 +51,12 @@ class AuthViewModel @Inject constructor(
             val role = UserRole.from(prefs.userRole.first())
             if (restored) {
                 val access = repository.getEffectiveAccess(role)
-                _uiState.update { it.copy(isAuthenticated = true, role = access.role, access = access, userName = prefs.userName.first()) }
+                _uiState.update { it.copy(isAuthenticated = true, role = access.role, access = access, userName = prefs.userName.first(), biometriaCompletada = hasBiometria()) }
             }
         }
     }
+
+    private suspend fun hasBiometria(): Boolean = !prefs.patientBirthDate.first().isNullOrBlank()
 
     fun loginWithCode(codigoAcceso: String) {
         viewModelScope.launch {
@@ -61,7 +64,7 @@ class AuthViewModel @Inject constructor(
             when (val result = repository.loginWithCode(codigoAcceso)) {
                 is Resource.Success -> {
                     val access = repository.getEffectiveAccess(UserRole.from(result.data.rol))
-                    _uiState.update { it.copy(isLoading = false, isAuthenticated = true, role = access.role, access = access, userName = result.data.nombre) }
+                    _uiState.update { it.copy(isLoading = false, isAuthenticated = true, role = access.role, access = access, userName = result.data.nombre, biometriaCompletada = hasBiometria()) }
                 }
                 is Resource.Error -> _uiState.update {
                     it.copy(isLoading = false, error = result.message)
@@ -77,7 +80,7 @@ class AuthViewModel @Inject constructor(
             when (val result = repository.login(email, password)) {
                 is Resource.Success -> {
                     val access = repository.getEffectiveAccess(UserRole.from(result.data.rol))
-                    _uiState.update { it.copy(isLoading = false, isAuthenticated = true, role = access.role, access = access, userName = result.data.nombre) }
+                    _uiState.update { it.copy(isLoading = false, isAuthenticated = true, role = access.role, access = access, userName = result.data.nombre, biometriaCompletada = hasBiometria()) }
                 }
                 is Resource.Error -> _uiState.update {
                     it.copy(isLoading = false, error = result.message)
@@ -135,6 +138,7 @@ class AuthViewModel @Inject constructor(
                                         role = access.role,
                                         access = access,
                                         userName = loginResult.data.nombre,
+                                        biometriaCompletada = hasBiometria(),
                                         successMessage = "Cuenta creada. Bienvenido"
                                     )
                                 }
@@ -213,6 +217,7 @@ class AuthViewModel @Inject constructor(
                             role = access.role,
                             access = access,
                             userName = result.data.nombre,
+                            biometriaCompletada = hasBiometria(),
                             successMessage = "Cuenta verificada exitosamente"
                         )
                     }

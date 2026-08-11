@@ -72,6 +72,7 @@ import com.bioguard.movil.ui.components.ConfirmDialog
 import com.bioguard.movil.ui.components.SystemNotificationDialog
 import com.bioguard.movil.ui.model.AppPermission
 import com.bioguard.movil.ui.model.EffectiveAccess
+import com.bioguard.movil.datastore.UserPreferences
 import com.bioguard.movil.ui.theme.AppTheme
 import com.bioguard.movil.ui.theme.GreenNeon
 import com.bioguard.movil.ui.theme.LocalThemeState
@@ -81,6 +82,7 @@ import com.bioguard.movil.ui.theme.colorPalette
 import com.bioguard.movil.ui.viewmodel.ProfileViewModel
 import java.io.ByteArrayOutputStream
 import java.util.Base64
+import kotlinx.coroutines.flow.first
 
 @Composable
 fun ProfileScreen(
@@ -100,6 +102,12 @@ fun ProfileScreen(
     val p = LocalThemeState.current.colorPalette()
     val context = LocalContext.current
     val uiState by profileViewModel.uiState.collectAsState()
+    val prefs = remember { UserPreferences(context) }
+    var localPhoto by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        localPhoto = prefs.patientPhoto.first()
+    }
     var isDarkMode by remember(themeState) {
         mutableStateOf(themeState.theme != AppTheme.CLARO)
     }
@@ -207,7 +215,7 @@ fun ProfileScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        val fotoBase64 = uiState.perfil?.fotoPerfil
+                        val fotoBase64 = uiState.perfil?.fotoPerfil?.takeIf { it.isNotBlank() } ?: localPhoto
                         Box(
                             modifier = Modifier
                                 .size(88.dp)

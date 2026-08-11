@@ -1,6 +1,7 @@
 package com.bioguard.movil
 
 import android.Manifest
+import android.bluetooth.BluetoothAdapter
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -45,6 +46,7 @@ class MainActivity : FragmentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
 
         requestRuntimePermissions()
+        requestBluetoothEnabled()
         checkRootAndWarn()
         startInactivityTimer()
 
@@ -110,6 +112,7 @@ class MainActivity : FragmentActivity() {
             permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            permissionsToRequest.add(Manifest.permission.BLUETOOTH_SCAN)
             permissionsToRequest.add(Manifest.permission.BLUETOOTH_CONNECT)
         }
         permissionsToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -120,6 +123,16 @@ class MainActivity : FragmentActivity() {
         }
         if (missing.isNotEmpty()) {
             permissionLauncher.launch(missing.toTypedArray())
+        }
+    }
+
+    private fun requestBluetoothEnabled() {
+        try {
+            val adapter = BluetoothAdapter.getDefaultAdapter() ?: return
+            if (!adapter.isEnabled) {
+                startActivity(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
+            }
+        } catch (_: Exception) {
         }
     }
 

@@ -167,9 +167,21 @@ fun WearablePairingScreen(
         }
     }
 
+    val enableBtLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) {
+        scope.launch { runScan() }
+    }
+
     fun triggerScan() {
         if (!hasPermissions) {
             permissionLauncher.launch(requiredPermissions)
+            return
+        }
+        val btManager = context.getSystemService(android.content.Context.BLUETOOTH_SERVICE) as? android.bluetooth.BluetoothManager
+        val btAdapter = btManager?.adapter
+        if (btAdapter == null || !btAdapter.isEnabled) {
+            enableBtLauncher.launch(android.content.Intent(android.bluetooth.BluetoothAdapter.ACTION_REQUEST_ENABLE))
             return
         }
         scope.launch { runScan() }
@@ -178,13 +190,20 @@ fun WearablePairingScreen(
     LaunchedEffect(Unit) {
         hasPermissions = checkPermissions()
         pairedDeviceName = prefs.deviceName.first()
+        if (hasPermissions) {
+            val btManager = context.getSystemService(android.content.Context.BLUETOOTH_SERVICE) as? android.bluetooth.BluetoothManager
+            val btAdapter = btManager?.adapter
+            if (btAdapter != null && !btAdapter.isEnabled) {
+                enableBtLauncher.launch(android.content.Intent(android.bluetooth.BluetoothAdapter.ACTION_REQUEST_ENABLE))
+            }
+        }
     }
 
     fun vincular(nombre: String, mac: String) {
         val bluetoothManager = context.getSystemService(android.content.Context.BLUETOOTH_SERVICE) as? android.bluetooth.BluetoothManager
         val adapter = bluetoothManager?.adapter
         if (adapter == null || !adapter.isEnabled) {
-            Toast.makeText(context, "Activa el Bluetooth del celular antes de vincular.", Toast.LENGTH_LONG).show()
+            enableBtLauncher.launch(android.content.Intent(android.bluetooth.BluetoothAdapter.ACTION_REQUEST_ENABLE))
             return
         }
         scope.launch {

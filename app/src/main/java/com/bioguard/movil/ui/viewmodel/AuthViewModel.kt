@@ -56,7 +56,7 @@ class AuthViewModel @Inject constructor(
             val role = UserRole.from(prefs.userRole.first())
             if (restored) {
                 val access = repository.getEffectiveAccess(role)
-                _uiState.update { it.copy(isAuthenticated = true, role = access.role, access = access, userName = prefs.userName.first(), biometriaCompletada = syncedBiometriaCompletada()) }
+                _uiState.update { it.copy(isAuthenticated = true, role = access.role, access = access, userName = prefs.userName.first(), biometriaCompletada = hasBiometria()) }
                 connectRealtime(access)
             }
         }
@@ -70,39 +70,13 @@ class AuthViewModel @Inject constructor(
 
     private suspend fun hasBiometria(): Boolean = !prefs.patientBirthDate.first().isNullOrBlank()
 
-    // Si la biometría no existe localmente (p. ej. se limpió al cambiar de cuenta o reinstalar),
-    // se recupera del servidor para que el formulario no reaparezca al volver a iniciar sesión.
-    private suspend fun syncedBiometriaCompletada(): Boolean {
-        if (hasBiometria()) return true
-        if (UserRole.from(prefs.userRole.first()) != UserRole.PACIENTE) return false
-        val pacienteId = pacienteRepository.resolvePatientId(prefs) ?: return false
-        val result = pacienteRepository.getBiometria(pacienteId)
-        if (result is Resource.Success) {
-            val bio = result.data
-            val birth = bio.fechaNacimiento.orEmpty()
-            if (birth.isNotBlank()) {
-                prefs.savePatientBiometrics(
-                    birthDate = birth,
-                    sex = bio.sexo.orEmpty(),
-                    weight = (bio.pesoKg ?: 0.0).toString(),
-                    height = (bio.estaturaCm ?: 0.0).toString(),
-                    isDiabetic = bio.esDiabetico,
-                    familyDiabetes = bio.familiaresDiabetes,
-                    activityLevel = bio.actividadFisica.orEmpty()
-                )
-                return true
-            }
-        }
-        return false
-    }
-
     fun loginWithCode(codigoAcceso: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             when (val result = repository.loginWithCode(codigoAcceso)) {
                 is Resource.Success -> {
                     val access = repository.getEffectiveAccess(UserRole.from(result.data.rol))
-                    _uiState.update { it.copy(isLoading = false, isAuthenticated = true, role = access.role, access = access, userName = result.data.nombre, biometriaCompletada = syncedBiometriaCompletada()) }
+                    _uiState.update { it.copy(isLoading = false, isAuthenticated = true, role = access.role, access = access, userName = result.data.nombre, biometriaCompletada = hasBiometria()) }
                     connectRealtime(access)
                 }
                 is Resource.Error -> _uiState.update {
@@ -119,7 +93,7 @@ class AuthViewModel @Inject constructor(
             when (val result = repository.login(email, password)) {
                 is Resource.Success -> {
                     val access = repository.getEffectiveAccess(UserRole.from(result.data.rol))
-                    _uiState.update { it.copy(isLoading = false, isAuthenticated = true, role = access.role, access = access, userName = result.data.nombre, biometriaCompletada = syncedBiometriaCompletada()) }
+                    _uiState.update { it.copy(isLoading = false, isAuthenticated = true, role = access.role, access = access, userName = result.data.nombre, biometriaCompletada = hasBiometria()) }
                     connectRealtime(access)
                 }
                 is Resource.Error -> _uiState.update {
@@ -178,7 +152,7 @@ class AuthViewModel @Inject constructor(
                                         role = access.role,
                                         access = access,
                                         userName = loginResult.data.nombre,
-                                        biometriaCompletada = syncedBiometriaCompletada(),
+                                        biometriaCompletada = hasBiometria(),
                                         successMessage = "Cuenta creada. Bienvenido"
                                     )
                                 }
@@ -259,7 +233,7 @@ class AuthViewModel @Inject constructor(
                             role = access.role,
                             access = access,
                             userName = result.data.nombre,
-                            biometriaCompletada = syncedBiometriaCompletada(),
+                            biometriaCompletada = hasBiometria(),
                             successMessage = "Cuenta verificada exitosamente"
                         )
                     }

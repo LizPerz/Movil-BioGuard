@@ -8,6 +8,7 @@ import com.bioguard.movil.data.repository.AuthRepository
 import com.bioguard.movil.data.repository.PacienteRepository
 import com.bioguard.movil.datastore.SecureTokenStorage
 import com.bioguard.movil.datastore.UserPreferences
+import com.bioguard.movil.realtime.RealtimeHubClient
 import com.bioguard.movil.ui.model.UserRole
 import com.bioguard.movil.ui.model.EffectiveAccess
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -37,7 +38,9 @@ class AuthViewModel @Inject constructor(
     application: Application,
     private val repository: AuthRepository,
     private val pacienteRepository: PacienteRepository,
-    private val prefs: UserPreferences
+    private val tokenStorage: SecureTokenStorage,
+    private val prefs: UserPreferences,
+    private val realtimeHub: RealtimeHubClient
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(AuthUiState())
@@ -54,8 +57,15 @@ class AuthViewModel @Inject constructor(
             if (restored) {
                 val access = repository.getEffectiveAccess(role)
                 _uiState.update { it.copy(isAuthenticated = true, role = access.role, access = access, userName = prefs.userName.first(), biometriaCompletada = syncedBiometriaCompletada()) }
+                connectRealtime(access)
             }
         }
+    }
+
+    private suspend fun connectRealtime(access: EffectiveAccess) {
+        val token = tokenStorage.authToken.first() ?: return
+        val pacienteId = access.patientId ?: prefs.patientId.first() ?: return
+        realtimeHub.connect(token, pacienteId)
     }
 
     private suspend fun hasBiometria(): Boolean = !prefs.patientBirthDate.first().isNullOrBlank()
@@ -93,6 +103,7 @@ class AuthViewModel @Inject constructor(
                 is Resource.Success -> {
                     val access = repository.getEffectiveAccess(UserRole.from(result.data.rol))
                     _uiState.update { it.copy(isLoading = false, isAuthenticated = true, role = access.role, access = access, userName = result.data.nombre, biometriaCompletada = syncedBiometriaCompletada()) }
+                    connectRealtime(access)
                 }
                 is Resource.Error -> _uiState.update {
                     it.copy(isLoading = false, error = result.message)
@@ -109,6 +120,7 @@ class AuthViewModel @Inject constructor(
                 is Resource.Success -> {
                     val access = repository.getEffectiveAccess(UserRole.from(result.data.rol))
                     _uiState.update { it.copy(isLoading = false, isAuthenticated = true, role = access.role, access = access, userName = result.data.nombre, biometriaCompletada = syncedBiometriaCompletada()) }
+                    connectRealtime(access)
                 }
                 is Resource.Error -> _uiState.update {
                     it.copy(isLoading = false, error = result.message)
@@ -170,6 +182,7 @@ class AuthViewModel @Inject constructor(
                                         successMessage = "Cuenta creada. Bienvenido"
                                     )
                                 }
+                                connectRealtime(access)
                             }
                             is Resource.Error -> _uiState.update {
                                 it.copy(isLoading = false, error = loginResult.message)
@@ -218,6 +231,7 @@ class AuthViewModel @Inject constructor(
 
     fun logout() {
         viewModelScope.launch {
+            realtimeHub.stop()
             repository.logout()
             _uiState.update { AuthUiState() }
         }
@@ -249,6 +263,7 @@ class AuthViewModel @Inject constructor(
                             successMessage = "Cuenta verificada exitosamente"
                         )
                     }
+                    connectRealtime(access)
                 }
                 is Resource.Error -> _uiState.update {
                     it.copy(isLoading = false, error = result.message)

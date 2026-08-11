@@ -9,6 +9,8 @@ import com.bioguard.movil.data.repository.UsuarioRepository
 import com.bioguard.movil.datastore.UserPreferences
 import com.bioguard.movil.network.MiPlanResponse
 import com.bioguard.movil.network.UsuarioWebResponse
+import com.bioguard.movil.realtime.RealtimeHubClient
+import com.bioguard.movil.ui.model.UserRole
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,7 +45,8 @@ class ProfileViewModel @Inject constructor(
     application: Application,
     private val repository: UsuarioRepository,
     private val pacienteRepository: PacienteRepository,
-    private val prefs: UserPreferences
+    private val prefs: UserPreferences,
+    private val realtimeHub: RealtimeHubClient
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(ProfileUiState())
@@ -52,14 +55,31 @@ class ProfileViewModel @Inject constructor(
     init {
         loadProfile()
         loadBiometria()
+        viewModelScope.launch {
+            realtimeHub.events.collect { event ->
+                when (event) {
+                    RealtimeHubClient.EventFoto,
+                    RealtimeHubClient.EventPerfil -> loadProfile()
+                    else -> {}
+                }
+            }
+        }
     }
 
     fun loadProfile() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             when (val result = repository.getMiPerfil()) {
-                is Resource.Success -> _uiState.update {
-                    it.copy(perfil = result.data)
+                is Resource.Success -> {
+                    val perfil = result.data
+                    if (UserRole.from(prefs.userRole.first()) == UserRole.PACIENTE &&
+                        !perfil.fotoPerfil.isNullOrBlank()
+                    ) {
+                        prefs.savePatientPhoto(perfil.fotoPerfil)
+                    }
+                    _uiState.update {
+                        it.copy(perfil = perfil)
+                    }
                 }
                 is Resource.Error -> {
                     val localNombre = prefs.userName.first().orEmpty()

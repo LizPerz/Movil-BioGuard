@@ -60,3 +60,8 @@
 -dontwarn androidx.room.paging.**
 
 # Firebase Cloud Messaging
+
+# SignalR
+-keep class com.microsoft.signalr.** { *; }
+-keep class org.reactivestreams.** { *; }
+-dontwarn com.microsoft.signalr.**

@@ -151,6 +151,9 @@ dependencies {
     // Security & Biometrics
     implementation(libs.androidx.security.crypto)
     implementation(libs.androidx.biometric)
+
+    // SignalR (sincronización en tiempo real con el backend)
+    implementation(libs.microsoft.signalr)
     
     testImplementation(libs.junit)
     testImplementation(libs.androidx.junit)

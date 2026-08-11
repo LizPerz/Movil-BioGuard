@@ -28,17 +28,23 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddAPhoto
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -69,6 +75,9 @@ import com.bioguard.movil.ui.theme.colorPalette
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
 
 private fun resizeBitmap(src: Bitmap, maxDim: Int = 512): Bitmap {
     val max = maxOf(src.width, src.height)
@@ -121,6 +130,11 @@ fun WelcomeScreen(
     var hasFamilyDiabetes by remember { mutableStateOf(false) }
     var activityExpanded by remember { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    val datePickerState = rememberDatePickerState()
+
+    val computedAge = Formatters.calculateAge(birthDate)
 
     val activityLevels = listOf("Sedentario", "Ligero", "Moderado", "Intenso", "Muy intenso")
 
@@ -163,6 +177,11 @@ fun WelcomeScreen(
                 Toast.makeText(context, "Fecha de nacimiento invalida (dd/mm/aaaa)", Toast.LENGTH_SHORT).show()
                 return@launch
             }
+            val edad = Formatters.calculateAge(isoDate)
+            if (edad == null || edad !in 1..120) {
+                Toast.makeText(context, "Fecha de nacimiento no valida (la edad debe estar entre 1 y 120 anos)", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
             val peso = weight.toDoubleOrNull()
             val estatura = height.toDoubleOrNull()
             if (peso == null || estatura == null || peso !in 1.0..300.0 || estatura !in 30.0..250.0) {
@@ -176,6 +195,7 @@ fun WelcomeScreen(
                 when (val bio = pacienteRepository.updateBiometria(
                     id = pacienteId,
                     fechaNacimiento = isoDate,
+                    edad = edad,
                     sexo = Formatters.toSexoCode(selectedSex),
                     pesoKg = peso,
                     estaturaCm = estatura,
@@ -330,10 +350,44 @@ fun WelcomeScreen(
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("dd/mm/aaaa", color = p.textTertiary) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        trailingIcon = {
+                            IconButton(onClick = {
+                                val iso = Formatters.toIsoDate(birthDate)
+                                if (iso != null) {
+                                    runCatching {
+                                        val millis = LocalDate.parse(iso).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+                                        datePickerState.selectedDateMillis = millis
+                                    }
+                                }
+                                showDatePicker = true
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Filled.CalendarMonth,
+                                    contentDescription = "Abrir calendario",
+                                    tint = p.accent
+                                )
+                            }
+                        },
                         singleLine = true,
                         shape = RoundedCornerShape(10.dp),
                         colors = tfColors()
                     )
+                    if (computedAge != null) {
+                        Text(
+                            text = "Edad calculada: $computedAge anos",
+                            fontSize = 11.sp,
+                            color = p.accent,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    } else {
+                        Text(
+                            text = "La edad se calcula automaticamente",
+                            fontSize = 11.sp,
+                            color = p.textTertiary,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(text = "SEXO", fontSize = 10.sp, color = p.accent, letterSpacing = 2.sp, modifier = Modifier.padding(bottom = 6.dp))
@@ -379,6 +433,32 @@ fun WelcomeScreen(
             CheckCard(text = "¿Tiene familiares con diabetes?", checked = hasFamilyDiabetes, onCheckedChange = { hasFamilyDiabetes = it })
 
             Spacer(modifier = Modifier.height(28.dp))
+
+            if (showDatePicker) {
+                DatePickerDialog(
+                    onDismissRequest = { showDatePicker = false },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            datePickerState.selectedDateMillis?.let { millis ->
+                                val day = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
+                                if (!day.isAfter(LocalDate.now())) {
+                                    birthDate = Formatters.toDisplayDate(day.toString())
+                                }
+                            }
+                            showDatePicker = false
+                        }) {
+                            Text("ACEPTAR", color = p.accent, fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDatePicker = false }) {
+                            Text("CANCELAR", color = p.textSecondary)
+                        }
+                    }
+                ) {
+                    DatePicker(state = datePickerState)
+                }
+            }
 
             Button(
                 onClick = { guardarPerfil() },

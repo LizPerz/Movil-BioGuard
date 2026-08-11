@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 
 data class BiometriaPacienteState(
     val fechaNacimiento: String = "",
+    val edad: Int? = null,
     val sexo: String = "",
     val pesoKg: Double = 0.0,
     val estaturaCm: Double = 0.0,
@@ -87,6 +88,7 @@ class ProfileViewModel @Inject constructor(
                         val apiData = result.data
                         val biometria = BiometriaPacienteState(
                             fechaNacimiento = apiData.fechaNacimiento.orEmpty(),
+                            edad = apiData.edad ?: com.bioguard.movil.data.Formatters.calculateAge(apiData.fechaNacimiento),
                             sexo = apiData.sexo.orEmpty(),
                             pesoKg = apiData.pesoKg ?: 0.0,
                             estaturaCm = apiData.estaturaCm ?: 0.0,
@@ -117,6 +119,7 @@ class ProfileViewModel @Inject constructor(
                             it.copy(
                                 biometria = BiometriaPacienteState(
                                     fechaNacimiento = birth,
+                                    edad = com.bioguard.movil.data.Formatters.calculateAge(birth),
                                     sexo = sex,
                                     pesoKg = weight,
                                     estaturaCm = height,
@@ -168,8 +171,9 @@ class ProfileViewModel @Inject constructor(
 
             val pacienteId = pacienteRepository.resolvePatientId(prefs)
             if (pacienteId != null) {
+                val edad = com.bioguard.movil.data.Formatters.calculateAge(fechaNacimiento)
                 when (val result = pacienteRepository.updateBiometria(
-                    pacienteId, fechaNacimiento, sexo, pesoKg, estaturaCm, esDiabetico, familiaresDiabetes, actividadFisica
+                    pacienteId, fechaNacimiento, edad ?: 0, sexo, pesoKg, estaturaCm, esDiabetico, familiaresDiabetes, actividadFisica
                 )) {
                     is Resource.Success -> {
                         val verifyResult = pacienteRepository.getBiometria(pacienteId)
@@ -177,6 +181,7 @@ class ProfileViewModel @Inject constructor(
                             val verified = verifyResult.data
                             val confirmedBiometria = BiometriaPacienteState(
                                 fechaNacimiento = verified.fechaNacimiento ?: fechaNacimiento,
+                                edad = verified.edad ?: edad,
                                 sexo = verified.sexo ?: sexo,
                                 pesoKg = verified.pesoKg ?: pesoKg,
                                 estaturaCm = verified.estaturaCm ?: estaturaCm,
@@ -215,7 +220,14 @@ class ProfileViewModel @Inject constructor(
                                     isLoading = false,
                                     successMessage = "Datos guardados localmente (servidor no disponible)",
                                     biometria = BiometriaPacienteState(
-                                        fechaNacimiento, sexo, pesoKg, estaturaCm, esDiabetico, familiaresDiabetes, actividadFisica
+                                        fechaNacimiento = fechaNacimiento,
+                                        edad = com.bioguard.movil.data.Formatters.calculateAge(fechaNacimiento),
+                                        sexo = sexo,
+                                        pesoKg = pesoKg,
+                                        estaturaCm = estaturaCm,
+                                        esDiabetico = esDiabetico,
+                                        familiaresDiabetes = familiaresDiabetes,
+                                        actividadFisica = actividadFisica
                                     )
                                 )
                             }
@@ -235,9 +247,16 @@ class ProfileViewModel @Inject constructor(
                             it.copy(
                                 isLoading = false,
                                 successMessage = "Datos guardados solo localmente: ${result.message}",
-                                biometria = BiometriaPacienteState(
-                                    fechaNacimiento, sexo, pesoKg, estaturaCm, esDiabetico, familiaresDiabetes, actividadFisica
-                                )
+                                        biometria = BiometriaPacienteState(
+                                            fechaNacimiento = fechaNacimiento,
+                                            edad = com.bioguard.movil.data.Formatters.calculateAge(fechaNacimiento),
+                                            sexo = sexo,
+                                            pesoKg = pesoKg,
+                                            estaturaCm = estaturaCm,
+                                            esDiabetico = esDiabetico,
+                                            familiaresDiabetes = familiaresDiabetes,
+                                            actividadFisica = actividadFisica
+                                        )
                             )
                         }
                     }
@@ -258,7 +277,14 @@ class ProfileViewModel @Inject constructor(
                         isLoading = false,
                         successMessage = "Perfil médico guardado localmente (sin paciente vinculado)",
                         biometria = BiometriaPacienteState(
-                            fechaNacimiento, sexo, pesoKg, estaturaCm, esDiabetico, familiaresDiabetes, actividadFisica
+                            fechaNacimiento = fechaNacimiento,
+                            edad = com.bioguard.movil.data.Formatters.calculateAge(fechaNacimiento),
+                            sexo = sexo,
+                            pesoKg = pesoKg,
+                            estaturaCm = estaturaCm,
+                            esDiabetico = esDiabetico,
+                            familiaresDiabetes = familiaresDiabetes,
+                            actividadFisica = actividadFisica
                         )
                     )
                 }

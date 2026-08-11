@@ -62,6 +62,7 @@ data class CrearPacienteRequest(@SerializedName("nombre") val nombre: String, @S
 data class CrearPacienteResponse(@SerializedName("pacienteId") val pacienteId: String, @SerializedName("codigoAccesoQr") val codigoAccesoQr: String, @SerializedName("message") val message: String)
 data class ActualizarBiometriaRequest(
     @SerializedName("fechaNacimiento") val fechaNacimiento: String,
+    @SerializedName("edad") val edad: Int = 0,
     @SerializedName("sexo") val sexo: String,
     @SerializedName("pesoKg") val pesoKg: Double,
     @SerializedName("estaturaCm") val estaturaCm: Double,
@@ -71,6 +72,7 @@ data class ActualizarBiometriaRequest(
 )
 data class BiometriaResponse(
     @SerializedName("fechaNacimiento") val fechaNacimiento: String? = null,
+    @SerializedName("edad") val edad: Int? = null,
     @SerializedName("sexo") val sexo: String? = null,
     @SerializedName("pesoKg") val pesoKg: Double? = null,
     @SerializedName("estaturaCm") val estaturaCm: Double? = null,

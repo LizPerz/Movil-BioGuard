@@ -14,23 +14,24 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -52,7 +53,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -63,7 +63,6 @@ import com.bioguard.movil.ui.theme.GlassBorder
 import com.bioguard.movil.ui.theme.GreenNeon
 import com.bioguard.movil.ui.theme.RedNeon
 import com.bioguard.movil.ui.theme.InputBackground
-import com.bioguard.movil.ui.theme.TextPrimary
 import com.bioguard.movil.ui.theme.TextSecondary
 import com.bioguard.movil.ui.theme.TextTertiary
 import com.bioguard.movil.ui.viewmodel.AuthViewModel
@@ -80,10 +79,6 @@ fun LoginScreen(
     val uiState by authViewModel.uiState.collectAsState()
     val context = LocalContext.current
     var toastMessage by remember { mutableStateOf("") }
-
-    var loginMode by remember { mutableStateOf("CODIGO") }
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
 
     val code = remember { mutableStateListOf("", "", "", "", "", "", "", "") }
     val focusRequesters = List(8) { remember { FocusRequester() } }
@@ -147,6 +142,7 @@ fun LoginScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
@@ -180,171 +176,89 @@ fun LoginScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(InputBackground)
-                            .padding(4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        val modes = listOf("CODIGO", "CORREO")
-                        modes.forEach { mode ->
-                            val selected = loginMode == mode
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(34.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(if (selected) CyanNeon else InputBackground)
-                                    .clickable { loginMode = mode }
-                                    .padding(vertical = 8.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = mode,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 1.sp,
-                                    color = if (selected) DarkBackground else TextSecondary
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = if (loginMode == "CODIGO") "CODIGO DE ACCESO" else "CORREO Y CONTRASE\u00d1A",
+                        text = "CODIGO DE ACCESO",
                         fontSize = 10.sp,
                         color = CyanNeon,
                         letterSpacing = 2.sp,
                         modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
                     )
 
-                    if (loginMode == "CORREO") {
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            OutlinedTextField(
-                                value = email,
-                                onValueChange = { email = it.take(254) },
-                                modifier = Modifier.fillMaxWidth(),
-                                placeholder = { Text("correo@ejemplo.com", color = TextTertiary, fontSize = 12.sp) },
-                                singleLine = true,
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                                shape = RoundedCornerShape(10.dp),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedContainerColor = InputBackground,
-                                    unfocusedContainerColor = InputBackground,
-                                    focusedBorderColor = CyanNeon,
-                                    unfocusedBorderColor = GlassBorder,
-                                    focusedTextColor = TextPrimary,
-                                    unfocusedTextColor = TextPrimary,
-                                    cursorColor = CyanNeon
-                                )
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            OutlinedTextField(
-                                value = password,
-                                onValueChange = { password = it.take(128) },
-                                modifier = Modifier.fillMaxWidth(),
-                                placeholder = { Text("Contrase\u00f1a", color = TextTertiary, fontSize = 12.sp) },
-                                singleLine = true,
-                                visualTransformation = PasswordVisualTransformation(),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                                shape = RoundedCornerShape(10.dp),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedContainerColor = InputBackground,
-                                    unfocusedContainerColor = InputBackground,
-                                    focusedBorderColor = CyanNeon,
-                                    unfocusedBorderColor = GlassBorder,
-                                    focusedTextColor = TextPrimary,
-                                    unfocusedTextColor = TextPrimary,
-                                    cursorColor = CyanNeon
-                                )
-                            )
-                        }
-                    } else {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            code.forEachIndexed { index, digit ->
-                                Box(
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(InputBackground)
-                                        .border(
-                                            width = if (digit.isNotEmpty()) 2.dp else 1.dp,
-                                            color = if (digit.isNotEmpty()) CyanNeon else GlassBorder,
-                                            shape = RoundedCornerShape(8.dp)
-                                        ),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    BasicTextField(
-                                        value = digit,
-                                        onValueChange = { value ->
-                                            if (value.length <= 1) {
-                                                val char = value.uppercase()
-                                                if (char.isNotEmpty() && (char[0].isLetterOrDigit())) {
-                                                    code[index] = char
-                                                    if (index < 7) {
-                                                        focusRequesters[index + 1].requestFocus()
-                                                    }
-                                                } else if (char.isEmpty()) {
-                                                    code[index] = ""
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        code.forEachIndexed { index, digit ->
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .aspectRatio(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(InputBackground)
+                                    .border(
+                                        width = if (digit.isNotEmpty()) 2.dp else 1.dp,
+                                        color = if (digit.isNotEmpty()) CyanNeon else GlassBorder,
+                                        shape = RoundedCornerShape(8.dp)
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                BasicTextField(
+                                    value = digit,
+                                    onValueChange = { value ->
+                                        if (value.length <= 1) {
+                                            val char = value.uppercase()
+                                            if (char.isNotEmpty() && (char[0].isLetterOrDigit())) {
+                                                code[index] = char
+                                                if (index < 7) {
+                                                    focusRequesters[index + 1].requestFocus()
                                                 }
-                                            }
-                                        },
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .focusRequester(focusRequesters[index]),
-                                        textStyle = TextStyle(
-                                            fontSize = 18.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = CyanNeon,
-                                            textAlign = TextAlign.Center
-                                        ),
-                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
-                                        singleLine = true,
-                                        decorationBox = { innerTextField ->
-                                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                                innerTextField()
+                                            } else if (char.isEmpty()) {
+                                                code[index] = ""
                                             }
                                         }
-                                    )
-                                }
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .focusRequester(focusRequesters[index]),
+                                    textStyle = TextStyle(
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = CyanNeon,
+                                        textAlign = TextAlign.Center
+                                    ),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
+                                    singleLine = true,
+                                    decorationBox = { innerTextField ->
+                                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                            innerTextField()
+                                        }
+                                    }
+                                )
                             }
                         }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Text(
-                            text = "Ingresa el codigo de 8 caracteres",
-                            fontSize = 11.sp,
-                            color = TextTertiary
-                        )
                     }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(
+                        text = "Ingresa el codigo de 8 caracteres",
+                        fontSize = 11.sp,
+                        color = TextTertiary
+                    )
 
                     Spacer(modifier = Modifier.height(24.dp))
 
                     Button(
                         onClick = {
-                            if (loginMode == "CODIGO") {
-                                authViewModel.loginWithCode(code.joinToString(""))
-                            } else {
-                                authViewModel.login(email.trim(), password)
-                            }
+                            authViewModel.loginWithCode(code.joinToString(""))
                         },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp)
                             .clip(RoundedCornerShape(10.dp)),
-                        enabled = if (loginMode == "CODIGO") {
-                            !uiState.isLoading && code.all { it.isNotEmpty() }
-                        } else {
-                            !uiState.isLoading && email.isNotBlank() && password.isNotBlank()
-                        },
+                        enabled = !uiState.isLoading && code.all { it.isNotEmpty() },
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = CyanNeon,

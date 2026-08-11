@@ -55,6 +55,35 @@ object Formatters {
     fun toSexoCode(sexo: String): String =
         if (sexo.equals("Femenino", ignoreCase = true)) "F" else "M"
 
+    fun sexoToDisplay(sexo: String): String = when {
+        sexo.equals("F", ignoreCase = true) -> "Femenino"
+        sexo.equals("M", ignoreCase = true) -> "Masculino"
+        sexo.equals("Masculino", ignoreCase = true) -> "Masculino"
+        sexo.equals("Femenino", ignoreCase = true) -> "Femenino"
+        sexo.equals("O", ignoreCase = true) || sexo.equals("Otro", ignoreCase = true) -> "Otro"
+        else -> sexo.ifBlank { "Sin registrar" }
+    }
+
+    fun sexoToCode(sexo: String): String = when {
+        sexo.equals("F", ignoreCase = true) || sexo.equals("Femenino", ignoreCase = true) -> "F"
+        sexo.equals("O", ignoreCase = true) || sexo.equals("Otro", ignoreCase = true) -> "O"
+        else -> "M"
+    }
+
+    /**
+     * Calcula la edad en años a partir de una fecha en formato ISO (YYYY-MM-DD).
+     * Retorna null si la fecha es inválida o futura.
+     */
+    fun calculateAge(isoDate: String?): Int? {
+        val parsed = toIsoDate(isoDate ?: return null) ?: return null
+        val birth = runCatching { LocalDate.parse(parsed, ISO_DATE) }.getOrNull() ?: return null
+        val today = LocalDate.now()
+        if (birth.isAfter(today)) return null
+        var age = today.year - birth.year
+        if (today.dayOfYear < birth.dayOfYear) age--
+        return age
+    }
+
     fun parseIsoTimestamp(timestamp: String): Instant? =
         runCatching { OffsetDateTime.parse(timestamp).toInstant() }
             .getOrElse {

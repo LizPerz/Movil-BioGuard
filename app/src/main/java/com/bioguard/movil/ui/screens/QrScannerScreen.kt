@@ -2,7 +2,6 @@ package com.bioguard.movil.ui.screens
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.util.Size
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -11,8 +10,6 @@ import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
-import androidx.camera.core.resolutionselector.ResolutionSelector
-import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
@@ -107,12 +104,26 @@ private fun analyzeImageProxy(
     }
 }
 
+/**
+ * Extrae el código de acceso de 8 caracteres desde cualquier payload QR:
+ * - Texto plano: "12345678"
+ * - URL con parámetro code: "...?code=12345678&userId=abc"
+ * - JSON/pipe/cualquier envoltura que contenga el código
+ */
 private fun extractCodigoAcceso(rawValue: String): String {
     val trimmed = rawValue.trim()
+    if (trimmed.isBlank()) return trimmed
+
+    // 1. Intenta un query parameter "code" (URL del portal web)
     val uri = runCatching { android.net.Uri.parse(trimmed) }.getOrNull()
-    val code = uri?.getQueryParameter("code")
-    if (code.isNullOrEmpty()) return trimmed
-    return code
+    uri?.getQueryParameter("code")?.takeIf { it.isNotBlank() }?.let { return it.trim() }
+
+    // 2. Busca un token contiguo de 8 alfanuméricos
+    Regex("""\b[A-Za-z0-9]{8}\b""").find(trimmed)?.value?.let { return it }
+
+    // 3. Fallback: primeros 8 caracteres alfanuméricos de la cadena
+    val alnum = trimmed.filter { it.isLetterOrDigit() }
+    return if (alnum.length >= 8) alnum.take(8) else trimmed
 }
 
 @OptIn(ExperimentalGetImage::class)
@@ -241,17 +252,7 @@ private fun QrScannerScreenContent(
                     it.setSurfaceProvider(previewView.surfaceProvider)
                 }
 
-                val resolutionSelector = ResolutionSelector.Builder()
-                    .setResolutionStrategy(
-                        ResolutionStrategy(
-                            Size(1280, 720),
-                            ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER
-                        )
-                    )
-                    .build()
-
                 val analysis = ImageAnalysis.Builder()
-                    .setResolutionSelector(resolutionSelector)
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .build()
 
@@ -271,14 +272,16 @@ private fun QrScannerScreenContent(
                     preview,
                     analysis
                 )
-                // Enable auto focus metering for close-up QR scans
+                // Enable auto focus metering for close-up QR scans (once the view is laid out)
                 try {
-                    val factory = previewView.meteringPointFactory
-                    val point = factory.createPoint(previewView.width / 2f, previewView.height / 2f)
-                    val action = androidx.camera.core.FocusMeteringAction.Builder(point)
-                        .setAutoCancelDuration(3, java.util.concurrent.TimeUnit.SECONDS)
-                        .build()
-                    camera.cameraControl.startFocusAndMetering(action)
+                    if (previewView.width > 0 && previewView.height > 0) {
+                        val factory = previewView.meteringPointFactory
+                        val point = factory.createPoint(previewView.width / 2f, previewView.height / 2f)
+                        val action = androidx.camera.core.FocusMeteringAction.Builder(point)
+                            .setAutoCancelDuration(3, java.util.concurrent.TimeUnit.SECONDS)
+                            .build()
+                        camera.cameraControl.startFocusAndMetering(action)
+                    }
                 } catch (_: Exception) { }
                 bound = true
             } catch (e: Exception) {

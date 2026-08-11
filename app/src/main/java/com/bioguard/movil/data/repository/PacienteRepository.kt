@@ -52,6 +52,7 @@ class PacienteRepository @Inject constructor(
     suspend fun updateBiometria(
         id: String,
         fechaNacimiento: String,
+        edad: Int = 0,
         sexo: String,
         pesoKg: Double,
         estaturaCm: Double,
@@ -64,6 +65,7 @@ class PacienteRepository @Inject constructor(
                 id,
                 ActualizarBiometriaRequest(
                     fechaNacimiento = fechaNacimiento,
+                    edad = edad,
                     sexo = sexo,
                     pesoKg = pesoKg,
                     estaturaCm = estaturaCm,

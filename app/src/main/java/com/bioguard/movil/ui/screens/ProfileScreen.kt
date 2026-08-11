@@ -19,6 +19,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.HealthAndSafety
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -29,6 +33,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -176,7 +181,12 @@ fun ProfileScreen(
                                 .border(width = 2.dp, color = p.accent, shape = CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(text = "👤", fontSize = 34.sp)
+                            Icon(
+                                imageVector = Icons.Filled.Person,
+                                contentDescription = null,
+                                tint = p.accent,
+                                modifier = Modifier.size(36.dp)
+                            )
                         }
 
                         Spacer(modifier = Modifier.height(12.dp))
@@ -203,17 +213,29 @@ fun ProfileScreen(
 
                 // ── PERFIL BIOMÉTRICO Y MÉDICO DEL PACIENTE ──
                 if (access.allows(AppPermission.PATIENT_MANAGE)) {
-                Text(
-                    text = "🏥 PERFIL BIOMÉTRICO Y DATO MÉDICO",
-                    fontSize = 10.sp,
-                    color = p.accent,
-                    letterSpacing = 2.sp,
-                    modifier = Modifier.padding(bottom = 10.dp)
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.HealthAndSafety,
+                        contentDescription = null,
+                        tint = p.accent,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "PERFIL BIOMÉTRICO Y DATO MÉDICO",
+                        fontSize = 10.sp,
+                        color = p.accent,
+                        letterSpacing = 2.sp
+                    )
+                }
 
                 val bio = uiState.biometria
                 ProfileInfoRow(label = "FECHA NACIMIENTO", value = bio.fechaNacimiento.takeIf { it.isNotBlank() }?.let { com.bioguard.movil.data.Formatters.toDisplayDate(it) } ?: "Sin registrar")
-                ProfileInfoRow(label = "SEXO BIOLÓGICO", value = bio.sexo.ifBlank { "Sin registrar" })
+                ProfileInfoRow(label = "EDAD", value = bio.edad?.let { "$it años" } ?: "Sin registrar")
+                ProfileInfoRow(label = "SEXO BIOLÓGICO", value = com.bioguard.movil.data.Formatters.sexoToDisplay(bio.sexo))
                 ProfileInfoRow(label = "PESO CORPORAL", value = if (bio.pesoKg > 0.0) "${bio.pesoKg} kg" else "Sin registrar")
                 ProfileInfoRow(label = "ESTATURA", value = if (bio.estaturaCm > 0.0) "${bio.estaturaCm} cm" else "Sin registrar")
                 ProfileInfoRow(label = "NIVEL ACTIVIDAD FISICA", value = bio.actividadFisica.ifBlank { "Sin registrar" })
@@ -230,8 +252,15 @@ fun ProfileScreen(
                     shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = p.accent)
                 ) {
+                    Icon(
+                        imageVector = Icons.Filled.Edit,
+                        contentDescription = null,
+                        tint = p.background,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "✏️ EDITAR INFORMACIÓN MÉDICA",
+                        text = "EDITAR INFORMACIÓN MÉDICA",
                         color = p.background,
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp,
@@ -413,7 +442,9 @@ fun EditBiometriaDialog(
     }
     var weight by remember { mutableStateOf(currentWeight) }
     var height by remember { mutableStateOf(currentHeight) }
-    var selectedSex by remember { mutableStateOf(currentSex) }
+    var selectedSex by remember(currentSex) {
+        mutableStateOf(com.bioguard.movil.data.Formatters.sexoToDisplay(currentSex))
+    }
     var isDiabetic by remember { mutableStateOf(currentDiabetic) }
     var hasFamilyDiabetes by remember { mutableStateOf(currentFamilyDiabetic) }
     var selectedActivity by remember { mutableStateOf(currentActivity) }
@@ -426,7 +457,16 @@ fun EditBiometriaDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text(text = "✏️ Editar Información Médica", color = p.accent, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Filled.Edit,
+                    contentDescription = null,
+                    tint = p.accent,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(text = "Editar Información Médica", color = p.accent, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            }
         },
         text = {
             Column(
@@ -486,7 +526,7 @@ fun EditBiometriaDialog(
 
                 Text(text = "Sexo Biológico", fontSize = 11.sp, color = p.textSecondary)
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("Masculino", "Femenino", "Otro").forEach { sexOption ->
+                    listOf("Masculino", "Femenino").forEach { sexOption ->
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -579,7 +619,7 @@ fun EditBiometriaDialog(
                         validationError = "Ingresa una fecha válida en formato dd/mm/aaaa"
                         return@Button
                     }
-                    onSave(isoBirth, selectedSex, weight, height, isDiabetic, hasFamilyDiabetes, selectedActivity)
+                    onSave(isoBirth, com.bioguard.movil.data.Formatters.toSexoCode(selectedSex), weight, height, isDiabetic, hasFamilyDiabetes, selectedActivity)
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = p.accent)
             ) {

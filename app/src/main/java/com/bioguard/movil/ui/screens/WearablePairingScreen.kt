@@ -69,84 +69,111 @@ fun WearablePairingScreen(
     var discoveredDevices by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
     var hasPermissions by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        val perms = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-            arrayOf(
-                android.Manifest.permission.BLUETOOTH_SCAN,
-                android.Manifest.permission.BLUETOOTH_CONNECT
-            )
-        } else {
-            arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION)
-        }
-        hasPermissions = perms.all { perm ->
+    val requiredPermissions = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+        arrayOf(
+            android.Manifest.permission.BLUETOOTH_SCAN,
+            android.Manifest.permission.BLUETOOTH_CONNECT
+        )
+    } else {
+        arrayOf(
+            android.Manifest.permission.ACCESS_FINE_LOCATION,
+            android.Manifest.permission.BLUETOOTH
+        )
+    }
+
+    fun checkPermissions(): Boolean =
+        requiredPermissions.all { perm ->
             androidx.core.content.ContextCompat.checkSelfPermission(
                 context, perm
             ) == android.content.pm.PackageManager.PERMISSION_GRANTED
         }
-        pairedDeviceName = prefs.deviceName.first()
+
+    suspend fun runScan() {
+        isScanning = true
+        discoveredDevices = emptyList()
+
+        val realDevices = mutableListOf<Pair<String, String>>()
+        try {
+            val nodeClient = com.google.android.gms.wearable.Wearable.getNodeClient(context)
+            val nodes = nodeClient.connectedNodes.await()
+            for (node in nodes) {
+                realDevices.add((node.displayName.ifBlank { "SmartWatch WearOS" }) to node.id)
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("WearablePairing", "WearOS node discovery: ${e.message}")
+        }
+
+        try {
+            val bluetoothManager = context.getSystemService(android.content.Context.BLUETOOTH_SERVICE) as? android.bluetooth.BluetoothManager
+            val adapter = bluetoothManager?.adapter
+            if (adapter != null && adapter.isEnabled) {
+                val scanner = adapter.bluetoothLeScanner
+                if (scanner != null) {
+                    val bleDevices = mutableListOf<Pair<String, String>>()
+                    val scanCallback = object : android.bluetooth.le.ScanCallback() {
+                        override fun onScanResult(callbackType: Int, result: android.bluetooth.le.ScanResult?) {
+                            result?.device?.let { dev ->
+                                val rawName = try { dev.name } catch (_: SecurityException) { null }
+                                val name = rawName ?: "Dispositivo BLE (${dev.address.takeLast(5)})"
+                                if (bleDevices.none { it.second == dev.address }) {
+                                    bleDevices.add(name to dev.address)
+                                    discoveredDevices = realDevices + bleDevices
+                                }
+                            }
+                        }
+                        override fun onScanFailed(errorCode: Int) {
+                            android.util.Log.w("WearablePairing", "BLE scan failed: $errorCode")
+                        }
+                    }
+                    try {
+                        scanner.startScan(
+                            null,
+                            android.bluetooth.le.ScanSettings.Builder()
+                                .setScanMode(android.bluetooth.le.ScanSettings.SCAN_MODE_LOW_LATENCY)
+                                .build(),
+                            scanCallback
+                        )
+                        kotlinx.coroutines.delay(8000)
+                        scanner.stopScan(scanCallback)
+                    } catch (e: SecurityException) {
+                        android.util.Log.w("WearablePairing", "BLE scan permission error: ${e.message}")
+                    }
+                    discoveredDevices = realDevices + bleDevices
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("WearablePairing", "BLE scan error: ${e.message}")
+        }
+
+        isScanning = false
+
+        if (discoveredDevices.isEmpty()) {
+            Toast.makeText(context, "No se detectaron dispositivos wearables encendidos ni cercanos. Asegurate de tener Bluetooth activado.", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
+    ) { result ->
+        hasPermissions = checkPermissions()
+        if (hasPermissions) {
+            scope.launch { runScan() }
+        } else {
+            Toast.makeText(context, "Se requieren permisos de Bluetooth y ubicacion para detectar dispositivos.", Toast.LENGTH_LONG).show()
+        }
     }
 
     fun triggerScan() {
         if (!hasPermissions) {
-            Toast.makeText(context, "Se requieren permisos de Bluetooth. Activalos en Ajustes > Aplicaciones > BioGuard > Permisos.", Toast.LENGTH_LONG).show()
+            permissionLauncher.launch(requiredPermissions)
             return
         }
-        scope.launch {
-            isScanning = true
-            discoveredDevices = emptyList()
+        scope.launch { runScan() }
+    }
 
-            val realDevices = mutableListOf<Pair<String, String>>()
-            try {
-                val nodeClient = com.google.android.gms.wearable.Wearable.getNodeClient(context)
-                val nodes = nodeClient.connectedNodes.await()
-                for (node in nodes) {
-                    realDevices.add((node.displayName.ifBlank { "SmartWatch WearOS" }) to node.id)
-                }
-            } catch (e: Exception) {
-                android.util.Log.w("WearablePairing", "WearOS node discovery: ${e.message}")
-            }
-
-            try {
-                val bluetoothManager = context.getSystemService(android.content.Context.BLUETOOTH_SERVICE) as? android.bluetooth.BluetoothManager
-                val adapter = bluetoothManager?.adapter
-                if (adapter != null && adapter.isEnabled) {
-                    val scanner = adapter.bluetoothLeScanner
-                    if (scanner != null) {
-                        val bleDevices = mutableListOf<Pair<String, String>>()
-                        val scanCallback = object : android.bluetooth.le.ScanCallback() {
-                            override fun onScanResult(callbackType: Int, result: android.bluetooth.le.ScanResult?) {
-                                result?.device?.let { dev ->
-                                    val name = try { dev.name } catch (_: SecurityException) { null }
-                                    if (name != null && bleDevices.none { it.second == dev.address }) {
-                                        bleDevices.add(name to dev.address)
-                                        discoveredDevices = realDevices + bleDevices
-                                    }
-                                }
-                            }
-                            override fun onScanFailed(errorCode: Int) {
-                                android.util.Log.w("WearablePairing", "BLE scan failed: $errorCode")
-                            }
-                        }
-                        try {
-                            scanner.startScan(scanCallback)
-                            kotlinx.coroutines.delay(8000)
-                            scanner.stopScan(scanCallback)
-                        } catch (e: SecurityException) {
-                            android.util.Log.w("WearablePairing", "BLE scan permission error: ${e.message}")
-                        }
-                        discoveredDevices = realDevices + bleDevices
-                    }
-                }
-            } catch (e: Exception) {
-                android.util.Log.w("WearablePairing", "BLE scan error: ${e.message}")
-            }
-
-            isScanning = false
-
-            if (discoveredDevices.isEmpty()) {
-                Toast.makeText(context, "No se detectaron dispositivos wearables encendidos ni cercanos. Asegurate de tener Bluetooth activado.", Toast.LENGTH_LONG).show()
-            }
-        }
+    LaunchedEffect(Unit) {
+        hasPermissions = checkPermissions()
+        pairedDeviceName = prefs.deviceName.first()
     }
 
     fun vincular(nombre: String, mac: String) {

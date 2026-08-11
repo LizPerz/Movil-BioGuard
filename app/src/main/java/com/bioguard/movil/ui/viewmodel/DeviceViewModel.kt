@@ -94,9 +94,11 @@ class DeviceViewModel @Inject constructor(
     private var activeScanCallback: ScanCallback? = null
 
     private fun hasBluetoothScanPermission(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
         val app = getApplication<Application>()
-        return Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
-            ContextCompat.checkSelfPermission(app, android.Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
+        val scanGranted = ContextCompat.checkSelfPermission(app, android.Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
+        val connectGranted = ContextCompat.checkSelfPermission(app, android.Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+        return scanGranted && connectGranted
     }
 
     init {

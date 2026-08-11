@@ -72,6 +72,7 @@ import com.bioguard.movil.ui.components.ConfirmDialog
 import com.bioguard.movil.ui.components.SystemNotificationDialog
 import com.bioguard.movil.ui.model.AppPermission
 import com.bioguard.movil.ui.model.EffectiveAccess
+import com.bioguard.movil.ui.model.UserRole
 import com.bioguard.movil.datastore.UserPreferences
 import com.bioguard.movil.ui.theme.AppTheme
 import com.bioguard.movil.ui.theme.GreenNeon
@@ -215,7 +216,8 @@ fun ProfileScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        val fotoBase64 = uiState.perfil?.fotoPerfil?.takeIf { it.isNotBlank() } ?: localPhoto
+                        val fotoBase64 = uiState.perfil?.fotoPerfil?.takeIf { it.isNotBlank() }
+                            ?: (if (access.role == UserRole.PACIENTE) localPhoto else null)
                         Box(
                             modifier = Modifier
                                 .size(88.dp)

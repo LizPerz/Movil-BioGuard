@@ -101,6 +101,12 @@ class DeviceViewModel @Inject constructor(
         return scanGranted && connectGranted
     }
 
+    private fun isBluetoothEnabled(): Boolean {
+        val app = getApplication<Application>()
+        val bluetoothManager = app.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+        return bluetoothManager?.adapter?.isEnabled == true
+    }
+
     init {
         loadDispositivo()
         observeWearableConnection()
@@ -109,11 +115,13 @@ class DeviceViewModel @Inject constructor(
     private fun observeWearableConnection() {
         val connector = getOrCreateWearableConnector()
         viewModelScope.launch {
-            connector.connectionState.collect { state ->
-                _uiState.update { it.copy(connectionState = state) }
-                if (state == WearableConnectionState.CONNECTED) {
+        connector.connectionState.collect { state ->
+            _uiState.update { it.copy(connectionState = state) }
+            if (state == WearableConnectionState.CONNECTED) {
+                if (isBluetoothEnabled()) {
                     _uiState.update { it.copy(isPaired = true, isConnected = true) }
-                } else if (state == WearableConnectionState.DISCONNECTED || state == WearableConnectionState.UNAVAILABLE) {
+                }
+            } else if (state == WearableConnectionState.DISCONNECTED || state == WearableConnectionState.UNAVAILABLE) {
                     _uiState.update { current ->
                         current.copy(
                             isConnected = false
@@ -192,6 +200,17 @@ class DeviceViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isScanning = true, error = null, dispositivosDisponibles = emptyList()) }
 
+            if (!isBluetoothEnabled()) {
+                _uiState.update {
+                    it.copy(
+                        isScanning = false,
+                        dispositivosDisponibles = emptyList(),
+                        error = "El módulo Bluetooth está desactivado. Activa el Bluetooth del celular para buscar y vincular dispositivos."
+                    )
+                }
+                return@launch
+            }
+
             val detectedRealDevices = mutableSetOf<DispositivoScanItem>()
 
             // 1. Discover WearOS wearables via Wearable API
@@ -215,24 +234,9 @@ class DeviceViewModel @Inject constructor(
                 android.util.Log.w("DeviceViewModel", "WearOS discovery error: ${e.message}")
             }
 
-            // 2. Check Bluetooth hardware
+            // 2. BLE scan (Bluetooth ya verificado como activo arriba)
             val bluetoothManager = getApplication<Application>().getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
             val adapter = bluetoothManager?.adapter
-
-            if (adapter == null || !adapter.isEnabled) {
-                if (detectedRealDevices.isEmpty()) {
-                    _uiState.update {
-                        it.copy(
-                            isScanning = false,
-                            dispositivosDisponibles = emptyList(),
-                            error = "El módulo Bluetooth está desactivado. Por favor activa el Bluetooth en tu dispositivo."
-                        )
-                    }
-                    return@launch
-                }
-            }
-
-            // 3. Execute BLE scan with low latency settings
             val scanner = adapter?.bluetoothLeScanner
             var scanStarted = false
 
@@ -344,6 +348,15 @@ class DeviceViewModel @Inject constructor(
     fun vincularDispositivo(item: DispositivoScanItem) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
+            if (!isBluetoothEnabled()) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = "Activa el Bluetooth del celular antes de vincular el dispositivo."
+                    )
+                }
+                return@launch
+            }
             val nodeId = item.wearNodeId
             if (nodeId.isNullOrBlank()) {
                 _uiState.update {

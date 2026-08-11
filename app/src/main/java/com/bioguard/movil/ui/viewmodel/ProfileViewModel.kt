@@ -61,8 +61,22 @@ class ProfileViewModel @Inject constructor(
                 is Resource.Success -> _uiState.update {
                     it.copy(perfil = result.data)
                 }
-                is Resource.Error -> _uiState.update {
-                    it.copy(error = result.message)
+                is Resource.Error -> {
+                    val localNombre = prefs.userName.first().orEmpty()
+                    val localId = prefs.userId.first().orEmpty()
+                    _uiState.update {
+                        it.copy(
+                            perfil = if (localNombre.isNotBlank() || localId.isNotBlank()) {
+                                UsuarioWebResponse(
+                                    id = localId,
+                                    nombre = localNombre,
+                                    correo = "",
+                                    fechaRegistro = ""
+                                )
+                            } else null,
+                            error = null
+                        )
+                    }
                 }
                 is Resource.Loading -> {}
             }
@@ -71,7 +85,7 @@ class ProfileViewModel @Inject constructor(
                     it.copy(plan = result.data, isLoading = false)
                 }
                 is Resource.Error -> _uiState.update {
-                    it.copy(isLoading = false, error = result.message)
+                    it.copy(isLoading = false, error = null)
                 }
                 is Resource.Loading -> {}
             }

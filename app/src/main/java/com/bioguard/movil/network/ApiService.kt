@@ -209,7 +209,8 @@ data class CuidadorResponse(
     @SerializedName("correo") val correo: String? = null,
     @SerializedName("nivelAcceso") val nivelAcceso: String? = null,
     @SerializedName("codigoAccesoQr") val codigoAccesoQr: String? = null,
-    @SerializedName("fechaRegistro") val fechaRegistro: String? = null
+    @SerializedName("fechaRegistro") val fechaRegistro: String? = null,
+    @SerializedName("foto") val foto: String? = null
 )
 data class CrearCuidadorRequest(
     @SerializedName("pacienteId") val pacienteId: String,

@@ -6,6 +6,8 @@ import com.bioguard.movil.network.ApiService
 import com.bioguard.movil.network.PrediccionResponse
 import com.bioguard.movil.network.DiagnosticarRequest
 import com.bioguard.movil.network.DiagnosticarResponse
+import com.bioguard.movil.network.GuardarPrediccionRequest
+import com.bioguard.movil.network.MessageResponse
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -30,11 +32,19 @@ class MlRepository @Inject constructor(
         }
     }
 
-    suspend fun diagnosticar(pacienteId: String, pulsoBpm: Double, temperaturaC: Double, sudoracionGsr: Double): Resource<DiagnosticarResponse> {
-        return try {
-            Resource.Success(api.diagnosticar(DiagnosticarRequest(pacienteId = pacienteId, pulsoBpm = pulsoBpm, temperaturaC = temperaturaC, sudoracionGsr = sudoracionGsr)))
-        } catch (e: Exception) {
-            Resource.Error(e.toUserMessage("Error al diagnosticar"))
-        }
-    }
-}
+     suspend fun diagnosticar(pacienteId: String, pulsoBpm: Double, temperaturaC: Double, sudoracionGsr: Double): Resource<DiagnosticarResponse> {
+         return try {
+             Resource.Success(api.diagnosticar(DiagnosticarRequest(pacienteId = pacienteId, pulsoBpm = pulsoBpm, temperaturaC = temperaturaC, sudoracionGsr = sudoracionGsr)))
+         } catch (e: Exception) {
+             Resource.Error(e.toUserMessage("Error al diagnosticar"))
+         }
+     }
+
+     suspend fun guardarPrediccion(request: GuardarPrediccionRequest): Resource<MessageResponse> {
+         return try {
+             Resource.Success(api.guardarPrediccion(request))
+         } catch (e: Exception) {
+             Resource.Error(e.toUserMessage("Error al guardar predicción"))
+         }
+     }
+ }

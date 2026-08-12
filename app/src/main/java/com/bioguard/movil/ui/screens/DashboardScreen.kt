@@ -496,6 +496,116 @@ fun DashboardScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // Enviar Reporte Glucémico Button
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(p.accent.copy(alpha = 0.15f))
+                        .border(width = 1.dp, color = p.accent, shape = RoundedCornerShape(12.dp))
+                        .clickable(enabled = !uiState.isLoading) {
+                            haptic.performClick()
+                            dashboardViewModel.generarReporteGlucemico()
+                        }
+                        .padding(14.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text(
+                                text = "📊 Reporte Glucémico",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = p.accent,
+                                letterSpacing = 1.sp
+                            )
+                            Text(
+                                text = if (uiState.isLoading) "Procesando..." else "Enviar análisis ML al backend",
+                                fontSize = 11.sp,
+                                color = p.textSecondary
+                            )
+                        }
+                        if (uiState.isLoading) {
+                            CircularProgressIndicator(
+                                color = p.accent,
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Text("→", fontSize = 16.sp, color = p.accent, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Botón de Sincronización Manual (si hay datos pendientes)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(YellowNeon.copy(alpha = 0.1f))
+                        .border(width = 1.dp, color = YellowNeon, shape = RoundedCornerShape(12.dp))
+                        .clickable(enabled = !uiState.isLoading) {
+                            haptic.performClick()
+                            dashboardViewModel.sincronizarManualmente()
+                        }
+                        .padding(14.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text(
+                                text = "🔄 Sincronizar Datos",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = YellowNeon,
+                                letterSpacing = 1.sp
+                            )
+                            Text(
+                                text = "Enviar reportes pendientes manualmente",
+                                fontSize = 11.sp,
+                                color = p.textSecondary
+                            )
+                        }
+                        if (uiState.isLoading) {
+                            CircularProgressIndicator(
+                                color = YellowNeon,
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Text("↻", fontSize = 16.sp, color = YellowNeon, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                if (uiState.error != null) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(RedNeon.copy(alpha = 0.1f))
+                            .border(width = 1.dp, color = RedNeon, shape = RoundedCornerShape(12.dp))
+                            .padding(12.dp)
+                    ) {
+                        Text(
+                            text = uiState.error!!,
+                            fontSize = 11.sp,
+                            color = RedNeon
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
                 Text(
                     text = stringResource(R.string.dashboard_recent_history),
                     fontSize = 11.sp,

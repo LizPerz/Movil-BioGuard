@@ -110,6 +110,7 @@ data class LecturaSensorRequest(
     @SerializedName("masaMuscularKg") val masaMuscularKg: Double? = null,
     @SerializedName("faseSueno") val faseSueno: String? = null,
     @SerializedName("glucosaEstimadaMgDl") val glucosaEstimadaMgDl: Double? = null,
+    @SerializedName("probabilidadPico") val probabilidadPico: Double? = null,
     @SerializedName("timestamp") val timestamp: String,
     @SerializedName("sourceMessageId") val sourceMessageId: String? = null
 )
@@ -289,12 +290,18 @@ data class AtenderAlertaRequest(@SerializedName("cuidadorId") val cuidadorId: St
 // =============================================
 data class PrediccionResponse(
     @SerializedName("id") val id: String? = null,
-    @SerializedName("probabilidad") val probabilidad: Double,
+    @SerializedName("probabilidadPico") val probabilidadPico: Double,
+    @SerializedName("probabilidad") val probabilidad: Double? = null, // compat legacy
     @SerializedName("nivelRiesgo") val nivelRiesgo: String,
     @SerializedName("recomendacion") val recomendacion: String? = null,
     @SerializedName("fechaPrediccion") val fechaPrediccion: String,
     @SerializedName("horasEstimadas") val horasEstimadas: Double? = null,
-    @SerializedName("modeloVersion") val modeloVersion: String? = null
+    @SerializedName("modeloVersion") val modeloVersion: String? = null,
+    @SerializedName("imc") val imc: Double? = null,
+    @SerializedName("z") val z: Double? = null,
+    @SerializedName("pPico") val pPico: Double? = null,
+    @SerializedName("casoClinico") val casoClinico: String? = null,
+    @SerializedName("accionAutomatizada") val accionAutomatizada: String? = null
 )
 data class DiagnosticarRequest(@SerializedName("pacienteId") val pacienteId: String, @SerializedName("pulsoBpm") val pulsoBpm: Double, @SerializedName("temperaturaC") val temperaturaC: Double, @SerializedName("sudoracionGsr") val sudoracionGsr: Double)
 data class DiagnosticarResponse(
@@ -304,6 +311,19 @@ data class DiagnosticarResponse(
     @SerializedName("recomendacion") val recomendacion: String? = null,
     @SerializedName("horasEstimadas") val horasEstimadas: Double? = null,
     @SerializedName("fechaPrediccion") val fechaPrediccion: String? = null,
+    @SerializedName("modeloVersion") val modeloVersion: String? = null
+)
+data class GuardarPrediccionRequest(
+    @SerializedName("pacienteId") val pacienteId: String,
+    @SerializedName("probabilidadPico") val probabilidadPico: Double,
+    @SerializedName("nivelRiesgo") val nivelRiesgo: String,
+    @SerializedName("casoClinico") val casoClinico: String? = null,
+    @SerializedName("accionAutomatizada") val accionAutomatizada: String? = null,
+    @SerializedName("imc") val imc: Double? = null,
+    @SerializedName("z") val z: Double? = null,
+    @SerializedName("pPico") val pPico: Double? = null,
+    @SerializedName("recomendacion") val recomendacion: String? = null,
+    @SerializedName("horasEstimadas") val horasEstimadas: Int? = null,
     @SerializedName("modeloVersion") val modeloVersion: String? = null
 )
 
@@ -548,17 +568,17 @@ interface ApiService {
     @PUT("api/Alertas/{id}/resolver")
     suspend fun atenderAlerta(@Path("id") id: String, @Body request: AtenderAlertaRequest): MessageResponse
 
-    // =============================================
-    // ML
-    // =============================================
-    @GET("api/ML/predicciones/{pacienteId}")
-    suspend fun getPredicciones(@Path("pacienteId") pacienteId: String): List<PrediccionResponse>
+     // =============================================
+     // ML / PREDICCIONES
+     // =============================================
+     @GET("api/Sensores/predicciones/{pacienteId}")
+     suspend fun getPredicciones(@Path("pacienteId") pacienteId: String): List<PrediccionResponse>
 
-    @GET("api/ML/predicciones/{pacienteId}/actual")
-    suspend fun getPrediccionActual(@Path("pacienteId") pacienteId: String): PrediccionResponse
+     @GET("api/Sensores/predicciones/{pacienteId}/actual")
+     suspend fun getPrediccionActual(@Path("pacienteId") pacienteId: String): PrediccionResponse
 
-    @POST("api/ML/diagnosticar")
-    suspend fun diagnosticar(@Body request: DiagnosticarRequest): DiagnosticarResponse
+     @POST("api/Sensores/prediccion")
+     suspend fun guardarPrediccion(@Body request: GuardarPrediccionRequest): MessageResponse
 
     // =============================================
     // REPORTES

@@ -5,9 +5,15 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.bioguard.movil.data.local.CachedDataDao
 import com.bioguard.movil.data.local.CachedReadingEntity
+import com.bioguard.movil.data.repository.MlRepository
+import com.bioguard.movil.data.repository.PacienteRepository
+import com.bioguard.movil.data.repository.PredictionMlSyncRepository
 import com.bioguard.movil.datastore.UserPreferences
+import com.bioguard.movil.ml.GlycemicPeakPredictor
 import com.bioguard.movil.network.DashboardSummary
+import com.bioguard.movil.network.GuardarPrediccionRequest
 import com.bioguard.movil.network.LecturaSensorResponse
+import com.bioguard.movil.service.PredictionMlSyncWorker
 import com.bioguard.movil.service.WearableConnectionState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -19,6 +25,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 data class DashboardUiState(
     val isLoading: Boolean = false,
@@ -33,7 +42,10 @@ data class DashboardUiState(
 class DashboardViewModel @Inject constructor(
     application: Application,
     private val cachedDataDao: CachedDataDao,
-    private val prefs: UserPreferences
+    private val prefs: UserPreferences,
+    private val mlRepository: MlRepository,
+    private val pacienteRepository: PacienteRepository,
+    private val syncRepository: PredictionMlSyncRepository
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(DashboardUiState())
@@ -42,6 +54,8 @@ class DashboardViewModel @Inject constructor(
 
     init {
         loadDashboard()
+        // Programar sincronización automática en background
+        PredictionMlSyncWorker.scheduleAutoSync(application)
     }
 
     fun loadDashboard() {
@@ -64,6 +78,120 @@ class DashboardViewModel @Inject constructor(
                         error = null
                     )
                 }
+            }
+        }
+    }
+
+    /**
+     * Generar reporte glucémico y enviarlo al backend directamente
+     * Si falla, se guarda localmente para envío posterior
+     */
+    fun generarReporteGlucemico() {
+        viewModelScope.launch {
+            try {
+                _uiState.update { it.copy(isLoading = true, error = null) }
+                
+                val pacienteId = _uiState.value.pacienteId ?: return@launch
+                val ultimaLectura = _uiState.value.summary?.ultimaLectura ?: return@launch
+                
+                // Get biometría para calcular IMC
+                val biometriaResult = pacienteRepository.getBiometria(pacienteId)
+                val biometria = (biometriaResult as? com.bioguard.movil.data.Resource.Success)?.data
+                    ?: run {
+                        _uiState.update { it.copy(isLoading = false, error = "No se pudo obtener biometría") }
+                        return@launch
+                    }
+                
+                val pesoKg = biometria.pesoKg ?: 0.0
+                val estaturaCm = biometria.estaturaCm ?: 0.0
+                
+                if (pesoKg <= 0 || estaturaCm <= 0) {
+                    _uiState.update { it.copy(isLoading = false, error = "Falta peso o estatura para calcular IMC") }
+                    return@launch
+                }
+                
+                // Computar predicción localmente (F1-F3)
+                val predictor = GlycemicPeakPredictor()
+                val prediction = predictor.predecir(
+                    pesoKg = pesoKg,
+                    estaturaCm = estaturaCm,
+                    pulsoBpm = ultimaLectura.pulsoBpm,
+                    temperaturaC = ultimaLectura.temperaturaC,
+                    sudoracionMicroS = ultimaLectura.sudoracionGsr
+                )
+                
+                // Construir reporte
+                val reportRequest = GuardarPrediccionRequest(
+                    pacienteId = pacienteId,
+                    probabilidadPico = prediction.pPico,
+                    nivelRiesgo = prediction.nivelRiesgo,
+                    casoClinico = prediction.casoClinico,
+                    accionAutomatizada = prediction.accionAutomatizada,
+                    imc = prediction.imc,
+                    z = prediction.z,
+                    pPico = prediction.pPico,
+                    recomendacion = prediction.accionAutomatizada,
+                    horasEstimadas = null,
+                    modeloVersion = GlycemicPeakPredictor.VERSION
+                )
+                
+                // Intentar enviar al backend
+                val sendResult = mlRepository.guardarPrediccion(reportRequest)
+                
+                if (sendResult is com.bioguard.movil.data.Resource.Success) {
+                    _uiState.update { it.copy(isLoading = false, error = null) }
+                } else {
+                    // Si falla, guardar localmente para sincronización posterior
+                    val localResult = syncRepository.guardarLocalmente(reportRequest)
+                    if (localResult is com.bioguard.movil.data.Resource.Success) {
+                        _uiState.update { 
+                            it.copy(
+                                isLoading = false, 
+                                error = "Reporte guardado localmente. Se sincronizará automáticamente."
+                            ) 
+                        }
+                    } else {
+                        _uiState.update { 
+                            it.copy(
+                                isLoading = false, 
+                                error = (sendResult as? com.bioguard.movil.data.Resource.Error)?.message ?: "Error desconocido"
+                            ) 
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isLoading = false, error = "Error: ${e.message}") }
+            }
+        }
+    }
+
+    /**
+     * Forzar sincronización manual de predicciones pendientes
+     */
+    fun sincronizarManualmente() {
+        viewModelScope.launch {
+            try {
+                _uiState.update { it.copy(isLoading = true) }
+                val result = syncRepository.sincronizarLote()
+                
+                if (result is com.bioguard.movil.data.Resource.Success) {
+                    val sincronizados = result.data
+                    _uiState.update { 
+                        it.copy(
+                            isLoading = false, 
+                            error = if (sincronizados > 0) "Se sincronizaron $sincronizados reportes" else "Sin datos pendientes"
+                        ) 
+                    }
+                } else {
+                    _uiState.update { 
+                        it.copy(
+                            isLoading = false, 
+                            error = (result as? com.bioguard.movil.data.Resource.Error)?.message
+                        ) 
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isLoading = false, error = "Error: ${e.message}") }
             }
         }
     }

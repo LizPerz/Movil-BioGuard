@@ -132,9 +132,9 @@ fun ReportsScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                ReportStatItem(stringResource(R.string.reports_medicamentos), "${reporte.totalMedicamentos}", GreenNeon)
                                 ReportStatItem(stringResource(R.string.reports_criticos), "${reporte.eventosCriticos}", RedNeon)
                                 ReportStatItem(stringResource(R.string.reports_pendientes), "${reporte.alertasPendientes}", YellowNeon)
+                                Spacer(modifier = Modifier.width(0.dp)) // Para mantener el layout balanceado
                             }
                         }
                     }

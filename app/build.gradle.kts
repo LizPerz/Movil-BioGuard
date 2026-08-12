@@ -141,6 +141,11 @@ dependencies {
     ksp(libs.hilt.compiler)
     implementation(libs.hilt.navigation.compose)
 
+    // WorkManager (sincronización en background de predicciones ML)
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.androidx.hilt.work)
+    ksp(libs.androidx.hilt.work.compiler)
+
     // Paging 3
     implementation(libs.androidx.paging.runtime)
     implementation(libs.androidx.paging.compose)

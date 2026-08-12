@@ -4,6 +4,7 @@ import android.content.Context
 import com.bioguard.movil.data.local.BioGuardDatabase
 import com.bioguard.movil.data.local.CachedDataDao
 import com.bioguard.movil.data.local.PendingDataDao
+import com.bioguard.movil.data.local.PendingPredictionMlDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -31,5 +32,11 @@ class DatabaseModule {
     @Singleton
     fun provideCachedDataDao(database: BioGuardDatabase): CachedDataDao {
         return database.cachedDataDao()
+    }
+
+    @Provides
+    @Singleton
+    fun providePendingPredictionMlDao(database: BioGuardDatabase): PendingPredictionMlDao {
+        return database.pendingPredictionMlDao()
     }
 }

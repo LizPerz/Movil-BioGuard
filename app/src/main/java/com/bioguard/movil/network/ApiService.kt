@@ -580,6 +580,9 @@ interface ApiService {
      @POST("api/Sensores/prediccion")
      suspend fun guardarPrediccion(@Body request: GuardarPrediccionRequest): MessageResponse
 
+     @POST("api/Sensores/diagnosticar")
+     suspend fun diagnosticar(@Body request: DiagnosticarRequest): DiagnosticarResponse
+
     // =============================================
     // REPORTES
     // =============================================

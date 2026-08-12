@@ -5,18 +5,21 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import androidx.hilt.work.HiltWorker
+import androidx.work.WorkerParameters
 import com.bioguard.movil.data.repository.PredictionMlSyncRepository
-import dagger.hilt.android.qualifiers.ApplicationContext
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedInject
 import java.util.concurrent.TimeUnit
-import javax.inject.Inject
 
 /**
  * Worker para sincronizar predicciones ML pendientes en background cada 15 minutos
  * (o cuando hay conectividad disponible)
  */
-class PredictionMlSyncWorker(
-    context: Context,
-    params: androidx.work.WorkerParameters,
+@HiltWorker
+class PredictionMlSyncWorker @AssistedInject constructor(
+    @Assisted context: Context,
+    @Assisted params: WorkerParameters,
     private val syncRepository: PredictionMlSyncRepository
 ) : CoroutineWorker(context, params) {
 

@@ -23,6 +23,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Smartphone
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -545,7 +547,7 @@ fun MlTutorialStep(
 
 @Composable
 fun TutorialFeatureCard(
-    icon: androidx.compose.material.icons.Icons,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
     description: String,
     color: Color

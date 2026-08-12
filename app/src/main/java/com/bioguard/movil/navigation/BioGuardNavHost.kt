@@ -49,7 +49,9 @@ fun BioGuardApp(
 
     val context = LocalContext.current
     val navigateAfterAuth: () -> Unit = {
-        val route = if (access.role == UserRole.PACIENTE && !authState.biometriaCompletada) {
+        val route = if (!authState.hasSeenOnboarding) {
+            Screen.ONBOARDING
+        } else if (access.role == UserRole.PACIENTE && !authState.biometriaCompletada) {
             Screen.WELCOME
         } else {
             access.homeRoute()
@@ -145,7 +147,9 @@ fun BioGuardApp(
                         isAuthenticated = authState.isAuthenticated,
                         onFinished = { authenticated ->
                             if (authenticated) {
-                                val route = if (access.role == UserRole.PACIENTE && !authState.biometriaCompletada) {
+                                val route = if (!authState.hasSeenOnboarding) {
+                                    Screen.ONBOARDING
+                                } else if (access.role == UserRole.PACIENTE && !authState.biometriaCompletada) {
                                     Screen.WELCOME
                                 } else {
                                     access.homeRoute()
@@ -193,11 +197,17 @@ fun BioGuardApp(
                     )
                 }
 
-                // ── Onboarding ──
+                // ── Onboarding (tutorial de tema + ML + vinculación, una sola vez) ──
                 composable(Screen.ONBOARDING) {
                     OnboardingScreen(
                         onComplete = {
-                            navController.navigate(access.homeRoute()) { popUpTo(Screen.ONBOARDING) { inclusive = true } }
+                            authViewModel.markOnboardingCompleted()
+                            val nextRoute = if (access.role == UserRole.PACIENTE && !authState.biometriaCompletada) {
+                                Screen.WELCOME
+                            } else {
+                                access.homeRoute()
+                            }
+                            navController.navigate(nextRoute) { popUpTo(Screen.ONBOARDING) { inclusive = true } }
                         },
                         themeState = themeState,
                         onThemeChange = onThemeChange

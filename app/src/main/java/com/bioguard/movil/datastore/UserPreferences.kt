@@ -53,6 +53,9 @@ class UserPreferences(private val context: Context) {
         val PATIENT_FAMILY_DIABETES = booleanPreferencesKey("patient_family_diabetes")
         val PATIENT_ACTIVITY_LEVEL = stringPreferencesKey("patient_activity_level")
         val PATIENT_PHOTO = stringPreferencesKey("patient_photo")
+
+        // Onboarding (tutorial de tema + ML + vinculación)
+        val HAS_SEEN_ONBOARDING = booleanPreferencesKey("has_seen_onboarding")
     }
 
     val userId: Flow<String?> = context.dataStore.data.map { it[Keys.USER_ID] }
@@ -96,6 +99,14 @@ class UserPreferences(private val context: Context) {
     val patientFamilyDiabetes: Flow<Boolean> = context.dataStore.data.map { it[Keys.PATIENT_FAMILY_DIABETES] ?: false }
     val patientActivityLevel: Flow<String?> = context.dataStore.data.map { it[Keys.PATIENT_ACTIVITY_LEVEL] }
     val patientPhoto: Flow<String?> = context.dataStore.data.map { it[Keys.PATIENT_PHOTO] }
+
+    val hasSeenOnboarding: Flow<Boolean> = context.dataStore.data.map { it[Keys.HAS_SEEN_ONBOARDING] ?: false }
+
+    suspend fun setOnboardingCompleted() {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.HAS_SEEN_ONBOARDING] = true
+        }
+    }
 
     suspend fun savePatientBiometrics(
         birthDate: String,

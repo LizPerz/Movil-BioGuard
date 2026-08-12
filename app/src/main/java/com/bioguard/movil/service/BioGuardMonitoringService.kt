@@ -19,8 +19,10 @@ import com.bioguard.movil.data.local.CachedReadingEntity
 import com.bioguard.movil.data.local.PendingAlertEntity
 import com.bioguard.movil.data.local.PendingEventEntity
 import com.bioguard.movil.data.local.PendingGpsEntity
+import com.bioguard.movil.data.local.PendingPredictionMlEntity
 import com.bioguard.movil.data.local.PendingReadingEntity
 import com.bioguard.movil.datastore.UserPreferences
+import com.bioguard.movil.ml.GlycemicPeakPredictor
 import com.bioguard.movil.ml.LocalRiskAssessment
 import com.bioguard.movil.ml.LocalRiskLevel
 import com.bioguard.movil.ml.PersonalizedAnomalyModel
@@ -58,6 +60,7 @@ class BioGuardMonitoringService : Service() {
     private lateinit var wearableConnector: WearableConnector
     private lateinit var localAlertNotifier: LocalAlertNotifier
     private val localRiskModel = PersonalizedAnomalyModel()
+    private val glycemicPeakPredictor = GlycemicPeakPredictor()
     private val fusedLocation by lazy { LocationServices.getFusedLocationProviderClient(this) }
     @Volatile private var ultimaLatitud: Double? = null
     @Volatile private var ultimaLongitud: Double? = null
@@ -161,12 +164,47 @@ class BioGuardMonitoringService : Service() {
                     val validSpo2 = if (request.spo2 != null && request.spo2 > 0.0) request.spo2 else 98.0
                     val validPasos = if (request.pasos != null && request.pasos > 0) request.pasos else (request.pulsoBpm.toInt() * 15 % 1500 + 450)
                     val validHrv = request.hrv ?: 45.0
+
+                    // Motor ML real (F1-F3): IMC, z-score y P(Pico) con peso/estatura del perfil
+                    val pesoKg = prefs.patientWeight.first()?.toDoubleOrNull() ?: 0.0
+                    val estaturaCm = prefs.patientHeight.first()?.toDoubleOrNull() ?: 0.0
+                    val glycemicPrediction = if (pesoKg > 0 && estaturaCm > 0) {
+                        glycemicPeakPredictor.predecir(
+                            pesoKg = pesoKg,
+                            estaturaCm = estaturaCm,
+                            pulsoBpm = request.pulsoBpm,
+                            temperaturaC = request.temperaturaC,
+                            sudoracionMicroS = request.sudoracionGsr
+                        )
+                    } else null
+
+                    // Glucosa estimada (heurística) para el dashboard en vivo; el reporte oficial ML usa GlycemicPeakPredictor
                     val calculatedGlucose = (95.0 +
                             (request.pulsoBpm - 72.0) * 0.45 +
                             (request.temperaturaC - 36.5) * 12.0 +
                             kotlin.math.max(0.0, request.sudoracionGsr - 45.0) * 0.5 +
                             kotlin.math.max(0.0, 45.0 - validHrv) * 0.4
                     ).coerceIn(70.0, 220.0)
+
+                    if (glycemicPrediction != null) {
+                        try {
+                            database.pendingPredictionMlDao().insert(
+                                PendingPredictionMlEntity(
+                                    pacienteId = patientId ?: "paciente-local",
+                                    probabilidadPico = glycemicPrediction.pPico,
+                                    nivelRiesgo = glycemicPrediction.nivelRiesgo,
+                                    casoClinico = glycemicPrediction.casoClinico,
+                                    accionAutomatizada = glycemicPrediction.accionAutomatizada,
+                                    imc = glycemicPrediction.imc,
+                                    z = glycemicPrediction.z,
+                                    pPico = glycemicPrediction.pPico,
+                                    modeloVersion = GlycemicPeakPredictor.VERSION
+                                )
+                            )
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Error guardando predicción ML automática", e)
+                        }
+                    }
 
                     database.cachedDataDao().insertReadings(
                         listOf(

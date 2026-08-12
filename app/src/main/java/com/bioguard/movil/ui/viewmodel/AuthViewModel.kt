@@ -30,7 +30,8 @@ data class AuthUiState(
     val successMessage: String? = null,
     val requiresVerification: Boolean = false,
     val pendingEmail: String? = null,
-    val biometriaCompletada: Boolean = false
+    val biometriaCompletada: Boolean = false,
+    val hasSeenOnboarding: Boolean = false
 )
 
 @HiltViewModel
@@ -56,7 +57,7 @@ class AuthViewModel @Inject constructor(
             val role = UserRole.from(prefs.userRole.first())
             if (restored) {
                 val access = repository.getEffectiveAccess(role)
-                _uiState.update { it.copy(isAuthenticated = true, role = access.role, access = access, userName = prefs.userName.first(), biometriaCompletada = hasBiometria()) }
+                _uiState.update { it.copy(isAuthenticated = true, role = access.role, access = access, userName = prefs.userName.first(), biometriaCompletada = hasBiometria(), hasSeenOnboarding = hasSeenOnboarding()) }
                 connectRealtime(access)
             }
         }
@@ -70,13 +71,22 @@ class AuthViewModel @Inject constructor(
 
     private suspend fun hasBiometria(): Boolean = !prefs.patientBirthDate.first().isNullOrBlank()
 
+    private suspend fun hasSeenOnboarding(): Boolean = prefs.hasSeenOnboarding.first()
+
+    fun markOnboardingCompleted() {
+        viewModelScope.launch {
+            prefs.setOnboardingCompleted()
+            _uiState.update { it.copy(hasSeenOnboarding = true) }
+        }
+    }
+
     fun loginWithCode(codigoAcceso: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             when (val result = repository.loginWithCode(codigoAcceso)) {
                 is Resource.Success -> {
                     val access = repository.getEffectiveAccess(UserRole.from(result.data.rol))
-                    _uiState.update { it.copy(isLoading = false, isAuthenticated = true, role = access.role, access = access, userName = result.data.nombre, biometriaCompletada = hasBiometria()) }
+                    _uiState.update { it.copy(isLoading = false, isAuthenticated = true, role = access.role, access = access, userName = result.data.nombre, biometriaCompletada = hasBiometria(), hasSeenOnboarding = hasSeenOnboarding()) }
                     connectRealtime(access)
                 }
                 is Resource.Error -> _uiState.update {
@@ -93,7 +103,7 @@ class AuthViewModel @Inject constructor(
             when (val result = repository.login(email, password)) {
                 is Resource.Success -> {
                     val access = repository.getEffectiveAccess(UserRole.from(result.data.rol))
-                    _uiState.update { it.copy(isLoading = false, isAuthenticated = true, role = access.role, access = access, userName = result.data.nombre, biometriaCompletada = hasBiometria()) }
+                    _uiState.update { it.copy(isLoading = false, isAuthenticated = true, role = access.role, access = access, userName = result.data.nombre, biometriaCompletada = hasBiometria(), hasSeenOnboarding = hasSeenOnboarding()) }
                     connectRealtime(access)
                 }
                 is Resource.Error -> _uiState.update {
@@ -153,6 +163,7 @@ class AuthViewModel @Inject constructor(
                                         access = access,
                                         userName = loginResult.data.nombre,
                                         biometriaCompletada = hasBiometria(),
+                                        hasSeenOnboarding = hasSeenOnboarding(),
                                         successMessage = "Cuenta creada. Bienvenido"
                                     )
                                 }
@@ -234,6 +245,7 @@ class AuthViewModel @Inject constructor(
                             access = access,
                             userName = result.data.nombre,
                             biometriaCompletada = hasBiometria(),
+                            hasSeenOnboarding = hasSeenOnboarding(),
                             successMessage = "Cuenta verificada exitosamente"
                         )
                     }

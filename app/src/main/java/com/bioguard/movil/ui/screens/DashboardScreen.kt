@@ -27,7 +27,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -514,19 +518,31 @@ fun DashboardScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Column {
-                            Text(
-                                text = "📊 Reporte Glucémico",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = p.accent,
-                                letterSpacing = 1.sp
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.TrendingUp,
+                                contentDescription = "Reporte Glucémico",
+                                tint = p.accent,
+                                modifier = Modifier.size(20.dp)
                             )
-                            Text(
-                                text = if (uiState.isLoading) "Procesando..." else "Enviar análisis ML al backend",
-                                fontSize = 11.sp,
-                                color = p.textSecondary
-                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "Reporte Glucémico",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = p.accent,
+                                    letterSpacing = 1.sp
+                                )
+                                Text(
+                                    text = if (uiState.isLoading) "Procesando..." else "Enviar análisis ML al backend",
+                                    fontSize = 11.sp,
+                                    color = p.textSecondary
+                                )
+                            }
                         }
                         if (uiState.isLoading) {
                             CircularProgressIndicator(
@@ -535,7 +551,12 @@ fun DashboardScreen(
                                 strokeWidth = 2.dp
                             )
                         } else {
-                            Text("→", fontSize = 16.sp, color = p.accent, fontWeight = FontWeight.Bold)
+                            Icon(
+                                imageVector = Icons.Filled.TrendingUp,
+                                contentDescription = null,
+                                tint = p.accent,
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
                     }
                 }
@@ -560,19 +581,31 @@ fun DashboardScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Column {
-                            Text(
-                                text = "🔄 Sincronizar Datos",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = YellowNeon,
-                                letterSpacing = 1.sp
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Sync,
+                                contentDescription = "Sincronizar Datos",
+                                tint = YellowNeon,
+                                modifier = Modifier.size(20.dp)
                             )
-                            Text(
-                                text = "Enviar reportes pendientes manualmente",
-                                fontSize = 11.sp,
-                                color = p.textSecondary
-                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "Sincronizar Datos",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = YellowNeon,
+                                    letterSpacing = 1.sp
+                                )
+                                Text(
+                                    text = "Enviar reportes pendientes manualmente",
+                                    fontSize = 11.sp,
+                                    color = p.textSecondary
+                                )
+                            }
                         }
                         if (uiState.isLoading) {
                             CircularProgressIndicator(
@@ -581,7 +614,12 @@ fun DashboardScreen(
                                 strokeWidth = 2.dp
                             )
                         } else {
-                            Text("↻", fontSize = 16.sp, color = YellowNeon, fontWeight = FontWeight.Bold)
+                            Icon(
+                                imageVector = Icons.Filled.Sync,
+                                contentDescription = null,
+                                tint = YellowNeon,
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
                     }
                 }

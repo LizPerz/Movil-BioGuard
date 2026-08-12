@@ -91,7 +91,10 @@ fun OnboardingScreen(
             themeState = themeState,
             onThemeChange = onThemeChange
         )
-        2 -> BluetoothPairingStep(
+        2 -> MlTutorialStep(
+            onNext = { step = 3 }
+        )
+        3 -> BluetoothPairingStep(
             onComplete = onComplete
         )
     }
@@ -444,7 +447,147 @@ fun AppearanceThemeStep(
                 Text(text = "CONTINUAR", color = p.background, fontWeight = FontWeight.Bold, letterSpacing = 2.sp, fontSize = 14.sp)
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+             Spacer(modifier = Modifier.height(24.dp))
+         }
+     }
+ }
+
+@Composable
+fun MlTutorialStep(
+    onNext: () -> Unit = {}
+) {
+    val p = LocalThemeState.current.colorPalette()
+    val context = LocalContext.current
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(p.background)
+            .padding(24.dp)
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(20.dp)
+    ) {
+        // Título
+        Text(
+            text = "🧠 Machine Learning\nde Glucemia",
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            color = p.textPrimary,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        )
+
+        Text(
+            text = "Aprende cómo BioGuard analiza tus vitales en tiempo real",
+            fontSize = 14.sp,
+            color = p.textSecondary,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Feature 1: Reporte Glucémico
+        TutorialFeatureCard(
+            icon = Icons.Filled.TrendingUp,
+            title = "Reporte Glucémico",
+            description = "Calcula automáticamente el análisis de tendencias glucémicas desde tus vitales: pulso, temperatura y sudoración.",
+            color = p.accent
+        )
+
+        // Feature 2: Sincronización
+        TutorialFeatureCard(
+            icon = Icons.Filled.Sync,
+            title = "Sincronizar Datos",
+            description = "Envía tus reportes al backend. Si la red falla, se guarda localmente y se sincroniza automáticamente.",
+            color = YellowNeon
+        )
+
+        // Feature 3: Análisis ML
+        TutorialFeatureCard(
+            icon = Icons.Filled.CheckCircle,
+            title = "Análisis Inteligente",
+            description = "El motor ML local calcula:\n• F1 (Índice de Masa Corporal)\n• F2 (Z-score de glucemia)\n• F3 (Probabilidad de pico)",
+            color = GreenNeon
+        )
+
+        // Feature 4: Niveles de Riesgo
+        TutorialFeatureCard(
+            icon = Icons.Filled.Watch,
+            title = "Detección de Riesgos",
+            description = "Identifica Hipoglucemia Nocturna, Hiperglucemia Severa u Óptimo según tus vitales.",
+            color = RedNeon
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Botones de navegación
+        Button(
+            onClick = onNext,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp)
+                .clip(RoundedCornerShape(10.dp)),
+            shape = RoundedCornerShape(10.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = p.accent)
+        ) {
+            Text(
+                text = "SIGUIENTE: SINCRONIZAR DISPOSITIVO",
+                color = p.background,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp,
+                fontSize = 13.sp
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+    }
+}
+
+@Composable
+fun TutorialFeatureCard(
+    icon: androidx.compose.material.icons.Icons,
+    title: String,
+    description: String,
+    color: Color
+) {
+    val p = LocalThemeState.current.colorPalette()
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(color.copy(alpha = 0.1f))
+            .border(width = 1.dp, color = color, shape = RoundedCornerShape(12.dp))
+            .padding(16.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = color,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = title,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = color
+                )
+            }
+            Text(
+                text = description,
+                fontSize = 12.sp,
+                color = p.textSecondary,
+                lineHeight = 16.sp
+            )
         }
     }
 }

@@ -336,7 +336,7 @@ fun PerfilBiometricoForm(
                 Text(text = "PESO (KG)", fontSize = 10.sp, color = p.accent, letterSpacing = 2.sp, modifier = Modifier.padding(bottom = 6.dp))
                 OutlinedTextField(
                     value = weight,
-                    onValueChange = { weight = it.filter(Char::isDigit).take(3) },
+                    onValueChange = { weight = sanitizeDecimal(it, maxIntegerDigits = 3, maxDecimalDigits = 2) },
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = { Text("70", color = p.textTertiary) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -349,7 +349,7 @@ fun PerfilBiometricoForm(
                 Text(text = "ESTATURA (CM)", fontSize = 10.sp, color = p.accent, letterSpacing = 2.sp, modifier = Modifier.padding(bottom = 6.dp))
                 OutlinedTextField(
                     value = height,
-                    onValueChange = { height = it.filter(Char::isDigit).take(3) },
+                    onValueChange = { height = sanitizeDecimal(it, maxIntegerDigits = 3, maxDecimalDigits = 2) },
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = { Text("175", color = p.textTertiary) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -470,4 +470,12 @@ private fun decodePhoto(base64: String): Bitmap? {
     } catch (_: Exception) {
         null
     }
+}
+
+private fun sanitizeDecimal(input: String, maxIntegerDigits: Int, maxDecimalDigits: Int): String {
+    val sanitized = input.filter { it.isDigit() || it == '.' }
+    val parts = sanitized.split(".")
+    val integer = parts.firstOrNull()?.take(maxIntegerDigits) ?: ""
+    val decimal = parts.drop(1).firstOrNull()?.take(maxDecimalDigits) ?: ""
+    return if (parts.size > 1) "$integer.$decimal" else integer
 }

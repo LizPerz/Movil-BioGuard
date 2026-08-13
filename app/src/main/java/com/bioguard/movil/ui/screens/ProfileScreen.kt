@@ -152,7 +152,10 @@ fun ProfileScreen(
         if (!uiState.isLoading) uploadingPhoto = false
     }
 
-    if (showEditBiometriaModal && access.allows(AppPermission.PATIENT_MANAGE)) {
+    val canManageBiometria = access.allows(AppPermission.PATIENT_MANAGE) ||
+        (access.role == UserRole.CUIDADOR && access.patientId != null)
+
+    if (showEditBiometriaModal && canManageBiometria) {
         PerfilBiometricoEditOverlay(
             bio = uiState.biometria,
             photo = uiState.perfil?.fotoPerfil?.takeIf { it.isNotBlank() }
@@ -312,7 +315,7 @@ fun ProfileScreen(
                 Spacer(modifier = Modifier.height(20.dp))
 
                 // ── PERFIL BIOMÉTRICO Y MÉDICO DEL PACIENTE ──
-                if (access.allows(AppPermission.PATIENT_MANAGE)) {
+                if (canManageBiometria) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
                     verticalAlignment = Alignment.CenterVertically

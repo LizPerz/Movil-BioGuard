@@ -34,12 +34,12 @@ if (releaseRequested) {
 
 android {
     namespace = "com.bioguard.movil"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.bioguard.movil"
         minSdk = 28
-        targetSdk = 36
+        targetSdk = 37
         versionCode = releaseVersionCode
         versionName = releaseVersionName
 

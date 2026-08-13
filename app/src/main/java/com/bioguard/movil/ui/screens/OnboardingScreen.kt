@@ -22,10 +22,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -54,8 +58,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -114,45 +123,72 @@ fun InteractiveMlTutorial(
 ) {
     val p = LocalThemeState.current.colorPalette()
     var currentSpot by remember { mutableIntStateOf(0) }
-    val spotBounds = remember { mutableStateOf<Map<Int, androidx.compose.ui.geometry.Rect>>(emptyMap()) }
+    val spotBounds = remember { mutableStateOf<Map<Int, Rect>>(emptyMap()) }
+    val spotContentY = remember { mutableStateOf<Map<Int, Float>>(emptyMap()) }
+    val overlayOrigin = remember { mutableStateOf<Offset?>(null) }
+    val scrollState = rememberScrollState()
 
     data class Spot(
         val id: Int,
-        val emoji: String,
+        val icon: androidx.compose.ui.graphics.vector.ImageVector,
         val title: String,
         val desc: String
     )
 
     val spots = listOf(
-        Spot(1, "\uD83D\uDC68\u200D\uD83E\uDDE0", "Machine Learning de glucemia",
+        Spot(1, Icons.Filled.Insights, "Machine Learning de glucemia",
             "BioGuard analiza tus vitales con un motor ML local y en la nube para predecir picos glucémicos."),
-        Spot(2, "\uD83D\uDCC8", "Reporte Glucémico",
+        Spot(2, Icons.Filled.TrendingUp, "Reporte Glucémico",
             "Calcula automáticamente la tendencia de glucemia desde pulso, temperatura y sudoración."),
-        Spot(3, "\uD83D\uDD04", "Sincronización automática",
+        Spot(3, Icons.Filled.Sync, "Sincronización automática",
             "Envía tus lecturas al backend. Sin red, todo se guarda localmente y se sincroniza solo al reconectar."),
-        Spot(4, "\uD83D\uDEA8", "Detección de riesgos",
+        Spot(4, Icons.Filled.Warning, "Detección de riesgos",
             "Identifica hipoglucemia nocturna, hiperglucemia severa o estado óptimo y alerta a tus cuidadores.")
     )
     val spot = spots[currentSpot]
 
-    Box(modifier = Modifier.fillMaxSize().background(p.background)) {
+    // Mantiene la tarjeta activa siempre a la vista al cambiar de paso.
+    LaunchedEffect(currentSpot) {
+        spotContentY.value[spot.id]?.let { y ->
+            scrollState.animateScrollTo(y.toInt().coerceAtLeast(0))
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(p.background)
+            .onGloballyPositioned { coords ->
+                val rect = coords.boundsInRoot()
+                overlayOrigin.value = Offset(rect.left, rect.top)
+            }
+    ) {
         // Contenido base: tarjetas que se van iluminando
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp)
-                .verticalScroll(rememberScrollState()),
+                .verticalScroll(scrollState)
+                .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "\uD83D\uDCAB Tutorial interactivo",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = p.textPrimary,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Filled.Insights,
+                    contentDescription = null,
+                    tint = p.accent,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = "Tutorial interactivo",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = p.textPrimary,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
             Text(
                 text = "Recorre cada función con el bot\u00F3n siguiente",
                 fontSize = 14.sp,
@@ -168,6 +204,7 @@ fun InteractiveMlTutorial(
                         .fillMaxWidth()
                         .onGloballyPositioned { coords ->
                             spotBounds.value = spotBounds.value + (s.id to coords.boundsInRoot())
+                            spotContentY.value = spotContentY.value + (s.id to coords.boundsInParent().top)
                         }
                         .clip(RoundedCornerShape(12.dp))
                         .background(
@@ -182,7 +219,12 @@ fun InteractiveMlTutorial(
                         .padding(16.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = s.emoji, fontSize = 28.sp)
+                        Icon(
+                            imageVector = s.icon,
+                            contentDescription = null,
+                            tint = if (currentSpot == s.id - 1) p.accent else p.textSecondary,
+                            modifier = Modifier.size(30.dp)
+                        )
                         Spacer(modifier = Modifier.width(14.dp))
                         Column {
                             Text(text = s.title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = p.textPrimary)
@@ -196,29 +238,40 @@ fun InteractiveMlTutorial(
         }
 
         // Overlay spotlight (estilo driver.js): atenta al layout para cortar el agujero.
+        // boundsInRoot() devuelve coordenadas en el espacio de la ventana, mientras que el
+        // Canvas dibuja en sus coordenadas locales; se traduce por el origen del contenedor
+        // (overlayOrigin) para que el recuadro encierre exactamente la tarjeta.
         val targetRect = spotBounds.value[spot.id]
-        if (targetRect != null) {
+        val origin = overlayOrigin.value
+        if (targetRect != null && origin != null) {
+            val localRect = targetRect.translate(-origin.x, -origin.y)
             Box(modifier = Modifier.fillMaxSize()) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
+                    val left = localRect.left.coerceIn(0f, size.width)
+                    val top = localRect.top.coerceIn(0f, size.height)
+                    val right = localRect.right.coerceIn(0f, size.width)
+                    val bottom = localRect.bottom.coerceIn(0f, size.height)
+                    val holeWidth = (right - left).coerceAtLeast(0f)
+                    val holeHeight = (bottom - top).coerceAtLeast(0f)
                     val scrim = Color.Black.copy(alpha = 0.62f)
                     // Superior
-                    drawRect(scrim, topLeft = androidx.compose.ui.geometry.Offset(0f, 0f),
-                        size = androidx.compose.ui.geometry.Size(size.width, targetRect.top.coerceAtLeast(0f)))
+                    drawRect(scrim, topLeft = Offset(0f, 0f),
+                        size = Size(size.width, top))
                     // Inferior
-                    drawRect(scrim, topLeft = androidx.compose.ui.geometry.Offset(0f, targetRect.bottom.coerceAtMost(size.height)),
-                        size = androidx.compose.ui.geometry.Size(size.width, (size.height - targetRect.bottom).coerceAtLeast(0f)))
+                    drawRect(scrim, topLeft = Offset(0f, bottom),
+                        size = Size(size.width, (size.height - bottom).coerceAtLeast(0f)))
                     // Izquierda
-                    drawRect(scrim, topLeft = androidx.compose.ui.geometry.Offset(0f, targetRect.top.coerceAtLeast(0f)),
-                        size = androidx.compose.ui.geometry.Size(targetRect.left.coerceAtLeast(0f), targetRect.height))
+                    drawRect(scrim, topLeft = Offset(0f, top),
+                        size = Size(left, holeHeight))
                     // Derecha
-                    drawRect(scrim, topLeft = androidx.compose.ui.geometry.Offset(targetRect.right.coerceAtMost(size.width), targetRect.top.coerceAtLeast(0f)),
-                        size = androidx.compose.ui.geometry.Size((size.width - targetRect.right).coerceAtLeast(0f), targetRect.height))
+                    drawRect(scrim, topLeft = Offset(right, top),
+                        size = Size((size.width - right).coerceAtLeast(0f), holeHeight))
                     // Borde del spotlight
                     drawRect(
                         color = p.accent,
-                        topLeft = targetRect.topLeft,
-                        size = targetRect.size,
-                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3f)
+                        topLeft = Offset(left, top),
+                        size = Size(holeWidth, holeHeight),
+                        style = Stroke(width = 3f)
                     )
                 }
 
@@ -245,7 +298,12 @@ fun InteractiveMlTutorial(
                             }
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(text = spot.emoji, fontSize = 26.sp)
+                            Icon(
+                                imageVector = spot.icon,
+                                contentDescription = null,
+                                tint = p.accent,
+                                modifier = Modifier.size(26.dp)
+                            )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(text = spot.title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = p.textPrimary)
                         }
@@ -268,7 +326,14 @@ fun InteractiveMlTutorial(
                                     shape = RoundedCornerShape(10.dp),
                                     modifier = Modifier.weight(1f).height(46.dp)
                                 ) {
-                                    Text(text = "\u2190 Anterior", color = p.accent, fontSize = 13.sp)
+                                    Icon(
+                                        imageVector = Icons.Filled.ArrowBack,
+                                        contentDescription = null,
+                                        tint = p.accent,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(text = "Anterior", color = p.accent, fontSize = 13.sp)
                                 }
                             }
                             Button(
@@ -279,12 +344,35 @@ fun InteractiveMlTutorial(
                                 shape = RoundedCornerShape(10.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = p.accent)
                             ) {
-                                Text(
-                                    text = if (currentSpot < spots.lastIndex) "Siguiente \u2192" else "\u2705 COMENZAR",
-                                    color = p.background,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 13.sp
-                                )
+                                if (currentSpot < spots.lastIndex) {
+                                    Text(
+                                        text = "Siguiente",
+                                        color = p.background,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Icon(
+                                        imageVector = Icons.Filled.ArrowForward,
+                                        contentDescription = null,
+                                        tint = p.background,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Filled.CheckCircle,
+                                        contentDescription = null,
+                                        tint = p.background,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "COMENZAR",
+                                        color = p.background,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp
+                                    )
+                                }
                             }
                         }
                     }

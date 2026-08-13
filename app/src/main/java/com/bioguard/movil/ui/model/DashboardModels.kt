@@ -1,12 +1,13 @@
 ﻿package com.bioguard.movil.ui.model
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 
 data class VitalSign(
     val name: String,
     val value: String,
     val unit: String,
-    val icon: String,
+    val icon: ImageVector,
     val color: Color,
     val status: String,
     val statusColor: Color

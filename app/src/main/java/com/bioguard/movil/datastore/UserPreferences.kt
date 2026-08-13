@@ -76,7 +76,7 @@ class UserPreferences(private val context: Context) {
 
     // Getters con valores por defecto
     val isSyncEnabled: Flow<Boolean> = context.dataStore.data.map { it[Keys.IS_SYNC_ENABLED] ?: true }
-    val syncIntervalMinutes: Flow<Int> = context.dataStore.data.map { it[Keys.SYNC_INTERVAL_MINUTES] ?: 15 }
+    val syncIntervalMinutes: Flow<Int> = context.dataStore.data.map { it[Keys.SYNC_INTERVAL_MINUTES] ?: 5 }
     val batchStartHour: Flow<Int> = context.dataStore.data.map { it[Keys.BATCH_START_HOUR] ?: 2 }
     val batchEndHour: Flow<Int> = context.dataStore.data.map { it[Keys.BATCH_END_HOUR] ?: 6 }
     val isBatchSyncEnabled: Flow<Boolean> = context.dataStore.data.map { it[Keys.IS_BATCH_SYNC_ENABLED] ?: false }
@@ -108,6 +108,12 @@ class UserPreferences(private val context: Context) {
         }
     }
 
+    suspend fun resetOnboarding() {
+        context.dataStore.edit { prefs ->
+            prefs.remove(Keys.HAS_SEEN_ONBOARDING)
+        }
+    }
+
     suspend fun savePatientBiometrics(
         birthDate: String,
         sex: String,
@@ -131,6 +137,12 @@ class UserPreferences(private val context: Context) {
     suspend fun savePatientPhoto(base64Photo: String) {
         context.dataStore.edit { prefs ->
             prefs[Keys.PATIENT_PHOTO] = base64Photo
+        }
+    }
+
+    suspend fun clearPatientPhoto() {
+        context.dataStore.edit { prefs ->
+            prefs.remove(Keys.PATIENT_PHOTO)
         }
     }
 

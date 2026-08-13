@@ -152,6 +152,7 @@ class BioGuardMonitoringService : Service() {
                             hrv = request.hrv,
                             spo2 = request.spo2,
                             pasos = request.pasos,
+                            glucosaEstimadaMgDl = request.glucosaEstimadaMgDl?.takeIf { it > 0.0 },
                             probabilidadPico = (assessment.score / 100.0).coerceIn(0.0, 1.0),
                             timestamp = request.timestamp,
                             sourceMessageId = sourceMessageId
@@ -178,13 +179,15 @@ class BioGuardMonitoringService : Service() {
                         )
                     } else null
 
-                    // Glucosa estimada (heurística) para el dashboard en vivo; el reporte oficial ML usa GlycemicPeakPredictor
+                    // Glucosa estimada: se usa la que envía el reloj (misma fuente que muestra
+                    // su pantalla); solo se recalcula localmente si el reloj no la incluye.
                     val calculatedGlucose = (95.0 +
                             (request.pulsoBpm - 72.0) * 0.45 +
                             (request.temperaturaC - 36.5) * 12.0 +
                             kotlin.math.max(0.0, request.sudoracionGsr - 45.0) * 0.5 +
                             kotlin.math.max(0.0, 45.0 - validHrv) * 0.4
                     ).coerceIn(70.0, 220.0)
+                    val finalGlucose = request.glucosaEstimadaMgDl?.takeIf { it > 0.0 } ?: calculatedGlucose
 
                     if (glycemicPrediction != null) {
                         try {
@@ -224,7 +227,7 @@ class BioGuardMonitoringService : Service() {
                                 grasaCorporalPct = request.grasaCorporalPct ?: 18.5,
                                 masaMuscularKg = request.masaMuscularKg ?: 32.0,
                                 faseSueno = request.faseSueno ?: "Sueño Profundo",
-                                glucosaEstimadaMgDl = calculatedGlucose,
+                                glucosaEstimadaMgDl = finalGlucose,
                                 fechaHora = request.timestamp
                             )
                         )
@@ -560,6 +563,7 @@ class BioGuardMonitoringService : Service() {
                     hrv = it.hrv,
                     spo2 = it.spo2,
                     pasos = it.pasos,
+                    glucosaEstimadaMgDl = it.glucosaEstimadaMgDl?.takeIf { g -> g > 0.0 },
                     probabilidadPico = it.probabilidadPico,
                     timestamp = it.timestamp,
                     sourceMessageId = it.sourceMessageId ?: "$installId:reading:${it.id}"

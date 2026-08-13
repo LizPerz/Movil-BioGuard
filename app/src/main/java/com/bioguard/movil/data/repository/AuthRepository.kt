@@ -127,6 +127,7 @@ class AuthRepository @Inject constructor(
         val prevUserId = prefs.userId.first()
         if (!prevUserId.isNullOrBlank() && prevUserId != newUserId) {
             prefs.clearPatientBiometrics()
+            prefs.resetOnboarding()
             pendingDataDao.clearReadings()
             pendingDataDao.clearGps()
             pendingDataDao.clearEvents()

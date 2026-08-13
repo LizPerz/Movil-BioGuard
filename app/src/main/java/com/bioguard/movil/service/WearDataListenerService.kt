@@ -112,6 +112,7 @@ class WearDataListenerService : WearableListenerService() {
             hrv = request.hrv ?: 0.0,
             spo2 = request.spo2 ?: 0.0,
             pasos = request.pasos ?: 0,
+            glucosaEstimadaMgDl = request.glucosaEstimadaMgDl?.takeIf { it > 0.0 },
             probabilidadPico = (assessment.score / 100.0).coerceIn(0.0, 1.0),
             timestamp = request.timestamp
         )

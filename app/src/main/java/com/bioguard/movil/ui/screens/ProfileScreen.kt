@@ -29,6 +29,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddAPhoto
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.Person
@@ -43,6 +44,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -69,6 +71,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bioguard.movil.R
 import com.bioguard.movil.ui.components.ConfirmDialog
+import com.bioguard.movil.ui.components.PerfilBiometricoData
+import com.bioguard.movil.ui.components.PerfilBiometricoForm
 import com.bioguard.movil.ui.components.SystemNotificationDialog
 import com.bioguard.movil.ui.model.AppPermission
 import com.bioguard.movil.ui.model.EffectiveAccess
@@ -80,6 +84,7 @@ import com.bioguard.movil.ui.theme.LocalThemeState
 import com.bioguard.movil.ui.theme.RedNeon
 import com.bioguard.movil.ui.theme.ThemeState
 import com.bioguard.movil.ui.theme.colorPalette
+import com.bioguard.movil.ui.viewmodel.BiometriaPacienteState
 import com.bioguard.movil.ui.viewmodel.ProfileViewModel
 import java.io.ByteArrayOutputStream
 import java.util.Base64
@@ -148,26 +153,27 @@ fun ProfileScreen(
     }
 
     if (showEditBiometriaModal && access.allows(AppPermission.PATIENT_MANAGE)) {
-        EditBiometriaDialog(
-            currentBirth = uiState.biometria.fechaNacimiento,
-            currentSex = uiState.biometria.sexo,
-            currentWeight = uiState.biometria.pesoKg.takeIf { it > 0.0 }?.toString().orEmpty(),
-            currentHeight = uiState.biometria.estaturaCm.takeIf { it > 0.0 }?.toString().orEmpty(),
-            currentDiabetic = uiState.biometria.esDiabetico,
-            currentFamilyDiabetic = uiState.biometria.familiaresDiabetes,
-            currentActivity = uiState.biometria.actividadFisica,
+        PerfilBiometricoEditOverlay(
+            bio = uiState.biometria,
+            photo = uiState.perfil?.fotoPerfil?.takeIf { it.isNotBlank() }
+                ?: (if (access.role == UserRole.PACIENTE) localPhoto else null),
             onDismiss = { showEditBiometriaModal = false },
-            onSave = { birth, sex, weight, height, isDiabetic, familyDiabetic, activity ->
+            onSave = { data ->
                 showEditBiometriaModal = false
                 profileViewModel.updateBiometriaPaciente(
-                    fechaNacimiento = birth,
-                    sexo = sex,
-                    pesoKg = weight.toDoubleOrNull() ?: 0.0,
-                    estaturaCm = height.toDoubleOrNull() ?: 0.0,
-                    esDiabetico = isDiabetic,
-                    familiaresDiabetes = familyDiabetic,
-                    actividadFisica = activity
+                    fechaNacimiento = data.birthDateIso,
+                    sexo = data.sexCode,
+                    pesoKg = data.weightKg,
+                    estaturaCm = data.heightCm,
+                    esDiabetico = data.isDiabetic,
+                    familiaresDiabetes = data.familyDiabetes,
+                    actividadFisica = data.activity
                 )
+                val currentPhoto = uiState.perfil?.fotoPerfil?.takeIf { it.isNotBlank() }
+                    ?: (if (access.role == UserRole.PACIENTE) localPhoto else null)
+                if (data.photoBase64 != null && data.photoBase64 != currentPhoto) {
+                    profileViewModel.updateFotoPerfil(data.photoBase64)
+                }
             }
         )
     }
@@ -837,4 +843,64 @@ private fun decodeBase64ToBitmap(base64: String): Bitmap? {
         val bytes = Base64.getDecoder().decode(data)
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
     }.getOrNull()
+}
+
+@Composable
+fun PerfilBiometricoEditOverlay(
+    bio: BiometriaPacienteState,
+    photo: String?,
+    onDismiss: () -> Unit,
+    onSave: (PerfilBiometricoData) -> Unit
+) {
+    val p = LocalThemeState.current.colorPalette()
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(p.background)
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = Icons.Filled.ArrowBack,
+                        contentDescription = "Volver",
+                        tint = p.textPrimary
+                    )
+                }
+                Icon(
+                    imageVector = Icons.Filled.HealthAndSafety,
+                    contentDescription = null,
+                    tint = p.accent,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "EDITAR INFORMACIÓN MÉDICA",
+                    fontSize = 12.sp,
+                    color = p.accent,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+            }
+            PerfilBiometricoForm(
+                initialBirthDate = com.bioguard.movil.data.Formatters.toDisplayDigits(bio.fechaNacimiento),
+                initialSex = bio.sexo,
+                initialWeight = bio.pesoKg.takeIf { it > 0.0 }?.toString() ?: "",
+                initialHeight = bio.estaturaCm.takeIf { it > 0.0 }?.toString() ?: "",
+                initialActivity = bio.actividadFisica,
+                initialDiabetic = bio.esDiabetico,
+                initialFamilyDiabetic = bio.familiaresDiabetes,
+                initialPhoto = photo,
+                submitText = "GUARDAR CAMBIOS",
+                onCancel = onDismiss,
+                isSaving = false,
+                onSave = onSave
+            )
+        }
+    }
 }

@@ -30,8 +30,16 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.DeviceThermostat
+import androidx.compose.material.icons.filled.Emergency
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -136,22 +144,9 @@ fun DashboardScreen(
 
     var showHelpForVital by remember { mutableStateOf<VitalSign?>(null) }
 
-    val lastHrv = ultimaLectura?.hrv?.takeIf { it > 0.0 } ?: 45.0
-    val lastSpo2 = ultimaLectura?.spo2?.takeIf { it > 0.0 } ?: 98.0
-    val lastPasos = ultimaLectura?.pasos?.takeIf { it > 0 } ?: 1250
-    val lastFaseSueno = ultimaLectura?.faseSueno ?: "Sueño Profundo"
-    val lastGrasa = ultimaLectura?.grasaCorporalPct?.takeIf { it > 0.0 } ?: 18.5
-    val lastMasaMuscular = ultimaLectura?.masaMuscularKg?.takeIf { it > 0.0 } ?: 32.0
-
     val formattedPulse = lastPulse?.toInt()?.toString() ?: "--"
     val formattedTemp = lastTemp?.let { String.format(java.util.Locale.US, "%.1f", it) } ?: "--"
     val formattedGsr = lastGsr?.let { String.format(java.util.Locale.US, "%.1f", it) } ?: "--"
-    val formattedHrv = String.format(java.util.Locale.US, "%.0f", lastHrv)
-    val formattedSpo2 = String.format(java.util.Locale.US, "%.0f", lastSpo2)
-    val formattedPasos = java.text.NumberFormat.getIntegerInstance(java.util.Locale.US).format(lastPasos)
-
-    val spo2Status = if (lastSpo2 < 95.0) "Bajo" else "Normal"
-    val spo2StatusColor = if (lastSpo2 < 95.0) RedNeon else GreenNeon
 
     val lastGlucose = (ultimaLectura?.glucosaEstimadaMgDl?.takeIf { it > 0.0 }
         ?: (95.0 + ((lastPulse ?: 72.0) - 72.0) * 0.45 + ((lastTemp ?: 36.5) - 36.5) * 12.0 + kotlin.math.max(0.0, (lastGsr ?: 45.0) - 45.0) * 0.5)).coerceIn(70.0, 220.0)
@@ -167,17 +162,26 @@ fun DashboardScreen(
         else -> GreenNeon
     }
 
+    val lastRisk = ultimaLectura?.probabilidadPico
+    val riskStatus = when {
+        lastRisk == null -> stringResource(R.string.dashboard_no_data)
+        lastRisk >= 0.7 -> "RIESGO ALTO"
+        lastRisk >= 0.5 -> "RIESGO MODERADO"
+        else -> "RIESGO BAJO"
+    }
+    val riskStatusColor = when (riskStatus) {
+        "RIESGO ALTO" -> RedNeon
+        "RIESGO MODERADO" -> YellowNeon
+        "RIESGO BAJO" -> GreenNeon
+        else -> p.textSecondary
+    }
+
     val vitalSigns = listOf(
-        VitalSign("Estimación Picos de Glucosa", formattedGlucose, "mg/dL", "🩸", Color(0xFFF43F5E), glucoseStatus, glucoseStatusColor),
-        VitalSign(stringResource(R.string.dashboard_heart_rate), formattedPulse, "BPM", "\u2665", p.accent, pulseStatus, if (pulseStatus == stringResource(R.string.dashboard_normal)) GreenNeon else if (pulseStatus == stringResource(R.string.dashboard_alert)) RedNeon else YellowNeon),
-        VitalSign(stringResource(R.string.dashboard_temperature), formattedTemp, "\u00b0C", "\uD83C\uDF21", p.accentSecondary, tempStatus, tempStatusColor),
-        VitalSign(stringResource(R.string.dashboard_conductivity), formattedGsr, "\u00b5S", "\u26a1", YellowNeon, gsrStatus, gsrStatusColor),
-        VitalSign("Variabilidad Cardíaca (HRV)", formattedHrv, "ms", "💓", Color(0xFFC084FC), "Óptima", GreenNeon),
-        VitalSign("Oxígeno en Sangre (SpO2)", formattedSpo2, "%", "🫁", Color(0xFF38BDF8), spo2Status, spo2StatusColor),
-        VitalSign("Pasos / Actividad", formattedPasos, "pasos", "👟", Color(0xFFA7F3D0), "Activo", GreenNeon),
-        VitalSign("Composición Corporal (BIA)", "${String.format(java.util.Locale.US, "%.1f", lastGrasa)}%", "grasa", "⚖️", Color(0xFFFDBA74), "${String.format(java.util.Locale.US, "%.1f", lastMasaMuscular)} kg masa", GreenNeon),
-        VitalSign("Monitoreo del Sueño", lastFaseSueno, "", "🌙", Color(0xFF818CF8), "Restaurativo", GreenNeon),
-        VitalSign("Electrocardiograma (ECG)", "Normal", "Ritmo", "🩺", GreenNeon, "Sinusal", GreenNeon)
+        VitalSign("Estimación Picos de Glucosa", formattedGlucose, "mg/dL", Icons.Filled.WaterDrop, Color(0xFFF43F5E), glucoseStatus, glucoseStatusColor),
+        VitalSign(stringResource(R.string.dashboard_heart_rate), formattedPulse, "BPM", Icons.Filled.Favorite, p.accent, pulseStatus, if (pulseStatus == stringResource(R.string.dashboard_normal)) GreenNeon else if (pulseStatus == stringResource(R.string.dashboard_alert)) RedNeon else YellowNeon),
+        VitalSign(stringResource(R.string.dashboard_temperature), formattedTemp, "\u00b0C", Icons.Filled.DeviceThermostat, p.accentSecondary, tempStatus, tempStatusColor),
+        VitalSign(stringResource(R.string.dashboard_conductivity), formattedGsr, "\u00b5S", Icons.Filled.Bolt, YellowNeon, gsrStatus, gsrStatusColor),
+        VitalSign("Riesgo IA de Pico Glucémico", if (lastRisk != null) "${(lastRisk * 100).toInt()}%" else "--", "probabilidad", Icons.Filled.Warning, if (lastRisk != null && lastRisk >= 0.5) RedNeon else p.accent, riskStatus, riskStatusColor)
     )
 
     val metabolicStatus = when {
@@ -394,7 +398,7 @@ fun DashboardScreen(
                     points = glucoseChartPoints,
                     lineColor = Color(0xFFF43F5E),
                     unit = "mg/dL",
-                    title = "🩸 Tendencia y Picos de Glucosa Estimados",
+                    title = "Tendencia y Picos de Glucosa Estimados",
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
 
@@ -403,7 +407,7 @@ fun DashboardScreen(
                     points = pulseChartPoints,
                     lineColor = p.accent,
                     unit = "BPM",
-                    title = "❤️ Ritmo Cardíaco en Tiempo Real",
+                    title = "Ritmo Cardíaco en Tiempo Real",
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
 
@@ -431,7 +435,12 @@ fun DashboardScreen(
                                 .background(metabolicColor.copy(alpha = 0.1f))
                                 .padding(horizontal = 12.dp, vertical = 6.dp)
                         ) {
-                            Text(text = if (metabolicStatus == stringResource(R.string.dashboard_critical)) "\u26a0" else "\u2713", fontSize = 18.sp, color = metabolicColor, fontWeight = FontWeight.Bold)
+                            Icon(
+                                imageVector = if (metabolicStatus == stringResource(R.string.dashboard_critical)) Icons.Filled.Emergency else Icons.Filled.CheckCircle,
+                                contentDescription = null,
+                                tint = metabolicColor,
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
                     }
                 }
@@ -451,6 +460,7 @@ fun DashboardScreen(
                             val points = when (vital.unit) {
                                 "BPM" -> pulseChartPoints
                                 "\u00b0C" -> tempChartPoints
+                                "mg/dL", "probabilidad" -> glucoseChartPoints
                                 else -> gsrChartPoints
                             }
                             activeVitalDetail = VitalDetailData(
@@ -484,10 +494,11 @@ fun DashboardScreen(
                         .padding(14.dp)
                 ) {
                     Row(verticalAlignment = Alignment.Top) {
-                        Text(
-                            text = if (metabolicStatus == stringResource(R.string.dashboard_critical)) "\uD83D\uDEA8" else if (metabolicStatus == stringResource(R.string.dashboard_alert) || metabolicStatus == stringResource(R.string.dashboard_elevated_m)) "\u26a0" else "\uD83D\uDCA1",
-                            fontSize = 18.sp,
-                            modifier = Modifier.padding(end = 8.dp)
+                        Icon(
+                            imageVector = if (metabolicStatus == stringResource(R.string.dashboard_critical)) Icons.Filled.Emergency else if (metabolicStatus == stringResource(R.string.dashboard_alert) || metabolicStatus == stringResource(R.string.dashboard_elevated_m)) Icons.Filled.Warning else Icons.Filled.Lightbulb,
+                            contentDescription = null,
+                            tint = if (metabolicStatus == stringResource(R.string.dashboard_critical)) RedNeon else if (metabolicStatus == stringResource(R.string.dashboard_alert) || metabolicStatus == stringResource(R.string.dashboard_elevated_m)) YellowNeon else p.accent,
+                            modifier = Modifier.size(18.dp).padding(top = 2.dp, end = 8.dp)
                         )
                         Text(
                             text = suggestion,
@@ -749,7 +760,13 @@ fun VitalInfoDialog(
         onDismissRequest = onDismiss,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = "💡 ", fontSize = 20.sp)
+                Icon(
+                    imageVector = Icons.Filled.Lightbulb,
+                    contentDescription = null,
+                    tint = p.accent,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(text = titleStatus, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = p.textPrimary)
             }
         },
@@ -792,7 +809,12 @@ fun VitalSignCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = vital.icon, fontSize = 24.sp, color = vital.color.copy(alpha = pulseAlpha))
+                Icon(
+                    imageVector = vital.icon,
+                    contentDescription = null,
+                    tint = vital.color.copy(alpha = pulseAlpha),
+                    modifier = Modifier.size(26.dp)
+                )
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(text = vital.name, fontSize = 11.sp, color = p.textSecondary, letterSpacing = 2.sp)
@@ -857,7 +879,12 @@ fun HistoryCard(item: HistoryItem) {
             Spacer(modifier = Modifier.height(10.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = "\u2665", fontSize = 11.sp, color = p.accent)
+                Icon(
+                    imageVector = Icons.Filled.Favorite,
+                    contentDescription = null,
+                    tint = p.accent,
+                    modifier = Modifier.size(11.dp)
+                )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(text = item.pulse, fontSize = 11.sp, color = p.textPrimary)
             }
@@ -865,7 +892,12 @@ fun HistoryCard(item: HistoryItem) {
             Spacer(modifier = Modifier.height(4.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = "\uD83C\uDF21", fontSize = 11.sp, color = p.accentSecondary)
+                Icon(
+                    imageVector = Icons.Filled.DeviceThermostat,
+                    contentDescription = null,
+                    tint = p.accentSecondary,
+                    modifier = Modifier.size(11.dp)
+                )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(text = item.temp, fontSize = 11.sp, color = p.textPrimary)
             }

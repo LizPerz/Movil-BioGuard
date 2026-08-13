@@ -72,10 +72,12 @@ class ProfileViewModel @Inject constructor(
             when (val result = repository.getMiPerfil()) {
                 is Resource.Success -> {
                     val perfil = result.data
-                    if (UserRole.from(prefs.userRole.first()) == UserRole.PACIENTE &&
-                        !perfil.fotoPerfil.isNullOrBlank()
-                    ) {
-                        prefs.savePatientPhoto(perfil.fotoPerfil)
+                    if (UserRole.from(prefs.userRole.first()) == UserRole.PACIENTE) {
+                        if (!perfil.fotoPerfil.isNullOrBlank()) {
+                            prefs.savePatientPhoto(perfil.fotoPerfil)
+                        } else {
+                            prefs.clearPatientPhoto()
+                        }
                     }
                     _uiState.update {
                         it.copy(perfil = perfil)

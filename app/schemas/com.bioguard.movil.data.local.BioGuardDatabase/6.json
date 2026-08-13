@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 6,
-    "identityHash": "a982f707b89a905a70d1624572a1f05a",
+    "identityHash": "8739b0708b11a0d18634f8cec69a3775",
     "entities": [
       {
         "tableName": "pending_readings",
@@ -269,7 +269,7 @@
       },
       {
         "tableName": "cached_readings",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `pacienteId` TEXT NOT NULL, `pulsoBpm` REAL NOT NULL, `temperaturaC` REAL NOT NULL, `sudoracionGsr` REAL NOT NULL, `hrv` REAL NOT NULL, `spo2` REAL NOT NULL, `pasos` INTEGER NOT NULL, `calorias` REAL NOT NULL, `accelX` REAL NOT NULL, `accelY` REAL NOT NULL, `accelZ` REAL NOT NULL, `grasaCorporalPct` REAL NOT NULL, `masaMuscularKg` REAL NOT NULL, `faseSueno` TEXT NOT NULL, `fechaHora` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `pacienteId` TEXT NOT NULL, `pulsoBpm` REAL NOT NULL, `temperaturaC` REAL NOT NULL, `sudoracionGsr` REAL NOT NULL, `hrv` REAL NOT NULL, `spo2` REAL NOT NULL, `pasos` INTEGER NOT NULL, `calorias` REAL NOT NULL, `fechaHora` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -323,42 +323,6 @@
             "fieldPath": "calorias",
             "columnName": "calorias",
             "affinity": "REAL",
-            "notNull": true
-          },
-          {
-            "fieldPath": "accelX",
-            "columnName": "accelX",
-            "affinity": "REAL",
-            "notNull": true
-          },
-          {
-            "fieldPath": "accelY",
-            "columnName": "accelY",
-            "affinity": "REAL",
-            "notNull": true
-          },
-          {
-            "fieldPath": "accelZ",
-            "columnName": "accelZ",
-            "affinity": "REAL",
-            "notNull": true
-          },
-          {
-            "fieldPath": "grasaCorporalPct",
-            "columnName": "grasaCorporalPct",
-            "affinity": "REAL",
-            "notNull": true
-          },
-          {
-            "fieldPath": "masaMuscularKg",
-            "columnName": "masaMuscularKg",
-            "affinity": "REAL",
-            "notNull": true
-          },
-          {
-            "fieldPath": "faseSueno",
-            "columnName": "faseSueno",
-            "affinity": "TEXT",
             "notNull": true
           },
           {
@@ -514,7 +478,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a982f707b89a905a70d1624572a1f05a')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '8739b0708b11a0d18634f8cec69a3775')"
     ]
   }
 }

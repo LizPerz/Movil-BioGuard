@@ -162,9 +162,9 @@ class BioGuardMonitoringService : Service() {
                         Log.d(TAG, "Lectura duplicada confirmada sin volver a procesarla")
                         return@reading true
                     }
-                    val validSpo2 = if (request.spo2 != null && request.spo2 > 0.0) request.spo2 else 98.0
-                    val validPasos = if (request.pasos != null && request.pasos > 0) request.pasos else (request.pulsoBpm.toInt() * 15 % 1500 + 450)
-                    val validHrv = request.hrv ?: 45.0
+                    val validSpo2 = request.spo2?.takeIf { it > 0.0 } ?: 0.0
+                    val validPasos = request.pasos?.takeIf { it > 0 } ?: 0
+                    val validHrv = request.hrv?.takeIf { it > 0.0 } ?: 0.0
 
                     // Motor ML real (F1-F3): IMC, z-score y P(Pico) con peso/estatura del perfil
                     val pesoKg = prefs.patientWeight.first()?.toDoubleOrNull() ?: 0.0
@@ -179,15 +179,8 @@ class BioGuardMonitoringService : Service() {
                         )
                     } else null
 
-                    // Glucosa estimada: se usa la que envía el reloj (misma fuente que muestra
-                    // su pantalla); solo se recalcula localmente si el reloj no la incluye.
-                    val calculatedGlucose = (95.0 +
-                            (request.pulsoBpm - 72.0) * 0.45 +
-                            (request.temperaturaC - 36.5) * 12.0 +
-                            kotlin.math.max(0.0, request.sudoracionGsr - 45.0) * 0.5 +
-                            kotlin.math.max(0.0, 45.0 - validHrv) * 0.4
-                    ).coerceIn(70.0, 220.0)
-                    val finalGlucose = request.glucosaEstimadaMgDl?.takeIf { it > 0.0 } ?: calculatedGlucose
+                    // Glucosa estimada: solo se usa la que envía el reloj; sin dato, se omite (0).
+                    val finalGlucose = request.glucosaEstimadaMgDl?.takeIf { it > 0.0 } ?: 0.0
 
                     if (glycemicPrediction != null) {
                         try {
@@ -220,13 +213,13 @@ class BioGuardMonitoringService : Service() {
                                 hrv = validHrv,
                                 spo2 = validSpo2,
                                 pasos = validPasos,
-                                calorias = (validPasos * 0.04),
-                                accelX = request.accelX ?: 0.12,
-                                accelY = request.accelY ?: 0.98,
-                                accelZ = request.accelZ ?: 0.04,
-                                grasaCorporalPct = request.grasaCorporalPct ?: 18.5,
-                                masaMuscularKg = request.masaMuscularKg ?: 32.0,
-                                faseSueno = request.faseSueno ?: "Sueño Profundo",
+                                calorias = if (validPasos > 0) validPasos * 0.04 else 0.0,
+                                accelX = request.accelX ?: 0.0,
+                                accelY = request.accelY ?: 0.0,
+                                accelZ = request.accelZ ?: 0.0,
+                                grasaCorporalPct = request.grasaCorporalPct ?: 0.0,
+                                masaMuscularKg = request.masaMuscularKg ?: 0.0,
+                                faseSueno = request.faseSueno ?: "",
                                 glucosaEstimadaMgDl = finalGlucose,
                                 fechaHora = request.timestamp
                             )

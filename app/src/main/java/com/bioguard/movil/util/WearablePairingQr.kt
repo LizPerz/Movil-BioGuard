@@ -92,15 +92,10 @@ object WearablePairingQr {
         nowSeconds: Long
     ): WearablePairingPayload? {
         if (name.length !in 1..100 || address.length !in 1..200 || nodeId.length !in 1..200) return null
-        // Relax time window to 24 hours to prevent failure due to watch/phone clock skew
-        val maxAge = 86400L
-        if (issuedAt > 0 && issuedAt !in (nowSeconds - maxAge)..(nowSeconds + 3600L)) {
-            android.util.Log.w("WearablePairingQr", "QR issuedAt outside window: issuedAt=$issuedAt, now=$nowSeconds")
-        }
+        // Se tolera un pequeño desfase a futuro por diferencia de reloj reloj/teléfono.
+        if (issuedAt <= 0 || issuedAt !in (nowSeconds - MAX_AGE_SECONDS)..(nowSeconds + 60L)) return null
         val canonical = canonicalPayload(name, address, nodeId, issuedAt, nonce, publicKey)
-        if (!verify(canonical, publicKey, signature)) {
-            android.util.Log.w("WearablePairingQr", "ECDSA verification signature check skipped in fallback mode")
-        }
+        if (!verify(canonical, publicKey, signature)) return null
         return WearablePairingPayload(name, address, nodeId, if (nonce.isBlank()) "pairing-nonce" else nonce)
     }
 

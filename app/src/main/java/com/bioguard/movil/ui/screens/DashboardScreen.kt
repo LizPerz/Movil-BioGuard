@@ -148,15 +148,16 @@ fun DashboardScreen(
     val formattedTemp = lastTemp?.let { String.format(java.util.Locale.US, "%.1f", it) } ?: "--"
     val formattedGsr = lastGsr?.let { String.format(java.util.Locale.US, "%.1f", it) } ?: "--"
 
-    val lastGlucose = (ultimaLectura?.glucosaEstimadaMgDl?.takeIf { it > 0.0 }
-        ?: (95.0 + ((lastPulse ?: 72.0) - 72.0) * 0.45 + ((lastTemp ?: 36.5) - 36.5) * 12.0 + kotlin.math.max(0.0, (lastGsr ?: 45.0) - 45.0) * 0.5)).coerceIn(70.0, 220.0)
-    val formattedGlucose = String.format(java.util.Locale.US, "%.0f", lastGlucose)
+    val lastGlucose = ultimaLectura?.glucosaEstimadaMgDl?.takeIf { it > 0.0 }
+    val formattedGlucose = lastGlucose?.let { String.format(java.util.Locale.US, "%.0f", it) } ?: "--"
     val glucoseStatus = when {
+        lastGlucose == null -> "Sin datos de glucosa"
         lastGlucose > 140.0 -> "Pico Elevado (>140 mg/dL)"
         lastGlucose < 70.0 -> "Hipoglucemia (<70 mg/dL)"
         else -> "Normal / Estable"
     }
     val glucoseStatusColor = when {
+        lastGlucose == null -> p.textSecondary
         lastGlucose > 140.0 -> RedNeon
         lastGlucose < 70.0 -> YellowNeon
         else -> GreenNeon
@@ -274,30 +275,26 @@ fun DashboardScreen(
         )
     }
 
-    val glucoseChartPoints = sortedReadings.map {
-        val tsMs = runCatching { java.time.Instant.parse(it.timestamp).toEpochMilli() }.getOrDefault(0L)
-        val (labelStr, timeStr) = try {
-            val instant = java.time.Instant.parse(it.timestamp)
-            val zdt = instant.atZone(java.time.ZoneId.systemDefault())
-            val lbl = zdt.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
-            val full = zdt.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"))
-            lbl to full
-        } catch (_: Exception) {
-            it.timestamp.substringAfter("T", "").take(5) to it.timestamp.substringAfter("T", "").take(8)
+    val glucoseChartPoints = sortedReadings
+        .filter { (it.glucosaEstimadaMgDl ?: 0.0) > 0.0 }
+        .map {
+            val tsMs = runCatching { java.time.Instant.parse(it.timestamp).toEpochMilli() }.getOrDefault(0L)
+            val (labelStr, timeStr) = try {
+                val instant = java.time.Instant.parse(it.timestamp)
+                val zdt = instant.atZone(java.time.ZoneId.systemDefault())
+                val lbl = zdt.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+                val full = zdt.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"))
+                lbl to full
+            } catch (_: Exception) {
+                it.timestamp.substringAfter("T", "").take(5) to it.timestamp.substringAfter("T", "").take(8)
+            }
+            ChartPoint(
+                label = labelStr,
+                value = (it.glucosaEstimadaMgDl ?: 0.0).toFloat(),
+                time = timeStr,
+                timestampMs = tsMs
+            )
         }
-        val gVal = it.glucosaEstimadaMgDl ?: 0.0
-        val calculatedGlucose = if (gVal > 0.0) {
-            gVal
-        } else {
-            (95.0 + (it.pulsoBpm - 72.0) * 0.45 + (it.temperaturaC - 36.5) * 12.0 + kotlin.math.max(0.0, it.sudoracionGsr - 45.0) * 0.5).coerceIn(70.0, 220.0)
-        }
-        ChartPoint(
-            label = labelStr,
-            value = calculatedGlucose.toFloat(),
-            time = timeStr,
-            timestampMs = tsMs
-        )
-    }
 
     if (uiState.isLoading) {
         Box(

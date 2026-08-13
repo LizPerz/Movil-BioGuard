@@ -64,7 +64,8 @@ class DashboardViewModel @Inject constructor(
             val patientId = prefs.patientId.first() ?: "paciente-local"
             _uiState.update { it.copy(isLoading = false, error = null, pacienteId = patientId) }
 
-            cachedDataDao.getAllCachedReadings(2000).collectLatest { cachedReadings ->
+            // La caché se filtra por paciente para no mezclar datos entre cuentas/pacientes.
+            cachedDataDao.getCachedReadings(patientId, 2000).collectLatest { cachedReadings ->
                 val latest = cachedReadings.firstOrNull()?.toResponse()
                 val connState = if (cachedReadings.isNotEmpty()) WearableConnectionState.STREAMING else WearableConnectionState.PAIRED
                 _uiState.update {
@@ -166,28 +167,31 @@ class DashboardViewModel @Inject constructor(
     }
 
     /**
-     * Forzar sincronización manual de predicciones pendientes
+     * Forzar sincronización manual: dispara el servicio que vacía toda la cola offline
+     * (lecturas, GPS, eventos, alertas) y además sincroniza las predicciones ML pendientes.
      */
     fun sincronizarManualmente() {
         viewModelScope.launch {
             try {
                 _uiState.update { it.copy(isLoading = true) }
+                com.bioguard.movil.service.BioGuardMonitoringService.requestCloudSync(getApplication())
                 val result = syncRepository.sincronizarLote()
-                
+
                 if (result is com.bioguard.movil.data.Resource.Success) {
                     val sincronizados = result.data
-                    _uiState.update { 
+                    _uiState.update {
                         it.copy(
-                            isLoading = false, 
-                            error = if (sincronizados > 0) "Se sincronizaron $sincronizados reportes" else "Sin datos pendientes"
-                        ) 
+                            isLoading = false,
+                            error = if (sincronizados > 0) "Se sincronizaron $sincronizados reportes y lecturas pendientes" else "Sincronizacion completada (cola vacia o sin red)"
+                        )
                     }
                 } else {
-                    _uiState.update { 
+                    _uiState.update {
                         it.copy(
-                            isLoading = false, 
+                            isLoading = false,
                             error = (result as? com.bioguard.movil.data.Resource.Error)?.message
-                        ) 
+                                ?: "Sincronizacion disparada. Revisa la conexion."
+                        )
                     }
                 }
             } catch (e: Exception) {

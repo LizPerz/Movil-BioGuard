@@ -5,6 +5,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.bioguard.movil.data.Formatters
 import com.bioguard.movil.data.Resource
+import com.bioguard.movil.data.local.CachedDataDao
+import com.bioguard.movil.data.local.CachedReadingEntity
 import com.bioguard.movil.data.repository.PacienteRepository
 import com.bioguard.movil.data.repository.SensorRepository
 import com.bioguard.movil.datastore.UserPreferences
@@ -14,7 +16,10 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 data class AnalysisUiState(
@@ -30,6 +35,7 @@ class AnalysisViewModel @Inject constructor(
     application: Application,
     private val sensorRepository: SensorRepository,
     private val pacienteRepository: PacienteRepository,
+    private val cachedDataDao: CachedDataDao,
     private val prefs: UserPreferences
 ) : AndroidViewModel(application) {
 
@@ -37,25 +43,50 @@ class AnalysisViewModel @Inject constructor(
     val uiState: StateFlow<AnalysisUiState> = _uiState.asStateFlow()
 
     private var allLecturas: List<LecturaSensorResponse> = emptyList()
+    private var cacheJob: Job? = null
 
     init {
         loadLecturas()
     }
 
     fun loadLecturas() {
-        viewModelScope.launch {
+        cacheJob?.cancel()
+        cacheJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             val pacienteId = pacienteRepository.resolvePatientId(prefs)
                 ?: return@launch _uiState.update { it.copy(isLoading = false, error = "No se encontro un paciente vinculado") }
-            when (val result = sensorRepository.getLecturas(pacienteId, 100)) {
+
+            // Fuente primaria: caché local filtrada por paciente. Se actualiza en tiempo real
+            // conforme llegan lecturas del reloj (evita fugas entre pacientes).
+            cachedDataDao.getCachedReadings(pacienteId, 500).collectLatest { cached ->
+                allLecturas = cached.map { it.toResponse() }
+                _uiState.update {
+                    it.copy(lecturas = filterByTime(allLecturas, it.selectedTimeFilter), isLoading = false, error = null)
+                }
+            }
+        }
+
+        // Respaldo remoto: backfill del historial para no quedarse sin datos al reinstalar.
+        viewModelScope.launch {
+            val pacienteId = pacienteRepository.resolvePatientId(prefs) ?: return@launch
+            when (val result = sensorRepository.getLecturas(pacienteId, 200)) {
                 is Resource.Success -> {
-                    allLecturas = result.data
-                    _uiState.update {
-                        it.copy(lecturas = filterByTime(allLecturas, it.selectedTimeFilter), isLoading = false)
+                    if (result.data.isNotEmpty()) {
+                        val knownIds = allLecturas.map { it.id }.toSet()
+                        val nuevos = result.data.filter { it.id !in knownIds }
+                        if (nuevos.isNotEmpty()) {
+                            allLecturas = (allLecturas + nuevos).distinctBy { it.id }
+                            _uiState.update {
+                                it.copy(lecturas = filterByTime(allLecturas, it.selectedTimeFilter), isLoading = false)
+                            }
+                        }
                     }
                 }
-                is Resource.Error -> _uiState.update {
-                    it.copy(isLoading = false, error = result.message)
+                is Resource.Error -> {
+                    // Si no hay datos locales ni remotos, se muestra el estado vacío sin bloquear.
+                    if (allLecturas.isEmpty()) {
+                        _uiState.update { it.copy(isLoading = false, error = result.message) }
+                    }
                 }
                 is Resource.Loading -> {}
             }
@@ -84,5 +115,19 @@ class AnalysisViewModel @Inject constructor(
             val ts = Formatters.parseIsoTimestamp(lectura.timestamp)?.toEpochMilli() ?: return@filter true
             ts >= cutoff
         }
+    }
+
+    private fun CachedReadingEntity.toResponse(): LecturaSensorResponse {
+        return LecturaSensorResponse(
+            id = id,
+            timestamp = fechaHora,
+            pulsoBpm = pulsoBpm,
+            temperaturaC = temperaturaC,
+            sudoracionGsr = sudoracionGsr,
+            hrv = hrv,
+            spo2 = spo2,
+            probabilidadPico = null,
+            nivelRiesgo = null
+        )
     }
 }

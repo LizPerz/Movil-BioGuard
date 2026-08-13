@@ -122,25 +122,8 @@ class BioGuardMonitoringService : Service() {
         wearableConnector = WearableConnector(
             context = this,
             onReadingReceived = reading@{ request, sourceMessageId ->
-                val patientId = prefs.patientId.first()
+                val patientId = prefs.patientId.first() ?: "paciente-local"
                 try {
-                    val insertedId = database.pendingDataDao().insertReading(
-                        PendingReadingEntity(
-                            pulsoBpm = request.pulsoBpm,
-                            temperaturaC = request.temperaturaC,
-                            sudoracionGsr = request.sudoracionGsr,
-                            hrv = request.hrv,
-                            spo2 = request.spo2,
-                            pasos = request.pasos,
-                            timestamp = request.timestamp,
-                            sourceMessageId = sourceMessageId
-                        )
-                    )
-                    if (insertedId == -1L) {
-                        Log.d(TAG, "Lectura duplicada confirmada sin volver a procesarla")
-                        return@reading true
-                    }
-                    val patientId = prefs.patientId.first() ?: "paciente-local"
                     val baseline = database.cachedDataDao().getRecentReadingsSnapshot(patientId).map { cached ->
                         VitalSample(
                             heartRateBpm = cached.pulsoBpm,
@@ -161,6 +144,23 @@ class BioGuardMonitoringService : Service() {
                         baseline = baseline,
                         personalizedAnalysisEnabled = prefs.isLocalAnalysisEnabled.first()
                     )
+                    val insertedId = database.pendingDataDao().insertReading(
+                        PendingReadingEntity(
+                            pulsoBpm = request.pulsoBpm,
+                            temperaturaC = request.temperaturaC,
+                            sudoracionGsr = request.sudoracionGsr,
+                            hrv = request.hrv,
+                            spo2 = request.spo2,
+                            pasos = request.pasos,
+                            probabilidadPico = (assessment.score / 100.0).coerceIn(0.0, 1.0),
+                            timestamp = request.timestamp,
+                            sourceMessageId = sourceMessageId
+                        )
+                    )
+                    if (insertedId == -1L) {
+                        Log.d(TAG, "Lectura duplicada confirmada sin volver a procesarla")
+                        return@reading true
+                    }
                     val validSpo2 = if (request.spo2 != null && request.spo2 > 0.0) request.spo2 else 98.0
                     val validPasos = if (request.pasos != null && request.pasos > 0) request.pasos else (request.pulsoBpm.toInt() * 15 % 1500 + 450)
                     val validHrv = request.hrv ?: 45.0
@@ -560,6 +560,7 @@ class BioGuardMonitoringService : Service() {
                     hrv = it.hrv,
                     spo2 = it.spo2,
                     pasos = it.pasos,
+                    probabilidadPico = it.probabilidadPico,
                     timestamp = it.timestamp,
                     sourceMessageId = it.sourceMessageId ?: "$installId:reading:${it.id}"
                 )

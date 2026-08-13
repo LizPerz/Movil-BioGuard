@@ -7,35 +7,27 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import android.view.MotionEvent
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.viewModels
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
-import androidx.lifecycle.lifecycleScope
 import com.bioguard.movil.datastore.UserPreferences
 import com.bioguard.movil.navigation.BioGuardApp
 import com.bioguard.movil.ui.theme.AppTheme
 import com.bioguard.movil.ui.theme.BioGuardMovilTheme
 import com.bioguard.movil.ui.theme.ThemeState
-import com.bioguard.movil.ui.viewmodel.AuthViewModel
 import com.bioguard.movil.util.BiometricHelper
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : FragmentActivity() {
-
-    private val authViewModel: AuthViewModel by viewModels()
-    private var lastInteractionTime = System.currentTimeMillis()
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -48,7 +40,6 @@ class MainActivity : FragmentActivity() {
         requestRuntimePermissions()
         requestBluetoothEnabled()
         checkRootAndWarn()
-        startInactivityTimer()
 
         val openAlert = intent?.getBooleanExtra("open_alert", false) ?: false
 
@@ -77,31 +68,6 @@ class MainActivity : FragmentActivity() {
                         scope.launch { prefs.saveTheme(newState.theme.name, newState.isDarkMode) }
                     }
                 )
-            }
-        }
-    }
-
-    override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
-        lastInteractionTime = System.currentTimeMillis()
-        return super.dispatchTouchEvent(ev)
-    }
-
-    private fun startInactivityTimer() {
-        lifecycleScope.launch {
-            while (true) {
-                delay(10000)
-                val current = System.currentTimeMillis()
-                if (current - lastInteractionTime > 15 * 60 * 1000) {
-                    val authState = authViewModel.uiState.value
-                    if (authState.isAuthenticated) {
-                        authViewModel.logout()
-                        Toast.makeText(
-                            this@MainActivity,
-                            "Sesión cerrada automáticamente por inactividad",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-                }
             }
         }
     }

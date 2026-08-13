@@ -5,6 +5,9 @@ import android.util.Log
 import com.bioguard.movil.data.local.BioGuardDatabase
 import com.bioguard.movil.data.local.PendingDataDao
 import com.bioguard.movil.data.local.PendingReadingEntity
+import com.bioguard.movil.datastore.UserPreferences
+import com.bioguard.movil.ml.PersonalizedAnomalyModel
+import com.bioguard.movil.ml.VitalSample
 import com.bioguard.movil.network.CrearAlertaRequest
 import com.bioguard.movil.network.CrearEventoRequest
 import com.bioguard.movil.network.HeartbeatRequest
@@ -16,6 +19,7 @@ import com.google.gson.Gson
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.nio.charset.StandardCharsets
 
@@ -35,6 +39,7 @@ class WearDataListenerService : WearableListenerService() {
 
     private val db by lazy { BioGuardDatabase.getInstance(applicationContext) }
     private val pendingDao by lazy { db.pendingDataDao() }
+    private val localRiskModel = PersonalizedAnomalyModel()
 
     override fun onMessageReceived(event: MessageEvent) {
         super.onMessageReceived(event)
@@ -78,6 +83,26 @@ class WearDataListenerService : WearableListenerService() {
             Log.w(TAG, "Lectura rechazada: BPM inválido")
             return
         }
+        val patientId = UserPreferences(applicationContext).patientId.first() ?: "paciente-local"
+        val baseline = db.cachedDataDao().getRecentReadingsSnapshot(patientId).map { cached ->
+            VitalSample(
+                heartRateBpm = cached.pulsoBpm,
+                temperatureC = cached.temperaturaC.takeIf { it > 0.0 },
+                gsr = cached.sudoracionGsr.takeIf { it > 0.0 },
+                hrvMs = cached.hrv.takeIf { it > 0.0 },
+                spo2Percent = cached.spo2.takeIf { it > 0.0 }
+            )
+        }
+        val assessment = localRiskModel.assess(
+            current = VitalSample(
+                heartRateBpm = request.pulsoBpm,
+                temperatureC = request.temperaturaC.takeIf { it > 0.0 },
+                gsr = request.sudoracionGsr.takeIf { it > 0.0 },
+                hrvMs = request.hrv?.takeIf { it > 0.0 },
+                spo2Percent = request.spo2?.takeIf { it > 0.0 }
+            ),
+            baseline = baseline
+        )
         val sourceId = request.sourceMessageId ?: System.currentTimeMillis().toString()
         val entity = PendingReadingEntity(
             sourceMessageId = sourceId,
@@ -87,6 +112,7 @@ class WearDataListenerService : WearableListenerService() {
             hrv = request.hrv ?: 0.0,
             spo2 = request.spo2 ?: 0.0,
             pasos = request.pasos ?: 0,
+            probabilidadPico = (assessment.score / 100.0).coerceIn(0.0, 1.0),
             timestamp = request.timestamp
         )
         pendingDao.insertReading(entity)

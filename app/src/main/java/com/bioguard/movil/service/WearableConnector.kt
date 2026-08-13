@@ -213,8 +213,17 @@ class WearableConnector(
                     CapabilityClient.FILTER_REACHABLE
                 ).await()
 
-                val node = capability.nodes.firstOrNull {
+                var node = capability.nodes.firstOrNull {
                     it.isNearby && (trustedNodeId == null || it.id == trustedNodeId)
+                }
+                // Si el nodo de confianza guardado no coincide (p. ej. el QR empaquetó el
+                // installId en lugar del nodo real), se adopta el primer wearable cercano con
+                // la capability y se aprende el nodo verdadero para no bloquear la sincronización.
+                if (node == null && !trustedNodeId.isNullOrBlank()) {
+                    node = capability.nodes.firstOrNull { it.isNearby }
+                    if (node != null) {
+                        learnTrustedNode(node.id)
+                    }
                 }
                 if (node != null) {
                     return@withTimeoutOrNull WearableDeviceInfo(
@@ -277,6 +286,24 @@ class WearableConnector(
         } catch (e: Exception) {
             Log.e(TAG, "Error discovering wearables", e)
             emptyList()
+        }
+    }
+
+    private suspend fun learnTrustedNode(nodeId: String) {
+        if (nodeId.isBlank()) return
+        runCatching {
+            com.bioguard.movil.datastore.UserPreferences(context).saveTrustedNodeId(nodeId)
+        }.onFailure { Log.w(TAG, "No se pudo persistir el nodo real del reloj: ${it.message}") }
+    }
+
+    private suspend fun isWearableNodeReachable(nodeId: String): Boolean {
+        if (nodeId.isBlank()) return false
+        return try {
+            capabilityClient.getCapability(BIOGUARD_CAPABILITY, CapabilityClient.FILTER_REACHABLE).await()
+                .nodes.any { it.id == nodeId && it.isNearby }
+        } catch (e: Exception) {
+            Log.w(TAG, "No se pudo verificar reachability del nodo $nodeId: ${e.message}")
+            true
         }
     }
 
@@ -353,12 +380,19 @@ class WearableConnector(
     suspend fun pairWithNode(nodeId: String, pairingNonce: String? = null): Boolean {
         if (nodeId.isBlank() || isWearOsApiInCooldown()) return false
         return try {
-            val target = Wearable.getNodeClient(context).connectedNodes.await()
-                .firstOrNull { it.id == nodeId && it.isNearby }
-                ?: run {
-                    Log.w(TAG, "Vinculacion rechazada: el nodo no esta conectado por proximidad")
-                    return false
-                }
+            val connectedNodes = Wearable.getNodeClient(context).connectedNodes.await()
+            var target = connectedNodes.firstOrNull { it.id == nodeId && it.isNearby }
+                ?: connectedNodes.firstOrNull { it.isNearby }
+            if (target == null) {
+                Log.w(TAG, "Vinculacion rechazada: el nodo no esta conectado por proximidad")
+                return false
+            }
+            if (target.id != nodeId) {
+                // El QR empaquetó el installId en lugar del nodo real: se usa el nodo real
+                // detectado y se aprende para futuras conexiones.
+                Log.w(TAG, "Nodo del QR ($nodeId) no coincide con nodo real (${target.id}); se adopta el real")
+                learnTrustedNode(target.id)
+            }
             val requestId = UUID.randomUUID().toString()
             val ack = CompletableDeferred<Boolean>()
             pendingPairingAcks[requestId] = ack
@@ -451,8 +485,20 @@ class WearableConnector(
             val trustedNodeId = trustedNodeIdProvider()
             val pacienteId = pacienteIdProvider() ?: ""
             if (!trustedNodeId.isNullOrBlank() && event.sourceNodeId != trustedNodeId) {
-                Log.w(TAG, "Ignored wearable message because sourceNodeId != trustedNodeId")
-                return@launch
+                // El QR puede haber empaquetado el installId en vez del nodeId real del reloj.
+                // Si el mensaje llega de un wearable con la capability correcta, lo aceptamos
+                // y aprendemos el nodo real para restablecer la sincronización.
+                if (isWearableNodeReachable(event.sourceNodeId)) {
+                    Log.w(
+                        TAG,
+                        "Nodo recibido ${event.sourceNodeId} difiere del guardado $trustedNodeId; " +
+                            "se adopta el nodo real del reloj"
+                    )
+                    learnTrustedNode(event.sourceNodeId)
+                } else {
+                    Log.w(TAG, "Ignored wearable message because sourceNodeId != trustedNodeId")
+                    return@launch
+                }
             }
             if (_connectedDevice.value == null) {
                 _connectedDevice.value = WearableDeviceInfo(
@@ -460,6 +506,12 @@ class WearableConnector(
                     displayName = "SmartWatch WearOS",
                     isNearby = true,
                     hasApp = true,
+                    lastSeenMillis = System.currentTimeMillis()
+                )
+            } else if (_connectedDevice.value?.nodeId != event.sourceNodeId) {
+                _connectedDevice.value = _connectedDevice.value?.copy(
+                    nodeId = event.sourceNodeId,
+                    isNearby = true,
                     lastSeenMillis = System.currentTimeMillis()
                 )
             }
@@ -555,7 +607,13 @@ class WearableConnector(
     override fun onCapabilityChanged(capabilityInfo: com.google.android.gms.wearable.CapabilityInfo) {
         scope.launch {
             val trustedNodeId = trustedNodeIdProvider()
-            val node = capabilityInfo.nodes.firstOrNull { it.isNearby && it.id == trustedNodeId }
+            var node = capabilityInfo.nodes.firstOrNull { it.isNearby && it.id == trustedNodeId }
+            if (node == null && !trustedNodeId.isNullOrBlank()) {
+                node = capabilityInfo.nodes.firstOrNull { it.isNearby }
+                if (node != null) {
+                    learnTrustedNode(node.id)
+                }
+            }
             if (node != null) {
                 _connectedDevice.value = WearableDeviceInfo(
                     nodeId = node.id,

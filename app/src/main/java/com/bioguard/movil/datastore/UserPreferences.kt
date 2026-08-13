@@ -195,6 +195,13 @@ class UserPreferences(private val context: Context) {
         }
     }
 
+    suspend fun saveTrustedNodeId(nodeId: String) {
+        if (nodeId.isBlank()) return
+        context.dataStore.edit { prefs ->
+            prefs[Keys.DEVICE_NODE_ID] = nodeId
+        }
+    }
+
     suspend fun saveSyncSettings(
         isSyncEnabled: Boolean,
         syncIntervalMinutes: Int,

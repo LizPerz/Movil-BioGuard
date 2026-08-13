@@ -18,6 +18,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -29,6 +31,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -46,13 +49,43 @@ import com.bioguard.movil.R
 fun ReportsScreen(
     reportsViewModel: ReportsViewModel,
     canReadHistory: Boolean = false,
-    onNavigateToHistory: () -> Unit = {}
+    onNavigateToHistory: () -> Unit = {},
+    userName: String? = null
 ) {
     val p = LocalThemeState.current.colorPalette()
     val uiState by reportsViewModel.uiState.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     LaunchedEffect(canReadHistory) {
         reportsViewModel.loadReportes(canReadHistory)
+    }
+
+    fun generarYCompartirPdf() {
+        val reporte = uiState.reporte ?: return
+        val file = com.bioguard.movil.util.ReportPdfGenerator.generate(
+            context = context,
+            reporte = reporte,
+            eventos = uiState.eventos,
+            pacienteNombre = userName ?: "Paciente"
+        )
+        val uri = androidx.core.content.FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            file
+        )
+        val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+            type = "application/pdf"
+            putExtra(android.content.Intent.EXTRA_STREAM, uri)
+            putExtra(android.content.Intent.EXTRA_SUBJECT, "BioGuard - Reporte de salud")
+            putExtra(
+                android.content.Intent.EXTRA_TEXT,
+                "Reporte de salud generado por BioGuard. Abre el PDF adjunto o guardalo para imprimirlo."
+            )
+            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(
+            android.content.Intent.createChooser(shareIntent, "Compartir reporte (PDF)")
+        )
     }
 
     if (uiState.isLoading) {
@@ -141,6 +174,34 @@ fun ReportsScreen(
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
+
+                if (uiState.reporte != null) {
+                    Button(
+                        onClick = { generarYCompartirPdf() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .clip(RoundedCornerShape(10.dp)),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = RedNeon)
+                    ) {
+                        androidx.compose.material3.Icon(
+                            imageVector = Icons.Filled.PictureAsPdf,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "DESCARGAR / COMPARTIR PDF",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp,
+                            fontSize = 12.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
 
                 if (canReadHistory) Text(
                     text = stringResource(R.string.reports_history),

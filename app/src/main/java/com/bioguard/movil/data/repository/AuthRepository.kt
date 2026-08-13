@@ -121,11 +121,19 @@ class AuthRepository @Inject constructor(
         }
     }
 
-    // Si se inicia sesión con una cuenta distinta, se descarta la biometría local de la anterior.
+    // Si se inicia sesión con una cuenta distinta, se descarta la biometría local de la anterior
+    // y se purgan las colas/caché para no mezclar datos entre cuentas.
     private suspend fun guardAccountSwitch(newUserId: String) {
         val prevUserId = prefs.userId.first()
         if (!prevUserId.isNullOrBlank() && prevUserId != newUserId) {
             prefs.clearPatientBiometrics()
+            pendingDataDao.clearReadings()
+            pendingDataDao.clearGps()
+            pendingDataDao.clearEvents()
+            pendingDataDao.clearAlerts()
+            cachedDataDao.clearAllReadings()
+            cachedDataDao.clearAllEvents()
+            cachedDataDao.clearAllAlerts()
         }
     }
 
@@ -188,6 +196,7 @@ class AuthRepository @Inject constructor(
                 planName = response.plan?.nombre,
                 permissions = response.permisos.mapNotNull { AppPermission.fromCode(it) }.toSet()
             )
+            switchPatientIfNeeded(access.patientId)
             prefs.saveEffectiveAccess(
                 patientId = access.patientId,
                 caregiverAccessLevel = access.caregiverAccessLevel,
@@ -209,6 +218,27 @@ class AuthRepository @Inject constructor(
             } else {
                 EffectiveAccess.restricted(fallbackRole, prefs.patientId.first())
             }
+        }
+    }
+
+    // Evita fugas de datos entre pacientes/cuentas: al cambiar el paciente activo se descarta
+    // la biometría/foto local del anterior y se purgan sus colas y caché para que las lecturas
+    // pendientes no se suban atribuidas al paciente equivocado.
+    private suspend fun switchPatientIfNeeded(newPatientId: String?) {
+        val prevPatientId = prefs.patientId.first()
+        if (!prevPatientId.isNullOrBlank() && newPatientId != prevPatientId) {
+            prefs.clearPatientBiometrics()
+            pendingDataDao.clearReadings()
+            pendingDataDao.clearGps()
+            pendingDataDao.clearEvents()
+            pendingDataDao.clearAlerts()
+            cachedDataDao.clearReadings(prevPatientId)
+            cachedDataDao.clearEvents(prevPatientId)
+            cachedDataDao.clearAlerts(prevPatientId)
+            android.util.Log.w(
+                "AuthRepository",
+                "Paciente activo cambio ($prevPatientId -> $newPatientId); datos locales del anterior purgados"
+            )
         }
     }
 

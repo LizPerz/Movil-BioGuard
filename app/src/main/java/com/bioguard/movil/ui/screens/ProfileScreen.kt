@@ -109,9 +109,6 @@ fun ProfileScreen(
     LaunchedEffect(Unit) {
         localPhoto = prefs.patientPhoto.first()
     }
-    var isDarkMode by remember(themeState) {
-        mutableStateOf(themeState.theme != AppTheme.CLARO)
-    }
 
     var errorDialogMessage by remember { mutableStateOf<String?>(null) }
     var successDialogMessage by remember { mutableStateOf<String?>(null) }
@@ -397,51 +394,69 @@ fun ProfileScreen(
                     modifier = Modifier.padding(bottom = 10.dp)
                 )
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(p.surface)
-                        .border(width = 1.dp, color = p.border, shape = RoundedCornerShape(8.dp))
-                        .padding(12.dp)
-                        .clickable {
-                            val newDark = !isDarkMode
-                            onThemeChange(
-                                if (newDark) {
-                                    themeState.copy(theme = AppTheme.OSCURO, isDarkMode = true)
-                                } else {
-                                    themeState.copy(theme = AppTheme.CLARO, isDarkMode = false)
-                                }
-                            )
-                        }
-                ) {
+                Text(
+                    text = "APARIENCIA Y TEMA",
+                    fontSize = 10.sp,
+                    color = p.accent,
+                    letterSpacing = 2.sp,
+                    modifier = Modifier.padding(bottom = 10.dp)
+                )
+
+                val themeOptions = listOf(
+                    Triple("Oscuro", AppTheme.OSCURO, Color(0xFF0E1116)),
+                    Triple("Claro", AppTheme.CLARO, Color(0xFFF5F5F5)),
+                    Triple("Cyberpunk", AppTheme.CYBERPUNK, Color(0xFF0A0020)),
+                    Triple("Salud", AppTheme.SALUD, Color(0xFF001A0F))
+                )
+                themeOptions.chunked(2).forEach { rowOptions ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Column {
-                            Text(text = stringResource(R.string.profile_dark_mode), fontSize = 13.sp, color = p.textPrimary, fontWeight = FontWeight.Medium)
-                            Text(text = if (isDarkMode) stringResource(R.string.profile_activated) else stringResource(R.string.profile_deactivated), fontSize = 10.sp, color = p.textSecondary)
-                        }
-                        Box(
-                            modifier = Modifier
-                                .size(width = 44.dp, height = 24.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (isDarkMode) p.accent else p.border)
-                                .padding(2.dp),
-                            contentAlignment = if (isDarkMode) Alignment.CenterEnd else Alignment.CenterStart
-                        ) {
+                        rowOptions.forEach { (name, appTheme, preview) ->
+                            val isSelected = themeState.theme == appTheme
                             Box(
                                 modifier = Modifier
-                                    .size(20.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.White)
-                            )
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (isSelected) p.accent.copy(alpha = 0.12f) else p.surface)
+                                    .border(
+                                        width = if (isSelected) 2.dp else 1.dp,
+                                        color = if (isSelected) p.accent else p.border,
+                                        shape = RoundedCornerShape(10.dp)
+                                    )
+                                    .clickable {
+                                        onThemeChange(
+                                            themeState.copy(
+                                                theme = appTheme,
+                                                isDarkMode = appTheme != AppTheme.CLARO
+                                            )
+                                        )
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 14.dp)
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(18.dp)
+                                                .clip(RoundedCornerShape(5.dp))
+                                                .background(preview)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = if (isSelected) "\u2713 $name" else name,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = if (name == "Claro" && !isSelected) Color.Black else p.textPrimary
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
-                Spacer(modifier = Modifier.height(6.dp))
 
                 ProfileMenuRow(text = stringResource(R.string.profile_notifications), subtitle = stringResource(R.string.profile_notifications_desc), onClick = onNavigateToNotifications)
                 if (access.allows(AppPermission.DEVICE_READ) || access.allows(AppPermission.DEVICE_PAIR)) {

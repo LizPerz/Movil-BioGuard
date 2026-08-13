@@ -266,7 +266,8 @@ fun BioGuardApp(
                             canReadHistory = access.allows(AppPermission.HEALTH_HISTORY),
                             onNavigateToHistory = {
                                 if (access.allows(AppPermission.HEALTH_HISTORY)) navController.navigate(Screen.HISTORY)
-                            }
+                            },
+                            userName = authState.userName
                         )
                     }
                 }

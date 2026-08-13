@@ -64,6 +64,7 @@ fun AnalysisScreen(analysisViewModel: AnalysisViewModel) {
         MetricOption("Temperatura", p.accentSecondary, Icons.Filled.DeviceThermostat),
         MetricOption("Conductividad", YellowNeon, Icons.Filled.Bolt)
     )
+    val metricEmojis = mapOf("Pulso" to "\u2764\uFE0F", "Temperatura" to "\uD83C\uDF21\uFE0F", "Conductividad" to "\u26A1")
 
     val chartPoints = uiState.lecturas.map { it ->
         val valFloat = when (uiState.selectedMetric) {
@@ -123,8 +124,77 @@ fun AnalysisScreen(analysisViewModel: AnalysisViewModel) {
                     text = stringResource(R.string.analysis_desc),
                     fontSize = 13.sp,
                     color = p.textSecondary,
-                    modifier = Modifier.padding(top = 4.dp, bottom = 20.dp)
+                    modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
                 )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(if (uiState.lecturas.isNotEmpty()) GreenNeon else p.border)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (uiState.lecturas.isNotEmpty()) "EN VIVO \u00B7 actualizado con el reloj" else "SIN DATOS DEL RELOJ A\u00DAN",
+                            fontSize = 10.sp,
+                            color = if (uiState.lecturas.isNotEmpty()) GreenNeon else p.textSecondary,
+                            letterSpacing = 1.sp
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(p.surface)
+                            .border(width = 1.dp, color = p.border, shape = RoundedCornerShape(8.dp))
+                            .clickable {
+                                haptic.performSelection()
+                                analysisViewModel.loadLecturas()
+                            }
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(text = "\uD83D\uDD04", fontSize = 14.sp)
+                    }
+                }
+
+                if (uiState.lecturas.isEmpty() && uiState.error == null) {
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(p.surface)
+                            .border(width = 1.dp, color = p.border, shape = RoundedCornerShape(12.dp))
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(text = "\uD83D\uDC5F", fontSize = 36.sp)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Conecta tu reloj BioGuard",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = p.textPrimary
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Las lecturas aparecer\u00E1n aqu\u00ED en tiempo real. Toca \uD83D\uDD04 para recargar.",
+                                fontSize = 12.sp,
+                                color = p.textSecondary,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -179,12 +249,16 @@ fun AnalysisScreen(analysisViewModel: AnalysisViewModel) {
                                 },
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = metric.icon,
-                                contentDescription = metric.name,
-                                tint = metric.color,
-                                modifier = Modifier.size(18.dp)
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = metric.icon,
+                                    contentDescription = metric.name,
+                                    tint = metric.color,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(text = metricEmojis[metric.name] ?: "", fontSize = 12.sp)
+                            }
                         }
                     }
                 }
@@ -196,7 +270,7 @@ fun AnalysisScreen(analysisViewModel: AnalysisViewModel) {
                     points = chartPoints,
                     lineColor = chartColor,
                     unit = unit,
-                    title = "Tendencia (${uiState.selectedMetric.uppercase()})"
+                    title = "${metricEmojis[uiState.selectedMetric] ?: ""} Tendencia (${uiState.selectedMetric.uppercase()})"
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))

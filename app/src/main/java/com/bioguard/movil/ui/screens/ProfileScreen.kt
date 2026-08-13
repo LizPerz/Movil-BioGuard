@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.MediaStore
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -348,7 +349,17 @@ fun ProfileScreen(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Button(
-                    onClick = { showEditBiometriaModal = true },
+                    onClick = {
+                        if (canManageBiometria) {
+                            showEditBiometriaModal = true
+                        } else {
+                            Toast.makeText(
+                                context,
+                                "No tienes permisos para editar la información médica",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(46.dp),

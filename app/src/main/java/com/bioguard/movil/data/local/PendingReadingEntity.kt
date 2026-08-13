@@ -19,6 +19,7 @@ data class PendingReadingEntity(
     val hrv: Double?,
     val spo2: Double?,
     val pasos: Int? = null,
+    val probabilidadPico: Double? = null,
     val timestamp: String,
     val sourceMessageId: String? = null
 )

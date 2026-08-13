@@ -9,15 +9,41 @@ import org.junit.Test
 class WearablePayloadValidatorTest {
     @Test
     fun `accepts supported durable telemetry`() {
-        val reading = LecturaSensorRequest(72.0, 0.0, 0.0, 41.2, null, 123, "2026-08-09T18:20:30Z")
+        val reading = LecturaSensorRequest(
+            pulsoBpm = 72.0,
+            temperaturaC = 0.0,
+            sudoracionGsr = 0.0,
+            hrv = 41.2,
+            pasos = 123,
+            timestamp = "2026-08-09T18:20:30Z"
+        )
         assertTrue(WearablePayloadValidator.isValid(reading))
         assertTrue(WearablePayloadValidator.isAllowedPath("/bioguard/telemetry/42"))
     }
 
     @Test
     fun `rejects non finite and physiologically impossible readings`() {
-        assertFalse(WearablePayloadValidator.isValid(LecturaSensorRequest(Double.NaN, 36.5, 1.0, null, null, null, "2026-08-09T18:20:30Z")))
-        assertFalse(WearablePayloadValidator.isValid(LecturaSensorRequest(72.0, 36.5, 1.0, null, 140.0, null, "2026-08-09T18:20:30Z")))
+        assertFalse(
+            WearablePayloadValidator.isValid(
+                LecturaSensorRequest(
+                    pulsoBpm = Double.NaN,
+                    temperaturaC = 36.5,
+                    sudoracionGsr = 1.0,
+                    timestamp = "2026-08-09T18:20:30Z"
+                )
+            )
+        )
+        assertFalse(
+            WearablePayloadValidator.isValid(
+                LecturaSensorRequest(
+                    pulsoBpm = 72.0,
+                    temperaturaC = 36.5,
+                    sudoracionGsr = 1.0,
+                    spo2 = 140.0,
+                    timestamp = "2026-08-09T18:20:30Z"
+                )
+            )
+        )
     }
 
     @Test

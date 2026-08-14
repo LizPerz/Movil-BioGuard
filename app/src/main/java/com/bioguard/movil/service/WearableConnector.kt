@@ -172,6 +172,23 @@ class WearableConnector(
         }
     }
 
+    /**
+     * Vinculación forzada: limpia el cooldown de la API de Wear OS e intenta
+     * descubrir/conectar de inmediato al reloj, reintentando aunque el companion
+     * todavía esté terminando de conectarse por Bluetooth.
+     */
+    fun forceReconnect() {
+        wearOsApiUnavailableUntilMillis = 0L
+        scope.launch {
+            val device = discoverAndConnect(forceWearOsRetry = true)
+            if (device != null) {
+                sendRiskThresholds()
+            } else {
+                Log.d(TAG, "Reconexión forzada sin reloj alcanzable todavía; se reintentará en breve")
+            }
+        }
+    }
+
     suspend fun discoverAndConnect(forceWearOsRetry: Boolean = false): WearableDeviceInfo? {
         if (!forceWearOsRetry && isWearOsApiInCooldown()) {
             _connectionState.value = WearableConnectionState.UNAVAILABLE
@@ -310,13 +327,13 @@ class WearableConnector(
     private fun startConnectionMonitor() {
         monitorJob = scope.launch {
             while (isActive) {
-                delay(30_000)
-                if (isWearOsApiInCooldown()) {
-                    _connectionState.value = WearableConnectionState.UNAVAILABLE
-                    continue
-                }
+                delay(15_000)
                 if (_connectionState.value != WearableConnectionState.CONNECTED) {
-                    val device = discoverAndConnect()
+                    val device = if (isWearOsApiInCooldown()) {
+                        discoverAndConnect(forceWearOsRetry = true)
+                    } else {
+                        discoverAndConnect()
+                    }
                     if (device != null) {
                         sendRiskThresholds()
                     }
@@ -674,7 +691,7 @@ class WearableConnector(
         private const val PAIR_PATH = "/bioguard/pair"
         private const val PAIR_ACK_TIMEOUT_MILLIS = 8_000L
         private const val WEAR_OS_API_UNAVAILABLE_STATUS = 17
-        private const val WEAR_OS_API_RETRY_COOLDOWN_MILLIS = 10 * 60 * 1000L
+        private const val WEAR_OS_API_RETRY_COOLDOWN_MILLIS = 30_000L
     }
 
     private fun ApiException.isWearOsApiUnavailable(): Boolean {

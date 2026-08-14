@@ -31,6 +31,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BluetoothDisabled
+import androidx.compose.material.icons.filled.BluetoothSearching
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -376,6 +377,32 @@ fun DeviceScreen(
                             Text(
                                 text = stringResource(R.string.device_disconnect),
                                 color = RedNeon,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+
+                    if (!isConnected) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Button(
+                            onClick = { deviceViewModel.reconectarForzado() },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = p.accent)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.BluetoothSearching,
+                                contentDescription = null,
+                                tint = p.background,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Reconectar por Bluetooth",
+                                color = p.background,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 12.sp
                             )

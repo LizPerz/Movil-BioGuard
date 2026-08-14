@@ -26,6 +26,7 @@ import com.bioguard.movil.util.WearablePairingQr
 import com.google.android.gms.wearable.Wearable
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -92,6 +93,7 @@ class DeviceViewModel @Inject constructor(
 
     private var wearableConnector: WearableConnector? = null
     private var activeScanCallback: ScanCallback? = null
+    private var reconnectJob: Job? = null
 
     private fun hasBluetoothScanPermission(): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
@@ -115,18 +117,19 @@ class DeviceViewModel @Inject constructor(
     private fun observeWearableConnection() {
         val connector = getOrCreateWearableConnector()
         viewModelScope.launch {
-        connector.connectionState.collect { state ->
-            _uiState.update { it.copy(connectionState = state) }
-            if (state == WearableConnectionState.CONNECTED) {
-                if (isBluetoothEnabled()) {
-                    _uiState.update { it.copy(isPaired = true, isConnected = true) }
-                }
-            } else if (state == WearableConnectionState.DISCONNECTED || state == WearableConnectionState.UNAVAILABLE) {
+            connector.connectionState.collect { state ->
+                _uiState.update { it.copy(connectionState = state) }
+                if (state == WearableConnectionState.CONNECTED) {
+                    if (isBluetoothEnabled()) {
+                        _uiState.update { it.copy(isPaired = true, isConnected = true) }
+                    }
+                } else if (state == WearableConnectionState.DISCONNECTED || state == WearableConnectionState.UNAVAILABLE) {
                     _uiState.update { current ->
                         current.copy(
                             isConnected = false
                         )
                     }
+                    scheduleForcedReconnect()
                 }
             }
         }
@@ -158,6 +161,46 @@ class DeviceViewModel @Inject constructor(
             wearableConnector?.register()
         }
         return wearableConnector!!
+    }
+
+    /**
+     * Reintenta la vinculación Bluetooth de forma forzada: limpia el cooldown de la
+     * API de Wear OS e intenta conectar con el reloj de inmediato.
+     */
+    fun reconectarForzado() {
+        val connector = getOrCreateWearableConnector()
+        _uiState.update { it.copy(isLoading = true, error = null) }
+        viewModelScope.launch {
+            connector.forceReconnect()
+            delay(4000)
+            if (connector.connectionState.value == WearableConnectionState.CONNECTED) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        isPaired = true,
+                        isConnected = true,
+                        successMessage = "Reloj conectado por Bluetooth"
+                    )
+                }
+            } else {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = "No se pudo conectar con el reloj por Bluetooth. Asegúrate de que esté encendido, cerca y con la app BioGuard abierta."
+                    )
+                }
+            }
+        }
+    }
+
+    private fun scheduleForcedReconnect() {
+        reconnectJob?.cancel()
+        reconnectJob = viewModelScope.launch {
+            delay(8_000)
+            if (isBluetoothEnabled()) {
+                getOrCreateWearableConnector().forceReconnect()
+            }
+        }
     }
 
     fun loadDispositivo() {

@@ -303,6 +303,7 @@ class BioGuardMonitoringService : Service() {
             pacienteIdProvider = { prefs.patientId.first() }
         )
         wearableConnector.register()
+        wearableConnector.forceReconnect()
 
         serviceScope.launch {
             delay(2000)
@@ -418,14 +419,12 @@ class BioGuardMonitoringService : Service() {
         // Loop: Reconnect wearable + resend thresholds if needed
         serviceScope.launch {
             while (true) {
-                delay(60_000L)
+                delay(20_000L)
                 val state = wearableConnector.connectionState.value
-                if (state != com.bioguard.movil.service.WearableConnectionState.CONNECTED &&
-                    state != com.bioguard.movil.service.WearableConnectionState.UNAVAILABLE
-                ) {
+                if (state != com.bioguard.movil.service.WearableConnectionState.CONNECTED) {
                     riskThresholdsSent = false
-                    Log.d(TAG, "Wearable disconnected, attempting reconnect...")
-                    wearableConnector.discoverAndConnect()
+                    Log.d(TAG, "Wearable disconnected ($state), attempting forced reconnect...")
+                    wearableConnector.forceReconnect()
                 }
                 if (wearableConnector.connectionState.value == com.bioguard.movil.service.WearableConnectionState.CONNECTED && !riskThresholdsSent) {
                     wearableConnector.sendRiskThresholds()

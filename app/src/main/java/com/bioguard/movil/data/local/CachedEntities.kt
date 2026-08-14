@@ -9,7 +9,7 @@ data class CachedReadingEntity(
     val pacienteId: String,
     val pulsoBpm: Double,
     val temperaturaC: Double,
-    val sudoracionGsr: Double,
+    val estresPct: Double,
     val hrv: Double,
     val spo2: Double,
     val pasos: Int,

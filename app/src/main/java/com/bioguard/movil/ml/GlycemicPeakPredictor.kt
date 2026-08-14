@@ -17,7 +17,7 @@ import kotlin.math.min
 data class PesosPico(
     val w0: Double = -8.0,      // intercept
     val w1: Double = 0.05,      // pulso (bpm)
-    val w2: Double = 0.02,      // sudor (µS)
+    val w2: Double = 0.03,      // estrés (%)
     val w3: Double = -0.04,     // temperatura (°C)
     val w4: Double = 0.15       // IMC
 ) {
@@ -30,9 +30,9 @@ data class GlycemicPrediction(
     val imc: Double,
     val z: Double,
     val pPico: Double,  // P(Pico) ∈ [0,1]
-    val casoClinico: String,  // "Hipoglucemia Nocturna", "Hiperglucemia Severa", "Óptimo", etc.
-    val nivelRiesgo: String,  // "Bajo", "Moderado Alto", "Crítico Alto"
-    val accionAutomatizada: String?  // null or action description
+    val casoClinico: String,  // "Hipoglucemia Nocturna", "Hiperglucemia Severa", "Estado Optimo", "Vigilancia"
+    val nivelRiesgo: String,  // "Critico Alto", "Moderado Alto", "Bajo (Estable)", "Por evaluar"
+    val accionAutomatizada: String?  // action description
 )
 
 class GlycemicPeakPredictor(private val pesos: PesosPico = PesosPico.DEFAULT) {
@@ -48,17 +48,17 @@ class GlycemicPeakPredictor(private val pesos: PesosPico = PesosPico.DEFAULT) {
 
     /**
      * F2: Logistic z-score
-     * z = w0 + w1*pulso + w2*sudor + w3*temp + w4*imc
+     * z = w0 + w1*pulso + w2*estres + w3*temp + w4*imc
      */
     fun calcularZ(
         pulsoBpm: Double,
-        sudoracionMicroS: Double,
+        estresPct: Double,
         temperaturaC: Double,
         imc: Double
     ): Double {
         return pesos.w0 +
                 pesos.w1 * pulsoBpm +
-                pesos.w2 * sudoracionMicroS +
+                pesos.w2 * estresPct +
                 pesos.w3 * temperaturaC +
                 pesos.w4 * imc
     }
@@ -72,40 +72,34 @@ class GlycemicPeakPredictor(private val pesos: PesosPico = PesosPico.DEFAULT) {
     }
 
     /**
-     * Risk matrix classification
+     * Risk matrix classification (sensores físicos reales del Galaxy Watch 7)
      * Returns clinical case, risk level, and recommended action
+     *   - Hipoglucemia Nocturna: Pulso > 110, Temp < 35.0°C, Estres > 80%   -> Critico Alto
+     *   - Hiperglucemia Severa:  Pulso 95-110, Temp > 37.2°C, Estres 60-80% -> Moderado Alto
+     *   - Estado Optimo:         Pulso 60-80, Temp 36.0-36.7°C, Estres < 50% -> Bajo (Estable)
+     *   - Vigilancia:            resto
      */
     fun clasificarRiesgo(
         pulsoBpm: Double,
         temperaturaC: Double,
-        sudoracionMicroS: Double,
-        pPico: Double
+        estresPct: Double
     ): Triple<String, String, String?> {
-        // Casos clínicos (basado en especificación)
         return when {
-            // Hipoglucemia Nocturna: Pulso >110 AND Temp <35 AND Sudor >80 µS
-            pulsoBpm > 110 && temperaturaC < 35 && sudoracionMicroS > 80 -> {
-                Triple("Hipoglucemia Nocturna", "Crítico Alto", "Activar protocolo de hipoglucemia nocturna")
+            // Hipoglucemia Nocturna: Pulso >110 AND Temp <35 AND Estres >80%
+            pulsoBpm > 110 && temperaturaC < 35 && estresPct > 80 -> {
+                Triple("Hipoglucemia Nocturna", "Critico Alto", "Detonar alerta sonora/haptica en Reloj y Celular; si no hay respuesta en 60s, enviar SMS con ubicacion GPS a red familiar.")
             }
-            // Hiperglucemia Severa: Pulso 95-110 AND Temp >37.2 AND Sudor <20 µS
-            pulsoBpm in 95.0..110.0 && temperaturaC > 37.2 && sudoracionMicroS < 20 -> {
-                Triple("Hiperglucemia Severa", "Moderado Alto", "Monitoreo intensivo de glucosa")
+            // Hiperglucemia Severa: Pulso 95-110 AND Temp >37.2 AND Estres 60-80%
+            pulsoBpm in 95.0..110.0 && temperaturaC > 37.2 && estresPct in 60.0..80.0 -> {
+                Triple("Hiperglucemia Severa", "Moderado Alto", "Enviar notificacion dirigida al celular con recomendaciones de hidratacion y caminata ligera.")
             }
-            // Óptimo: Pulso 60-80 bpm AND Temp 36-36.7°C AND Sudor 15-35 µS
-            pulsoBpm in 60.0..80.0 && temperaturaC in 36.0..36.7 && sudoracionMicroS in 15.0..35.0 -> {
-                Triple("Óptimo", "Bajo", null)
+            // Estado Optimo: Pulso 60-80 bpm AND Temp 36-36.7°C AND Estres <50%
+            pulsoBpm in 60.0..80.0 && temperaturaC in 36.0..36.7 && estresPct < 50 -> {
+                Triple("Estado Optimo", "Bajo (Estable)", "Mantener streaming BLE continuo cada 10 segundos y realizar almacenamiento silencioso en SQLite local.")
             }
-            // Alto P(Pico) indicates glycemic event risk
-            pPico >= 0.7 -> {
-                Triple("Evento Glucémico Potencial", "Moderado Alto", "Verificar glucosa en sangre")
-            }
-            // Estrés fisiológico
-            pulsoBpm > 100 || temperaturaC > 38 -> {
-                Triple("Estrés Fisiológico", "Moderado", "Monitoreo recomendado")
-            }
-            // Default: monitoreo estándar
+            // Vigilancia: monitoreo continuo
             else -> {
-                Triple("Monitoreo Estándar", "Bajo", null)
+                Triple("Vigilancia", "Por evaluar", "Mantener monitoreo continuo; evaluar siguiente lectura en 10 segundos.")
             }
         }
     }
@@ -119,13 +113,13 @@ class GlycemicPeakPredictor(private val pesos: PesosPico = PesosPico.DEFAULT) {
         estaturaCm: Double,
         pulsoBpm: Double,
         temperaturaC: Double,
-        sudoracionMicroS: Double
+        estresPct: Double
     ): GlycemicPrediction {
         // F1: IMC
         val imc = calcularIMC(pesoKg, estaturaCm)
 
         // F2: z-score
-        val z = calcularZ(pulsoBpm, sudoracionMicroS, temperaturaC, imc)
+        val z = calcularZ(pulsoBpm, estresPct, temperaturaC, imc)
 
         // F3: P(Pico)
         val pPico = calcularPPico(z)
@@ -134,8 +128,7 @@ class GlycemicPeakPredictor(private val pesos: PesosPico = PesosPico.DEFAULT) {
         val (casoClinico, nivelRiesgo, accion) = clasificarRiesgo(
             pulsoBpm,
             temperaturaC,
-            sudoracionMicroS,
-            pPico
+            estresPct
         )
 
         return GlycemicPrediction(
@@ -157,7 +150,7 @@ class GlycemicPeakPredictor(private val pesos: PesosPico = PesosPico.DEFAULT) {
         fun withCustomPesos(
             w0: Double = -8.0,
             w1: Double = 0.05,
-            w2: Double = 0.02,
+            w2: Double = 0.03,
             w3: Double = -0.04,
             w4: Double = 0.15
         ): GlycemicPeakPredictor {

@@ -119,7 +119,7 @@
     <string name="dashboard_low_m">BAJO</string>
     <string name="dashboard_heart_rate">RITMO CARDÍACO</string>
     <string name="dashboard_temperature">TEMPERATURA</string>
-    <string name="dashboard_conductivity">CONDUCTIVIDAD</string>
+    <string name="dashboard_stress">ESTRÉS</string>
     <string name="dashboard_loading">CARGANDO...</string>
     <string name="dashboard_critical">CRÍTICO</string>
     <string name="dashboard_sug_critical">⚠ Atención médica inmediata requerida. Consulta a tu especialista.</string>

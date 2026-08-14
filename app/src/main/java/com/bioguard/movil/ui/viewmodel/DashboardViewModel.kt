@@ -118,7 +118,7 @@ class DashboardViewModel @Inject constructor(
                     estaturaCm = estaturaCm,
                     pulsoBpm = ultimaLectura.pulsoBpm,
                     temperaturaC = ultimaLectura.temperaturaC,
-                    sudoracionMicroS = ultimaLectura.sudoracionGsr
+                    estresPct = ultimaLectura.estresPct
                 )
                 
                 // Construir reporte
@@ -206,7 +206,7 @@ class DashboardViewModel @Inject constructor(
             timestamp = fechaHora,
             pulsoBpm = pulsoBpm,
             temperaturaC = temperaturaC,
-            sudoracionGsr = sudoracionGsr,
+            estresPct = estresPct,
             hrv = hrv,
             spo2 = spo2,
             probabilidadPico = null,

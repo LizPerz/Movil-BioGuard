@@ -12,7 +12,7 @@ class WearablePayloadValidatorTest {
         val reading = LecturaSensorRequest(
             pulsoBpm = 72.0,
             temperaturaC = 0.0,
-            sudoracionGsr = 0.0,
+            estresPct = 0.0,
             hrv = 41.2,
             pasos = 123,
             timestamp = "2026-08-09T18:20:30Z"
@@ -28,7 +28,7 @@ class WearablePayloadValidatorTest {
                 LecturaSensorRequest(
                     pulsoBpm = Double.NaN,
                     temperaturaC = 36.5,
-                    sudoracionGsr = 1.0,
+                    estresPct = 1.0,
                     timestamp = "2026-08-09T18:20:30Z"
                 )
             )
@@ -38,7 +38,7 @@ class WearablePayloadValidatorTest {
                 LecturaSensorRequest(
                     pulsoBpm = 72.0,
                     temperaturaC = 36.5,
-                    sudoracionGsr = 1.0,
+                    estresPct = 1.0,
                     spo2 = 140.0,
                     timestamp = "2026-08-09T18:20:30Z"
                 )

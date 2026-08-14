@@ -35,7 +35,7 @@ import org.json.JSONObject
 data class WatchEventDto(
     val bpm: Float,
     val temperatura: Float,
-    val sudoracionGsr: Float,
+    val estresPct: Float,
     val nivelRiesgo: String,
     val timestamp: Long,
     val tipoEvento: String,
@@ -50,7 +50,7 @@ data class WatchAlertDto(
     val timestamp: Long,
     val bpm: Float,
     val temperatura: Float,
-    val sudoracionGsr: Float
+    val estresPct: Float
 )
 
 data class RiskThresholds(
@@ -59,7 +59,7 @@ data class RiskThresholds(
     val criticalTemp: Float = 39.0f,
     val moderateBpm: Float = 105f,
     val moderateTemp: Float = 37.8f,
-    val moderateGsr: Float = 65f
+    val moderateStress: Float = 60f
 )
 
 enum class WearableConnectionState {
@@ -431,12 +431,12 @@ class WearableConnector(
         }
     }
 
-    fun sendAlertCommandToWatch(bpm: Float, temperatura: Float, gsr: Float, probability: Float) {
+    fun sendAlertCommandToWatch(bpm: Float, temperatura: Float, estresPct: Float, probability: Float) {
         val payload = """
             {
                 "bpm": $bpm,
                 "temperatura": $temperatura,
-                "gsr": $gsr,
+                "estresPct": $estresPct,
                 "probability": $probability
             }
         """.trimIndent().toByteArray(StandardCharsets.UTF_8)

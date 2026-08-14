@@ -32,9 +32,9 @@ class MlRepository @Inject constructor(
         }
     }
 
-     suspend fun diagnosticar(pacienteId: String, pulsoBpm: Double, temperaturaC: Double, sudoracionGsr: Double): Resource<DiagnosticarResponse> {
+     suspend fun diagnosticar(pacienteId: String, pulsoBpm: Double, temperaturaC: Double, estresPct: Double): Resource<DiagnosticarResponse> {
          return try {
-             Resource.Success(api.diagnosticar(DiagnosticarRequest(pacienteId = pacienteId, pulsoBpm = pulsoBpm, temperaturaC = temperaturaC, sudoracionGsr = sudoracionGsr)))
+             Resource.Success(api.diagnosticar(DiagnosticarRequest(pacienteId = pacienteId, pulsoBpm = pulsoBpm, temperaturaC = temperaturaC, estresPct = estresPct)))
          } catch (e: Exception) {
              Resource.Error(e.toUserMessage("Error al diagnosticar"))
          }

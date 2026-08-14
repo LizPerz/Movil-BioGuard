@@ -15,7 +15,7 @@ data class PendingReadingEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val pulsoBpm: Double,
     val temperaturaC: Double,
-    val sudoracionGsr: Double,
+    val estresPct: Double,
     val hrv: Double?,
     val spo2: Double?,
     val pasos: Int? = null,

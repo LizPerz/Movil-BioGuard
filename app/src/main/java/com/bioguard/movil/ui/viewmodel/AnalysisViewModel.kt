@@ -123,7 +123,7 @@ class AnalysisViewModel @Inject constructor(
             timestamp = fechaHora,
             pulsoBpm = pulsoBpm,
             temperaturaC = temperaturaC,
-            sudoracionGsr = sudoracionGsr,
+            estresPct = estresPct,
             hrv = hrv,
             spo2 = spo2,
             probabilidadPico = null,

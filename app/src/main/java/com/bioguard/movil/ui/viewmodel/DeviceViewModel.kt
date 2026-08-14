@@ -119,17 +119,22 @@ class DeviceViewModel @Inject constructor(
         viewModelScope.launch {
             connector.connectionState.collect { state ->
                 _uiState.update { it.copy(connectionState = state) }
-                if (state == WearableConnectionState.CONNECTED) {
-                    if (isBluetoothEnabled()) {
+                when (state) {
+                    // La conexión se deriva de la capa de datos Wear OS (nodo con capability
+                    // "bioguard_watch" alcanzable / ACK de vinculación / mensajes recibidos),
+                    // no del estado de un enlace Bluetooth del SO. La capa de datos ya exige
+                    // un enlace activo para reportar nodos reachable.
+                    WearableConnectionState.CONNECTED,
+                    WearableConnectionState.STREAMING,
+                    WearableConnectionState.PAIRED -> {
                         _uiState.update { it.copy(isPaired = true, isConnected = true) }
                     }
-                } else if (state == WearableConnectionState.DISCONNECTED || state == WearableConnectionState.UNAVAILABLE) {
-                    _uiState.update { current ->
-                        current.copy(
-                            isConnected = false
-                        )
+                    WearableConnectionState.DISCONNECTED,
+                    WearableConnectionState.UNAVAILABLE -> {
+                        _uiState.update { current -> current.copy(isConnected = false) }
+                        scheduleForcedReconnect()
                     }
-                    scheduleForcedReconnect()
+                    else -> Unit
                 }
             }
         }
@@ -179,7 +184,7 @@ class DeviceViewModel @Inject constructor(
                         isLoading = false,
                         isPaired = true,
                         isConnected = true,
-                        successMessage = "Reloj conectado por Bluetooth"
+                        successMessage = "Reloj conectado (capa de datos Wear OS)"
                     )
                 }
             } else {

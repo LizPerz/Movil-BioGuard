@@ -10,6 +10,7 @@ import com.bioguard.movil.data.repository.PacienteRepository
 import com.bioguard.movil.data.repository.PredictionMlSyncRepository
 import com.bioguard.movil.datastore.UserPreferences
 import com.bioguard.movil.ml.GlycemicPeakPredictor
+import com.bioguard.movil.ml.GlycemicPrediction
 import com.bioguard.movil.network.DashboardSummary
 import com.bioguard.movil.network.GuardarPrediccionRequest
 import com.bioguard.movil.network.LecturaSensorResponse
@@ -35,6 +36,7 @@ data class DashboardUiState(
     val lecturasRecientes: List<LecturaSensorResponse> = emptyList(),
     val pacienteId: String? = null,
     val connectionState: WearableConnectionState = WearableConnectionState.DISCONNECTED,
+    val ultimaPrediccion: GlycemicPrediction? = null,
     val error: String? = null
 )
 
@@ -64,9 +66,30 @@ class DashboardViewModel @Inject constructor(
             val patientId = prefs.patientId.first() ?: "paciente-local"
             _uiState.update { it.copy(isLoading = false, error = null, pacienteId = patientId) }
 
+            // Peso/estatura para el IMC (F1) usado por el predictor local de pico glucémico.
+            val pesoKg = prefs.patientWeight.first()?.toDoubleOrNull() ?: 0.0
+            val estaturaCm = prefs.patientHeight.first()?.toDoubleOrNull() ?: 0.0
+            val tieneBiometria = pesoKg > 0 && estaturaCm > 0
+            val predictor = GlycemicPeakPredictor()
+
             // La caché se filtra por paciente para no mezclar datos entre cuentas/pacientes.
             cachedDataDao.getCachedReadings(patientId, 2000).collectLatest { cachedReadings ->
-                val latest = cachedReadings.firstOrNull()?.toResponse()
+                val responses = cachedReadings.mapIndexed { index, reading ->
+                    val pred = if (tieneBiometria) {
+                        predictor.predecir(
+                            pesoKg = pesoKg,
+                            estaturaCm = estaturaCm,
+                            pulsoBpm = reading.pulsoBpm,
+                            temperaturaC = reading.temperaturaC,
+                            estresPct = reading.estresPct
+                        )
+                    } else null
+                    reading.toResponse(
+                        probabilidadPico = pred?.pPico,
+                        nivelRiesgo = pred?.nivelRiesgo
+                    )
+                }
+                val latest = responses.firstOrNull()
                 val connState = if (cachedReadings.isNotEmpty()) WearableConnectionState.STREAMING else WearableConnectionState.PAIRED
                 _uiState.update {
                     it.copy(
@@ -75,7 +98,18 @@ class DashboardViewModel @Inject constructor(
                         summary = DashboardSummary(
                             ultimaLectura = latest
                         ),
-                        lecturasRecientes = cachedReadings.map { reading -> reading.toResponse() },
+                        lecturasRecientes = responses,
+                        ultimaPrediccion = responses.firstOrNull()?.let { r ->
+                            if (r.probabilidadPico != null) {
+                                predictor.predecir(
+                                    pesoKg = pesoKg,
+                                    estaturaCm = estaturaCm,
+                                    pulsoBpm = r.pulsoBpm,
+                                    temperaturaC = r.temperaturaC,
+                                    estresPct = r.estresPct
+                                )
+                            } else null
+                        },
                         error = null
                     )
                 }
@@ -200,7 +234,10 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
-    private fun CachedReadingEntity.toResponse(): LecturaSensorResponse {
+    private fun CachedReadingEntity.toResponse(
+        probabilidadPico: Double? = null,
+        nivelRiesgo: String? = null
+    ): LecturaSensorResponse {
         return LecturaSensorResponse(
             id = id,
             timestamp = fechaHora,
@@ -209,8 +246,8 @@ class DashboardViewModel @Inject constructor(
             estresPct = estresPct,
             hrv = hrv,
             spo2 = spo2,
-            probabilidadPico = null,
-            nivelRiesgo = null
+            probabilidadPico = probabilidadPico,
+            nivelRiesgo = nivelRiesgo
         )
     }
 }

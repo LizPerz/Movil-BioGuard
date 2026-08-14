@@ -55,6 +55,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bioguard.movil.R
+import com.bioguard.movil.ml.GlycemicPrediction
 import com.bioguard.movil.ui.components.BioHealthChart
 import com.bioguard.movil.ui.components.ChartPoint
 import com.bioguard.movil.ui.components.ErrorRetryBox
@@ -296,6 +297,26 @@ fun DashboardScreen(
             )
         }
 
+    val probabilidadChartPoints = sortedReadings.mapNotNull { reading ->
+        val prob = reading.probabilidadPico ?: return@mapNotNull null
+        val tsMs = runCatching { java.time.Instant.parse(reading.timestamp).toEpochMilli() }.getOrDefault(0L)
+        val (labelStr, timeStr) = try {
+            val instant = java.time.Instant.parse(reading.timestamp)
+            val zdt = instant.atZone(java.time.ZoneId.systemDefault())
+            val lbl = zdt.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+            val full = zdt.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"))
+            lbl to full
+        } catch (_: Exception) {
+            reading.timestamp.substringAfter("T", "").take(5) to reading.timestamp.substringAfter("T", "").take(8)
+        }
+        ChartPoint(
+            label = labelStr,
+            value = (prob * 100).toFloat(),
+            time = timeStr,
+            timestampMs = tsMs
+        )
+    }
+
     if (uiState.isLoading) {
         Box(
             modifier = Modifier
@@ -399,6 +420,23 @@ fun DashboardScreen(
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
 
+                // Análisis IA de Pico Glucémico (tarjeta de predicción local)
+                uiState.ultimaPrediccion?.let { prediccion ->
+                    MlPredictionCard(prediccion = prediccion)
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+
+                // Interactive Probability Vector Chart
+                if (probabilidadChartPoints.isNotEmpty()) {
+                    BioHealthChart(
+                        points = probabilidadChartPoints,
+                        lineColor = if ((uiState.ultimaPrediccion?.pPico ?: 0.0) >= 0.5) RedNeon else GreenNeon,
+                        unit = "%",
+                        title = "Probabilidad IA de Pico Glucémico",
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                }
+
                 // Interactive Heart Rate Vector Chart
                 BioHealthChart(
                     points = pulseChartPoints,
@@ -457,7 +495,8 @@ fun DashboardScreen(
                             val points = when (vital.unit) {
                                 "BPM" -> pulseChartPoints
                                 "\u00b0C" -> tempChartPoints
-                                "mg/dL", "probabilidad" -> glucoseChartPoints
+                                "probabilidad" -> probabilidadChartPoints
+                                "mg/dL" -> glucoseChartPoints
                                 else -> stressChartPoints
                             }
                             activeVitalDetail = VitalDetailData(
@@ -701,6 +740,59 @@ fun DashboardScreen(
             unit = vital.unit,
             onDismiss = { showHelpForVital = null }
         )
+    }
+}
+
+@Composable
+fun MlPredictionCard(prediccion: GlycemicPrediction) {
+    val p = LocalThemeState.current.colorPalette()
+    val probPct = (prediccion.pPico * 100).coerceIn(0.0, 100.0)
+    val riskColor = when {
+        prediccion.pPico >= 0.7 -> RedNeon
+        prediccion.pPico >= 0.5 -> YellowNeon
+        else -> GreenNeon
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(p.surface)
+            .border(width = 1.dp, color = riskColor.copy(alpha = 0.4f), shape = RoundedCornerShape(16.dp))
+            .padding(16.dp)
+    ) {
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(text = "Análisis IA · Pico Glucémico", fontSize = 11.sp, color = p.textSecondary, letterSpacing = 2.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(text = prediccion.nivelRiesgo, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = riskColor, letterSpacing = 1.sp)
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(text = "P(Pico)", fontSize = 10.sp, color = p.textSecondary, letterSpacing = 1.sp)
+                    Text(
+                        text = String.format(java.util.Locale.US, "%.1f%%", probPct),
+                        fontSize = 26.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = riskColor
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(text = prediccion.casoClinico, fontSize = 13.sp, color = p.textPrimary, fontWeight = FontWeight.Medium)
+            if (!prediccion.accionAutomatizada.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = prediccion.accionAutomatizada,
+                    fontSize = 11.sp,
+                    color = p.textSecondary,
+                    lineHeight = 17.sp
+                )
+            }
+        }
     }
 }
 

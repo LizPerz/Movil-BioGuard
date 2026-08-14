@@ -3,11 +3,13 @@ package com.bioguard.movil.ui.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.bioguard.movil.data.Resource
 import com.bioguard.movil.data.local.CachedDataDao
 import com.bioguard.movil.data.local.CachedReadingEntity
 import com.bioguard.movil.data.repository.MlRepository
 import com.bioguard.movil.data.repository.PacienteRepository
 import com.bioguard.movil.data.repository.PredictionMlSyncRepository
+import com.bioguard.movil.data.repository.SensorRepository
 import com.bioguard.movil.datastore.UserPreferences
 import com.bioguard.movil.ml.GlycemicPeakPredictor
 import com.bioguard.movil.ml.GlycemicPrediction
@@ -16,6 +18,7 @@ import com.bioguard.movil.network.GuardarPrediccionRequest
 import com.bioguard.movil.network.LecturaSensorResponse
 import com.bioguard.movil.service.PredictionMlSyncWorker
 import com.bioguard.movil.service.WearableConnectionState
+import com.bioguard.movil.ui.model.UserRole
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,6 +50,7 @@ class DashboardViewModel @Inject constructor(
     private val prefs: UserPreferences,
     private val mlRepository: MlRepository,
     private val pacienteRepository: PacienteRepository,
+    private val sensorRepository: SensorRepository,
     private val syncRepository: PredictionMlSyncRepository
 ) : AndroidViewModel(application) {
 
@@ -72,48 +76,105 @@ class DashboardViewModel @Inject constructor(
             val tieneBiometria = pesoKg > 0 && estaturaCm > 0
             val predictor = GlycemicPeakPredictor()
 
+            // Cuidador: no recibe el stream Bluetooth del reloj (está vinculado al teléfono
+            // del paciente); su pantalla se alimenta de las lecturas REALES que el backend
+            // ya tiene sincronizadas para el paciente asignado.
+            if (UserRole.from(prefs.userRole.first()) == UserRole.CUIDADOR) {
+                when (val result = sensorRepository.getLecturas(patientId, 100)) {
+                    is Resource.Success -> pintarLecturas(
+                        responses = result.data,
+                        predictor = predictor,
+                        pesoKg = pesoKg,
+                        estaturaCm = estaturaCm,
+                        tieneBiometria = tieneBiometria
+                    )
+                    is Resource.Error -> _uiState.update {
+                        it.copy(isLoading = false, error = result.message)
+                    }
+                    is Resource.Loading -> {}
+                }
+                return@launch
+            }
+
+            // Paciente: la caché local es la fuente en tiempo real (stream Wear → teléfono).
+            // Si la caché está vacía (reinstalación / dispositivo nuevo), se rescatan del
+            // backend las lecturas reales ya sincronizadas para no pintar una pantalla vacía.
+            val backendLecturas = when (val result = sensorRepository.getLecturas(patientId, 100)) {
+                is Resource.Success -> result.data
+                else -> emptyList()
+            }
+
             // La caché se filtra por paciente para no mezclar datos entre cuentas/pacientes.
             cachedDataDao.getCachedReadings(patientId, 2000).collectLatest { cachedReadings ->
-                val responses = cachedReadings.mapIndexed { index, reading ->
-                    val pred = if (tieneBiometria) {
+                val responses = if (cachedReadings.isNotEmpty()) {
+                    cachedReadings.mapIndexed { index, reading ->
+                        val pred = if (tieneBiometria) {
+                            predictor.predecir(
+                                pesoKg = pesoKg,
+                                estaturaCm = estaturaCm,
+                                pulsoBpm = reading.pulsoBpm,
+                                temperaturaC = reading.temperaturaC,
+                                estresPct = reading.estresPct
+                            )
+                        } else null
+                        reading.toResponse(
+                            probabilidadPico = pred?.pPico,
+                            nivelRiesgo = pred?.nivelRiesgo
+                        )
+                    }
+                } else {
+                    backendLecturas
+                }
+                pintarLecturas(
+                    responses = responses,
+                    predictor = predictor,
+                    pesoKg = pesoKg,
+                    estaturaCm = estaturaCm,
+                    tieneBiometria = tieneBiometria
+                )
+            }
+        }
+    }
+
+    private fun pintarLecturas(
+        responses: List<LecturaSensorResponse>,
+        predictor: GlycemicPeakPredictor,
+        pesoKg: Double,
+        estaturaCm: Double,
+        tieneBiometria: Boolean
+    ) {
+        val latest = responses.firstOrNull()
+        val connState = if (responses.isNotEmpty()) WearableConnectionState.STREAMING else WearableConnectionState.PAIRED
+        _uiState.update {
+            it.copy(
+                isLoading = false,
+                connectionState = connState,
+                summary = DashboardSummary(ultimaLectura = latest),
+                lecturasRecientes = responses,
+                ultimaPrediccion = latest?.let { r ->
+                    if (tieneBiometria && r.probabilidadPico != null) {
                         predictor.predecir(
                             pesoKg = pesoKg,
                             estaturaCm = estaturaCm,
-                            pulsoBpm = reading.pulsoBpm,
-                            temperaturaC = reading.temperaturaC,
-                            estresPct = reading.estresPct
+                            pulsoBpm = r.pulsoBpm,
+                            temperaturaC = r.temperaturaC,
+                            estresPct = r.estresPct
+                        )
+                    } else if (r.probabilidadPico != null) {
+                        // Cuidador sin biometría local: se muestra el riesgo IA real ya
+                        // calculado por el móvil del paciente y persistido en el backend.
+                        GlycemicPrediction(
+                            imc = 0.0,
+                            z = 0.0,
+                            pPico = r.probabilidadPico,
+                            casoClinico = r.nivelRiesgo ?: "Por evaluar",
+                            nivelRiesgo = r.nivelRiesgo ?: "Por evaluar",
+                            accionAutomatizada = null
                         )
                     } else null
-                    reading.toResponse(
-                        probabilidadPico = pred?.pPico,
-                        nivelRiesgo = pred?.nivelRiesgo
-                    )
-                }
-                val latest = responses.firstOrNull()
-                val connState = if (cachedReadings.isNotEmpty()) WearableConnectionState.STREAMING else WearableConnectionState.PAIRED
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        connectionState = connState,
-                        summary = DashboardSummary(
-                            ultimaLectura = latest
-                        ),
-                        lecturasRecientes = responses,
-                        ultimaPrediccion = responses.firstOrNull()?.let { r ->
-                            if (r.probabilidadPico != null) {
-                                predictor.predecir(
-                                    pesoKg = pesoKg,
-                                    estaturaCm = estaturaCm,
-                                    pulsoBpm = r.pulsoBpm,
-                                    temperaturaC = r.temperaturaC,
-                                    estresPct = r.estresPct
-                                )
-                            } else null
-                        },
-                        error = null
-                    )
-                }
-            }
+                },
+                error = null
+            )
         }
     }
 

@@ -14,7 +14,7 @@ class IdempotencyPayloadTest {
         val request = LecturaSensorRequest(
             pulsoBpm = 72.0,
             temperaturaC = 36.5,
-            sudoracionGsr = 0.0,
+            estresPct = 0.0,
             timestamp = "2026-08-09T00:00:00Z",
             sourceMessageId = "install-1:reading:42"
         )

@@ -88,7 +88,7 @@ class WearDataListenerService : WearableListenerService() {
             VitalSample(
                 heartRateBpm = cached.pulsoBpm,
                 temperatureC = cached.temperaturaC.takeIf { it > 0.0 },
-                gsr = cached.sudoracionGsr.takeIf { it > 0.0 },
+                estresPct = cached.estresPct.takeIf { it > 0.0 },
                 hrvMs = cached.hrv.takeIf { it > 0.0 },
                 spo2Percent = cached.spo2.takeIf { it > 0.0 }
             )
@@ -97,7 +97,7 @@ class WearDataListenerService : WearableListenerService() {
             current = VitalSample(
                 heartRateBpm = request.pulsoBpm,
                 temperatureC = request.temperaturaC.takeIf { it > 0.0 },
-                gsr = request.sudoracionGsr.takeIf { it > 0.0 },
+                estresPct = request.estresPct.takeIf { it > 0.0 },
                 hrvMs = request.hrv?.takeIf { it > 0.0 },
                 spo2Percent = request.spo2?.takeIf { it > 0.0 }
             ),
@@ -108,7 +108,7 @@ class WearDataListenerService : WearableListenerService() {
             sourceMessageId = sourceId,
             pulsoBpm = request.pulsoBpm,
             temperaturaC = request.temperaturaC,
-            sudoracionGsr = request.sudoracionGsr,
+            estresPct = request.estresPct,
             hrv = request.hrv ?: 0.0,
             spo2 = request.spo2 ?: 0.0,
             pasos = request.pasos ?: 0,

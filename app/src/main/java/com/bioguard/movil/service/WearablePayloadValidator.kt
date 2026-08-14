@@ -23,7 +23,7 @@ object WearablePayloadValidator {
     fun isValid(reading: LecturaSensorRequest): Boolean {
         if (!reading.pulsoBpm.isFinite() || reading.pulsoBpm !in 1.0..250.0) return false
         if (!reading.temperaturaC.isFinite() || (reading.temperaturaC != 0.0 && reading.temperaturaC !in 20.0..50.0)) return false
-        if (!reading.sudoracionGsr.isFinite() || reading.sudoracionGsr !in 0.0..1_000.0) return false
+        if (!reading.estresPct.isFinite() || reading.estresPct !in 0.0..100.0) return false
         if (!reading.hrv.isNullOrFiniteIn(0.0..1_000.0)) return false
         if (!reading.spo2.isNullOrFiniteIn(50.0..100.0, zeroIsUnavailable = true)) return false
         if (reading.pasos != null && reading.pasos !in 0..200_000) return false
@@ -40,7 +40,7 @@ object WearablePayloadValidator {
     fun isValid(event: WatchEventDto): Boolean =
         event.bpm.isFinite() && event.bpm in 0f..250f &&
             event.temperatura.isFinite() && event.temperatura in 0f..45f &&
-            event.sudoracionGsr.isFinite() && event.sudoracionGsr in 0f..1_000f &&
+            event.estresPct.isFinite() && event.estresPct in 0f..100f &&
             event.nivelRiesgo.length in 1..32 && event.tipoEvento.length in 1..80 &&
             event.descripcion.length in 1..500 &&
             (event.probabilidadMl == null || (event.probabilidadMl.isFinite() && event.probabilidadMl in 0.0..1.0))
@@ -49,7 +49,7 @@ object WearablePayloadValidator {
         alert.tipoAlerta.length in 1..80 && alert.mensaje.length in 1..500 &&
             alert.nivelRiesgo.length in 1..32 && alert.bpm.isFinite() && alert.bpm in 0f..250f &&
             alert.temperatura.isFinite() && alert.temperatura in 0f..45f &&
-            alert.sudoracionGsr.isFinite() && alert.sudoracionGsr in 0f..1_000f
+            alert.estresPct.isFinite() && alert.estresPct in 0f..100f
 
     private fun Double?.isNullOrFiniteIn(range: ClosedFloatingPointRange<Double>, zeroIsUnavailable: Boolean = false): Boolean {
         if (this == null) return true

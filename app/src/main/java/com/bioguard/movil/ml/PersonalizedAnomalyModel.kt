@@ -8,7 +8,7 @@ import kotlin.math.sqrt
 data class VitalSample(
     val heartRateBpm: Double,
     val temperatureC: Double? = null,
-    val gsr: Double? = null,
+    val estresPct: Double? = null,
     val hrvMs: Double? = null,
     val spo2Percent: Double? = null
 )
@@ -83,9 +83,9 @@ class PersonalizedAnomalyModel {
                 minimumScale = 0.20
             )?.let { add(it to 0.8) }
             standardizedDeviation(
-                current.gsr.validIn(GSR_RANGE),
-                baseline.mapNotNull { it.gsr.validIn(GSR_RANGE) },
-                minimumScale = 0.50
+                current.estresPct.validIn(ESTRES_RANGE),
+                baseline.mapNotNull { it.estresPct.validIn(ESTRES_RANGE) },
+                minimumScale = 5.0
             )?.let { add(it to 0.5) }
             standardizedDeviation(
                 current.hrvMs.validIn(HRV_RANGE),
@@ -170,10 +170,10 @@ class PersonalizedAnomalyModel {
             }
         }
 
-        sample.gsr.validIn(GSR_RANGE)?.let { gsr ->
-            if (gsr > 12.0) {
+        sample.estresPct.validIn(ESTRES_RANGE)?.let { estres ->
+            if (estres > 80.0) {
                 score = max(score, 50.0)
-                reasons += "Respuesta electrodérmica elevada"
+                reasons += "Nivel de estrés elevado"
             }
         }
 
@@ -191,7 +191,7 @@ class PersonalizedAnomalyModel {
         private const val MAX_REASONS = 3
         private val HEART_RATE_RANGE = 25.0..240.0
         private val TEMPERATURE_RANGE = 25.0..45.0
-        private val GSR_RANGE = 0.0..100.0
+        private val ESTRES_RANGE = 0.0..100.0
         private val HRV_RANGE = 1.0..300.0
         private val SPO2_RANGE = 50.0..100.0
     }

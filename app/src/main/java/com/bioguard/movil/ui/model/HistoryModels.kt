@@ -7,7 +7,7 @@ data class HistoryEntry(
     val time: String,
     val pulse: String,
     val temp: String,
-    val gsr: String,
+    val estres: String,
     val status: String,
     val statusColor: Color
 )

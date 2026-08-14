@@ -99,7 +99,7 @@ data class LecturaSensorRequest(
     @SerializedName("pacienteId") val pacienteId: String? = null,
     @SerializedName("pulsoBpm") val pulsoBpm: Double,
     @SerializedName("temperaturaC") val temperaturaC: Double,
-    @SerializedName("sudoracionGsr") val sudoracionGsr: Double,
+    @SerializedName("estresPct") val estresPct: Double,
     @SerializedName("hrv") val hrv: Double? = null,
     @SerializedName("spo2") val spo2: Double? = null,
     @SerializedName("pasos") val pasos: Int? = null,
@@ -119,7 +119,7 @@ data class LecturaSensorResponse(
     @SerializedName("timestamp") val timestamp: String,
     @SerializedName("pulsoBpm") val pulsoBpm: Double,
     @SerializedName("temperaturaC") val temperaturaC: Double,
-    @SerializedName("sudoracionGsr") val sudoracionGsr: Double,
+    @SerializedName("estresPct") val estresPct: Double,
     @SerializedName("hrv") val hrv: Double? = null,
     @SerializedName("spo2") val spo2: Double? = null,
     @SerializedName("pasos") val pasos: Int? = null,
@@ -281,7 +281,7 @@ data class AlertaResponse(
     @SerializedName("fechaCreacion") val fechaCreacion: String = "",
     @SerializedName("fechaAtencion") val fechaAtencion: String? = null
 )
-data class CrearAlertaRequest(@SerializedName("pacienteId") val pacienteId: String, @SerializedName("tipo") val tipo: String, @SerializedName("nivel") val nivel: String, @SerializedName("titulo") val titulo: String, @SerializedName("mensaje") val mensaje: String, @SerializedName("pulsoBpm") val pulsoBpm: Int? = null, @SerializedName("temperaturaC") val temperaturaC: Double? = null, @SerializedName("sudoracionGsr") val sudoracionGsr: Double? = null, @SerializedName("probabilidadPico") val probabilidadPico: Double? = null)
+data class CrearAlertaRequest(@SerializedName("pacienteId") val pacienteId: String, @SerializedName("tipo") val tipo: String, @SerializedName("nivel") val nivel: String, @SerializedName("titulo") val titulo: String, @SerializedName("mensaje") val mensaje: String, @SerializedName("pulsoBpm") val pulsoBpm: Int? = null, @SerializedName("temperaturaC") val temperaturaC: Double? = null, @SerializedName("estresPct") val estresPct: Double? = null, @SerializedName("probabilidadPico") val probabilidadPico: Double? = null)
 data class CrearAlertaResponse(@SerializedName("alertaId") val alertaId: String, @SerializedName("message") val message: String)
 data class AtenderAlertaRequest(@SerializedName("cuidadorId") val cuidadorId: String, @SerializedName("accionTomada") val accionTomada: String? = null)
 
@@ -303,7 +303,7 @@ data class PrediccionResponse(
     @SerializedName("casoClinico") val casoClinico: String? = null,
     @SerializedName("accionAutomatizada") val accionAutomatizada: String? = null
 )
-data class DiagnosticarRequest(@SerializedName("pacienteId") val pacienteId: String, @SerializedName("pulsoBpm") val pulsoBpm: Double, @SerializedName("temperaturaC") val temperaturaC: Double, @SerializedName("sudoracionGsr") val sudoracionGsr: Double)
+data class DiagnosticarRequest(@SerializedName("pacienteId") val pacienteId: String, @SerializedName("pulsoBpm") val pulsoBpm: Double, @SerializedName("temperaturaC") val temperaturaC: Double, @SerializedName("estresPct") val estresPct: Double)
 data class DiagnosticarResponse(
     @SerializedName("pacienteId") val pacienteId: String,
     @SerializedName("nivelRiesgo") val nivelRiesgo: String,

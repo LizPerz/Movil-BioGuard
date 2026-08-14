@@ -108,7 +108,7 @@ fun DashboardScreen(
             ?.let { System.currentTimeMillis() - it in 0..120_000L }
     } == true
     val lastTemp = ultimaLectura?.temperaturaC
-    val lastGsr = ultimaLectura?.sudoracionGsr
+    val lastStress = ultimaLectura?.estresPct
     val lastPulse = ultimaLectura?.pulsoBpm
 
     val tempStatus = when {
@@ -124,12 +124,12 @@ fun DashboardScreen(
         else -> GreenNeon
     }
 
-    val gsrStatus = when {
-        lastGsr == null -> stringResource(R.string.dashboard_no_data)
-        lastGsr >= 8.0 -> stringResource(R.string.dashboard_elevated)
+    val stressStatus = when {
+        lastStress == null -> stringResource(R.string.dashboard_no_data)
+        lastStress >= 80.0 -> stringResource(R.string.dashboard_elevated)
         else -> stringResource(R.string.dashboard_normal)
     }
-    val gsrStatusColor = when (gsrStatus) {
+    val stressStatusColor = when (stressStatus) {
         stringResource(R.string.dashboard_elevated) -> YellowNeon
         else -> GreenNeon
     }
@@ -146,7 +146,7 @@ fun DashboardScreen(
 
     val formattedPulse = lastPulse?.toInt()?.toString() ?: "--"
     val formattedTemp = lastTemp?.let { String.format(java.util.Locale.US, "%.1f", it) } ?: "--"
-    val formattedGsr = lastGsr?.let { String.format(java.util.Locale.US, "%.1f", it) } ?: "--"
+    val formattedStress = lastStress?.let { String.format(java.util.Locale.US, "%.0f", it) } ?: "--"
 
     val lastGlucose = ultimaLectura?.glucosaEstimadaMgDl?.takeIf { it > 0.0 }
     val formattedGlucose = lastGlucose?.let { String.format(java.util.Locale.US, "%.0f", it) } ?: "--"
@@ -181,7 +181,7 @@ fun DashboardScreen(
         VitalSign("Estimación Picos de Glucosa", formattedGlucose, "mg/dL", Icons.Filled.WaterDrop, Color(0xFFF43F5E), glucoseStatus, glucoseStatusColor),
         VitalSign(stringResource(R.string.dashboard_heart_rate), formattedPulse, "BPM", Icons.Filled.Favorite, p.accent, pulseStatus, if (pulseStatus == stringResource(R.string.dashboard_normal)) GreenNeon else if (pulseStatus == stringResource(R.string.dashboard_alert)) RedNeon else YellowNeon),
         VitalSign(stringResource(R.string.dashboard_temperature), formattedTemp, "\u00b0C", Icons.Filled.DeviceThermostat, p.accentSecondary, tempStatus, tempStatusColor),
-        VitalSign(stringResource(R.string.dashboard_conductivity), formattedGsr, "\u00b5S", Icons.Filled.Bolt, YellowNeon, gsrStatus, gsrStatusColor),
+        VitalSign(stringResource(R.string.dashboard_stress), formattedStress, "Estrés %", Icons.Filled.Bolt, YellowNeon, stressStatus, stressStatusColor),
         VitalSign("Riesgo IA de Pico Glucémico", if (lastRisk != null) "${(lastRisk * 100).toInt()}%" else "--", "probabilidad", Icons.Filled.Warning, if (lastRisk != null && lastRisk >= 0.5) RedNeon else p.accent, riskStatus, riskStatusColor)
     )
 
@@ -256,7 +256,7 @@ fun DashboardScreen(
         )
     }
 
-    val gsrChartPoints = sortedReadings.map {
+    val stressChartPoints = sortedReadings.map {
         val tsMs = runCatching { java.time.Instant.parse(it.timestamp).toEpochMilli() }.getOrDefault(0L)
         val (labelStr, timeStr) = try {
             val instant = java.time.Instant.parse(it.timestamp)
@@ -269,7 +269,7 @@ fun DashboardScreen(
         }
         ChartPoint(
             label = labelStr,
-            value = it.sudoracionGsr.toFloat(),
+            value = it.estresPct.toFloat(),
             time = timeStr,
             timestampMs = tsMs
         )
@@ -458,7 +458,7 @@ fun DashboardScreen(
                                 "BPM" -> pulseChartPoints
                                 "\u00b0C" -> tempChartPoints
                                 "mg/dL", "probabilidad" -> glucoseChartPoints
-                                else -> gsrChartPoints
+                                else -> stressChartPoints
                             }
                             activeVitalDetail = VitalDetailData(
                                 title = vital.name,
@@ -732,6 +732,14 @@ fun VitalInfoDialog(
                 else -> "Pulso Bajo / Bradicardia (< 60 BPM)" to "Un pulso de ${valueStr} BPM se encuentra por debajo de 60 latidos por minuto. Es común en personas deportistas; en reposo prolongado vigila mareos."
             }
         }
+        vitalName.contains("Estrés", ignoreCase = true) || unit == "Estrés %" -> {
+            when {
+                valDouble == null -> "Información de Nivel de Estrés" to "Sin lecturas suficientes para evaluar el nivel de estrés."
+                valDouble <= 50.0 -> "Normal / Estable (0 - 50%)" to "Un nivel de estrés de ${valueStr}% indica estabilidad en el sistema nervioso simpático, con buena recuperación metabólica."
+                valDouble <= 80.0 -> "Elevado (50 - 80%)" to "Un nivel de estrés de ${valueStr}% refleja mayor actividad simpática. Suele vincularse a picos de estrés, estimulación emocional o esfuerzo físico."
+                else -> "Muy Elevado (> 80%)" to "Un nivel de estrés de ${valueStr}% está muy por encima del rango saludable. Procura descanso, hidratación y consultar a tu red de cuidadores si persiste."
+            }
+        }
         vitalName.contains("Oxígeno", ignoreCase = true) || unit == "%" -> {
             "Saturación de Oxígeno (SpO2: 95% - 100%)" to "Una saturación de oxígeno en sangre de ${valueStr}% refleja una adecuada oxigenación arterial y excelente función respiratoria. Valores superiores al 95% se consideran completamente sanos."
         }
@@ -746,9 +754,8 @@ fun VitalInfoDialog(
         }
         else -> {
             when {
-                valDouble == null -> "Información de Conductividad (GSR)" to "Sin lecturas suficientes para evaluar la respuesta galvánica de la piel."
-                valDouble <= 50.0 -> "Normal / Estable (0 - 50 µS)" to "Una conductividad galvánica de la piel de ${valueStr} µS indica niveles normales de sudoración y estabilidad en el sistema nervioso simpático (bajo nivel de estrés)."
-                else -> "Elevada (> 50 µS)" to "Una respuesta galvánica de ${valueStr} µS refleja mayor actividad sudorípara. Suele vincularse a picos de estrés, estimulación emocional o esfuerzo físico."
+                valDouble == null -> "Información de la señal" to "Sin lecturas suficientes para evaluar esta métrica."
+                else -> "Lectura registrada: ${valueStr} ${unit}" to "Valor capturado por los sensores del Galaxy Watch 7 en la última sincronización."
             }
         }
     }

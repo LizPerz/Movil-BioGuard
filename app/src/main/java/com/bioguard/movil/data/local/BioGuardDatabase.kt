@@ -14,7 +14,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         CachedReadingEntity::class, CachedEventEntity::class, CachedAlertEntity::class,
         PendingPredictionMlEntity::class
     ],
-    version = 11,
+    version = 12,
     exportSchema = true
 )
 abstract class BioGuardDatabase : RoomDatabase() {
@@ -178,6 +178,70 @@ abstract class BioGuardDatabase : RoomDatabase() {
             }
         }
 
+        // v11 -> v12: GSR (sudoracionGsr) reemplazado por Estrés/HRV % (estresPct)
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `pending_readings_new` (" +
+                        "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`pulsoBpm` REAL NOT NULL, " +
+                        "`temperaturaC` REAL NOT NULL, " +
+                        "`estresPct` REAL NOT NULL, " +
+                        "`hrv` REAL, " +
+                        "`spo2` REAL, " +
+                        "`pasos` INTEGER, " +
+                        "`glucosaEstimadaMgDl` REAL, " +
+                        "`probabilidadPico` REAL, " +
+                        "`timestamp` TEXT NOT NULL, " +
+                        "`sourceMessageId` TEXT)"
+                )
+                db.execSQL(
+                    "INSERT INTO `pending_readings_new` (" +
+                        "`id`, `pulsoBpm`, `temperaturaC`, `estresPct`, `hrv`, `spo2`, `pasos`, " +
+                        "`glucosaEstimadaMgDl`, `probabilidadPico`, `timestamp`, `sourceMessageId`) " +
+                        "SELECT `id`, `pulsoBpm`, `temperaturaC`, `sudoracionGsr`, `hrv`, `spo2`, `pasos`, " +
+                        "`glucosaEstimadaMgDl`, `probabilidadPico`, `timestamp`, `sourceMessageId` FROM `pending_readings`"
+                )
+                db.execSQL("DROP TABLE `pending_readings`")
+                db.execSQL("ALTER TABLE `pending_readings_new` RENAME TO `pending_readings`")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_pending_readings_timestamp` ON `pending_readings` (`timestamp`)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_pending_readings_sourceMessageId` ON `pending_readings` (`sourceMessageId`)")
+
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `cached_readings_new` (" +
+                        "`id` TEXT PRIMARY KEY NOT NULL, " +
+                        "`pacienteId` TEXT NOT NULL, " +
+                        "`pulsoBpm` REAL NOT NULL, " +
+                        "`temperaturaC` REAL NOT NULL, " +
+                        "`estresPct` REAL NOT NULL, " +
+                        "`hrv` REAL NOT NULL, " +
+                        "`spo2` REAL NOT NULL, " +
+                        "`pasos` INTEGER NOT NULL, " +
+                        "`calorias` REAL NOT NULL, " +
+                        "`accelX` REAL NOT NULL DEFAULT 0.0, " +
+                        "`accelY` REAL NOT NULL DEFAULT 0.0, " +
+                        "`accelZ` REAL NOT NULL DEFAULT 0.0, " +
+                        "`grasaCorporalPct` REAL NOT NULL DEFAULT 0.0, " +
+                        "`masaMuscularKg` REAL NOT NULL DEFAULT 0.0, " +
+                        "`faseSueno` TEXT NOT NULL DEFAULT 'Sueño Profundo', " +
+                        "`glucosaEstimadaMgDl` REAL NOT NULL DEFAULT 0.0, " +
+                        "`fechaHora` TEXT NOT NULL, " +
+                        "`timestamp` INTEGER NOT NULL)"
+                )
+                db.execSQL(
+                    "INSERT INTO `cached_readings_new` (" +
+                        "`id`, `pacienteId`, `pulsoBpm`, `temperaturaC`, `estresPct`, `hrv`, `spo2`, `pasos`, " +
+                        "`calorias`, `accelX`, `accelY`, `accelZ`, `grasaCorporalPct`, `masaMuscularKg`, " +
+                        "`faseSueno`, `glucosaEstimadaMgDl`, `fechaHora`, `timestamp`) " +
+                        "SELECT `id`, `pacienteId`, `pulsoBpm`, `temperaturaC`, `sudoracionGsr`, `hrv`, `spo2`, `pasos`, " +
+                        "`calorias`, `accelX`, `accelY`, `accelZ`, `grasaCorporalPct`, `masaMuscularKg`, " +
+                        "`faseSueno`, `glucosaEstimadaMgDl`, `fechaHora`, `timestamp` FROM `cached_readings`"
+                )
+                db.execSQL("DROP TABLE `cached_readings`")
+                db.execSQL("ALTER TABLE `cached_readings_new` RENAME TO `cached_readings`")
+            }
+        }
+
         fun getInstance(context: Context): BioGuardDatabase {
             return INSTANCE ?: synchronized(this) {
                 val passphrase = com.bioguard.movil.util.SecurityUtils.getOrCreateDatabasePassphrase(context)
@@ -193,7 +257,7 @@ abstract class BioGuardDatabase : RoomDatabase() {
                     context.applicationContext,
                     BioGuardDatabase::class.java,
                     "bioguard_offline_db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
                     .fallbackToDestructiveMigration()
                     .openHelperFactory(factory)
                     .build()

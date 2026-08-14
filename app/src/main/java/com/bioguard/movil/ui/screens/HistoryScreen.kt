@@ -70,7 +70,7 @@ fun HistoryScreen(
             time = lectura.timestamp.drop(11).take(5),
             pulse = "${lectura.pulsoBpm.toInt()} BPM",
             temp = "%.1f\u00b0C".format(lectura.temperaturaC),
-            gsr = "%.1f".format(lectura.sudoracionGsr),
+            estres = "%.0f".format(lectura.estresPct),
             status = status,
             statusColor = statusColor
         )
@@ -368,7 +368,7 @@ fun HistoryScreen(
                                                     modifier = Modifier.size(11.dp)
                                                 )
                                                 Spacer(modifier = Modifier.width(3.dp))
-                                                Text(text = "GSR ${entry.gsr}", fontSize = 11.sp, color = p.textSecondary)
+                                                Text(text = "Estrés ${entry.estres}%", fontSize = 11.sp, color = p.textSecondary)
                                             }
                                         }
                                     }

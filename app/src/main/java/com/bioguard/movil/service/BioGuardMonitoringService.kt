@@ -128,7 +128,7 @@ class BioGuardMonitoringService : Service() {
                         VitalSample(
                             heartRateBpm = cached.pulsoBpm,
                             temperatureC = cached.temperaturaC.takeIf { it > 0.0 },
-                            gsr = cached.sudoracionGsr.takeIf { it > 0.0 },
+                            estresPct = cached.estresPct.takeIf { it > 0.0 },
                             hrvMs = cached.hrv.takeIf { it > 0.0 },
                             spo2Percent = cached.spo2.takeIf { it > 0.0 }
                         )
@@ -137,7 +137,7 @@ class BioGuardMonitoringService : Service() {
                         current = VitalSample(
                             heartRateBpm = request.pulsoBpm,
                             temperatureC = request.temperaturaC.takeIf { it > 0.0 },
-                            gsr = request.sudoracionGsr.takeIf { it > 0.0 },
+                            estresPct = request.estresPct.takeIf { it > 0.0 },
                             hrvMs = request.hrv?.takeIf { it > 0.0 },
                             spo2Percent = request.spo2?.takeIf { it > 0.0 }
                         ),
@@ -148,7 +148,7 @@ class BioGuardMonitoringService : Service() {
                         PendingReadingEntity(
                             pulsoBpm = request.pulsoBpm,
                             temperaturaC = request.temperaturaC,
-                            sudoracionGsr = request.sudoracionGsr,
+                            estresPct = request.estresPct,
                             hrv = request.hrv,
                             spo2 = request.spo2,
                             pasos = request.pasos,
@@ -175,7 +175,7 @@ class BioGuardMonitoringService : Service() {
                             estaturaCm = estaturaCm,
                             pulsoBpm = request.pulsoBpm,
                             temperaturaC = request.temperaturaC,
-                            sudoracionMicroS = request.sudoracionGsr
+                            estresPct = request.estresPct
                         )
                     } else null
 
@@ -209,7 +209,7 @@ class BioGuardMonitoringService : Service() {
                                 pacienteId = patientId,
                                 pulsoBpm = request.pulsoBpm,
                                 temperaturaC = request.temperaturaC,
-                                sudoracionGsr = request.sudoracionGsr,
+                                estresPct = request.estresPct,
                                 hrv = validHrv,
                                 spo2 = validSpo2,
                                 pasos = validPasos,
@@ -552,7 +552,7 @@ class BioGuardMonitoringService : Service() {
                     pacienteId = prefs.patientId.first(),
                     pulsoBpm = it.pulsoBpm,
                     temperaturaC = it.temperaturaC,
-                    sudoracionGsr = it.sudoracionGsr,
+                    estresPct = it.estresPct,
                     hrv = it.hrv,
                     spo2 = it.spo2,
                     pasos = it.pasos,
@@ -716,7 +716,7 @@ class BioGuardMonitoringService : Service() {
             wearableConnector.sendAlertCommandToWatch(
                 request.pulsoBpm.toFloat(),
                 request.temperaturaC.toFloat(),
-                request.sudoracionGsr.toFloat(),
+                request.estresPct.toFloat(),
                 (assessment.score / 100.0).toFloat()
             )
         }

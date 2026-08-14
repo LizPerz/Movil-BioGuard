@@ -14,9 +14,9 @@ object ReportExporter {
             val fileName = "bioguard_reporte_biometrico_${System.currentTimeMillis()}.csv"
             val file = File(context.cacheDir, fileName)
             file.bufferedWriter().use { writer ->
-                writer.write("Timestamp,PulsoBPM,TemperaturaC,SudoracionGSR,HRV,SpO2,NivelRiesgo\n")
+                writer.write("Timestamp,PulsoBPM,TemperaturaC,EstresPct,HRV,SpO2,NivelRiesgo\n")
                 for (l in lecturas) {
-                    writer.write("${l.timestamp},${l.pulsoBpm},${l.temperaturaC},${l.sudoracionGsr},${l.hrv ?: 0.0},${l.spo2 ?: 0.0},${l.nivelRiesgo ?: "-"}\n")
+                    writer.write("${l.timestamp},${l.pulsoBpm},${l.temperaturaC},${l.estresPct},${l.hrv ?: 0.0},${l.spo2 ?: 0.0},${l.nivelRiesgo ?: "-"}\n")
                 }
             }
             file

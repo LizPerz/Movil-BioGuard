@@ -90,7 +90,7 @@ class LecturasSyncRepository @Inject constructor(
                 pacienteId = patientId,
                 pulsoBpm = it.pulsoBpm,
                 temperaturaC = it.temperaturaC,
-                sudoracionGsr = it.sudoracionGsr,
+                estresPct = it.estresPct,
                 hrv = it.hrv,
                 spo2 = it.spo2,
                 pasos = it.pasos,

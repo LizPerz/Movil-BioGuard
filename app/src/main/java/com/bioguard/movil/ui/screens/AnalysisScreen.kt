@@ -62,15 +62,15 @@ fun AnalysisScreen(analysisViewModel: AnalysisViewModel) {
     val metrics = listOf(
         MetricOption("Pulso", p.accent, Icons.Filled.Favorite),
         MetricOption("Temperatura", p.accentSecondary, Icons.Filled.DeviceThermostat),
-        MetricOption("Conductividad", YellowNeon, Icons.Filled.Bolt)
+        MetricOption("Estrés", YellowNeon, Icons.Filled.Bolt)
     )
-    val metricEmojis = mapOf("Pulso" to "\u2764\uFE0F", "Temperatura" to "\uD83C\uDF21\uFE0F", "Conductividad" to "\u26A1")
+    val metricEmojis = mapOf("Pulso" to "\u2764\uFE0F", "Temperatura" to "\uD83C\uDF21\uFE0F", "Estrés" to "\u26A1")
 
     val chartPoints = uiState.lecturas.map { it ->
         val valFloat = when (uiState.selectedMetric) {
             "Pulso" -> it.pulsoBpm.toFloat()
             "Temperatura" -> it.temperaturaC.toFloat()
-            "Conductividad" -> it.sudoracionGsr.toFloat()
+            "Estrés" -> it.estresPct.toFloat()
             else -> it.pulsoBpm.toFloat()
         }
         ChartPoint(
@@ -84,7 +84,7 @@ fun AnalysisScreen(analysisViewModel: AnalysisViewModel) {
     val unit = when (uiState.selectedMetric) {
         "Pulso" -> "BPM"
         "Temperatura" -> "\u00b0C"
-        else -> "\u00b5S"
+        else -> "%"
     }
 
     if (uiState.isLoading) {

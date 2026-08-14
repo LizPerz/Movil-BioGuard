@@ -73,7 +73,7 @@ class PersonalizedAnomalyModelTest {
             current = VitalSample(
                 heartRateBpm = 72.0,
                 temperatureC = 0.0,
-                gsr = 0.0,
+                estresPct = 0.0,
                 hrvMs = 0.0,
                 spo2Percent = 0.0
             ),

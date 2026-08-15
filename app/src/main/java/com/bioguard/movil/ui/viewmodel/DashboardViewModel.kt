@@ -16,6 +16,8 @@ import com.bioguard.movil.ml.GlycemicPrediction
 import com.bioguard.movil.network.DashboardSummary
 import com.bioguard.movil.network.GuardarPrediccionRequest
 import com.bioguard.movil.network.LecturaSensorResponse
+import com.bioguard.movil.network.PrediccionResponse
+import com.bioguard.movil.realtime.RealtimeHubClient
 import com.bioguard.movil.service.PredictionMlSyncWorker
 import com.bioguard.movil.service.WearableConnectionState
 import com.bioguard.movil.ui.model.UserRole
@@ -29,9 +31,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 data class DashboardUiState(
     val isLoading: Boolean = false,
@@ -49,16 +48,32 @@ class DashboardViewModel @Inject constructor(
     private val cachedDataDao: CachedDataDao,
     private val prefs: UserPreferences,
     private val mlRepository: MlRepository,
-    private val pacienteRepository: PacienteRepository,
     private val sensorRepository: SensorRepository,
-    private val syncRepository: PredictionMlSyncRepository
+    private val pacienteRepository: PacienteRepository,
+    private val syncRepository: PredictionMlSyncRepository,
+    private val realtimeHubClient: RealtimeHubClient
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(DashboardUiState())
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
     private var dashboardJob: Job? = null
+    private var backendJob: Job? = null
+
+    // Predicción ML vigente del backend: enriquece la card de Riesgo IA en ambos roles
+    // cuando la lectura aún no trae probabilidad/riesgo persistidos.
+    private var backendPrediccion: PrediccionResponse? = null
 
     init {
+        // Tiempo real: nueva lectura/alerta/ubicación del paciente → refrescar dashboard
+        viewModelScope.launch {
+            realtimeHubClient.events.collect { event ->
+                when (event) {
+                    RealtimeHubClient.EventLectura,
+                    RealtimeHubClient.EventAlerta,
+                    RealtimeHubClient.EventUbicacion -> loadDashboard()
+                }
+            }
+        }
         loadDashboard()
         // Programar sincronización automática en background
         PredictionMlSyncWorker.scheduleAutoSync(application)
@@ -107,7 +122,9 @@ class DashboardViewModel @Inject constructor(
             // La caché se filtra por paciente para no mezclar datos entre cuentas/pacientes.
             cachedDataDao.getCachedReadings(patientId, 2000).collectLatest { cachedReadings ->
                 val responses = if (cachedReadings.isNotEmpty()) {
-                    cachedReadings.mapIndexed { index, reading ->
+                    cachedReadings.map { reading ->
+                        // El predictor local complementa; si la lectura ya trae probabilidad/riesgo
+                        // persistidos (calculados por el motor ML al recibirla), se conservan.
                         val pred = if (tieneBiometria) {
                             predictor.predecir(
                                 pesoKg = pesoKg,
@@ -118,8 +135,8 @@ class DashboardViewModel @Inject constructor(
                             )
                         } else null
                         reading.toResponse(
-                            probabilidadPico = pred?.pPico,
-                            nivelRiesgo = pred?.nivelRiesgo
+                            probabilidadPico = pred?.pPico ?: reading.probabilidadPico.takeIf { it > 0.0 },
+                            nivelRiesgo = pred?.nivelRiesgo ?: reading.nivelRiesgo.takeIf { it.isNotBlank() }
                         )
                     }
                 } else {
@@ -134,6 +151,15 @@ class DashboardViewModel @Inject constructor(
                 )
             }
         }
+
+        // Predicción ML vigente del backend: se aplica a la card de Riesgo IA cuando la
+        // lectura del momento aún no trae probabilidad/riesgo (p. ej. cuidador recién conectado).
+        backendJob?.cancel()
+        backendJob = viewModelScope.launch {
+            val patientId = prefs.patientId.first() ?: return@launch
+            val prediccion = runCatching { mlRepository.getPrediccionActual(patientId) }.getOrNull()
+            backendPrediccion = (prediccion as? Resource.Success)?.data
+        }
     }
 
     private fun pintarLecturas(
@@ -143,14 +169,21 @@ class DashboardViewModel @Inject constructor(
         estaturaCm: Double,
         tieneBiometria: Boolean
     ) {
-        val latest = responses.firstOrNull()
-        val connState = if (responses.isNotEmpty()) WearableConnectionState.STREAMING else WearableConnectionState.PAIRED
+        // Si ninguna lectura trae probabilidad pero hay predicción ML vigente en el backend,
+        // se usa como respaldo para no pintar la card de Riesgo IA vacía.
+        val withPred = responses.map { r ->
+            val p = backendPrediccion
+            if (p == null || r.probabilidadPico != null) r
+            else r.copy(probabilidadPico = p.probabilidadPico, nivelRiesgo = p.nivelRiesgo)
+        }
+        val latest = withPred.firstOrNull()
+        val connState = if (withPred.isNotEmpty()) WearableConnectionState.STREAMING else WearableConnectionState.PAIRED
         _uiState.update {
             it.copy(
                 isLoading = false,
                 connectionState = connState,
                 summary = DashboardSummary(ultimaLectura = latest),
-                lecturasRecientes = responses,
+                lecturasRecientes = withPred,
                 ultimaPrediccion = latest?.let { r ->
                     if (tieneBiometria && r.probabilidadPico != null) {
                         predictor.predecir(
@@ -305,10 +338,12 @@ class DashboardViewModel @Inject constructor(
             pulsoBpm = pulsoBpm,
             temperaturaC = temperaturaC,
             estresPct = estresPct,
-            hrv = hrv,
-            spo2 = spo2,
-            probabilidadPico = probabilidadPico,
-            nivelRiesgo = nivelRiesgo
+            hrv = hrv.takeIf { it > 0.0 },
+            spo2 = spo2.takeIf { it > 0.0 },
+            pasos = pasos.takeIf { it > 0 },
+            glucosaEstimadaMgDl = glucosaEstimadaMgDl.takeIf { it > 0.0 },
+            probabilidadPico = probabilidadPico?.takeIf { it > 0.0 },
+            nivelRiesgo = nivelRiesgo?.takeIf { it.isNotBlank() }
         )
     }
 }

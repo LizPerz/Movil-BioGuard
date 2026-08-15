@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 12,
-    "identityHash": "492ceb9a11b0eaf235e960fe78ce6c61",
+    "identityHash": "a85fcdc85514ea087e33a3a820f1a499",
     "entities": [
       {
         "tableName": "pending_readings",
@@ -279,7 +279,7 @@
       },
       {
         "tableName": "cached_readings",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `pacienteId` TEXT NOT NULL, `pulsoBpm` REAL NOT NULL, `temperaturaC` REAL NOT NULL, `estresPct` REAL NOT NULL, `hrv` REAL NOT NULL, `spo2` REAL NOT NULL, `pasos` INTEGER NOT NULL, `calorias` REAL NOT NULL, `accelX` REAL NOT NULL, `accelY` REAL NOT NULL, `accelZ` REAL NOT NULL, `grasaCorporalPct` REAL NOT NULL, `masaMuscularKg` REAL NOT NULL, `faseSueno` TEXT NOT NULL, `glucosaEstimadaMgDl` REAL NOT NULL, `fechaHora` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `pacienteId` TEXT NOT NULL, `pulsoBpm` REAL NOT NULL, `temperaturaC` REAL NOT NULL, `estresPct` REAL NOT NULL, `hrv` REAL NOT NULL, `spo2` REAL NOT NULL, `pasos` INTEGER NOT NULL, `calorias` REAL NOT NULL, `accelX` REAL NOT NULL, `accelY` REAL NOT NULL, `accelZ` REAL NOT NULL, `grasaCorporalPct` REAL NOT NULL, `masaMuscularKg` REAL NOT NULL, `faseSueno` TEXT NOT NULL, `glucosaEstimadaMgDl` REAL NOT NULL, `probabilidadPico` REAL NOT NULL, `nivelRiesgo` TEXT NOT NULL, `fechaHora` TEXT NOT NULL, `timestamp` INTEGER NOT NULL, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -375,6 +375,18 @@
             "fieldPath": "glucosaEstimadaMgDl",
             "columnName": "glucosaEstimadaMgDl",
             "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "probabilidadPico",
+            "columnName": "probabilidadPico",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nivelRiesgo",
+            "columnName": "nivelRiesgo",
+            "affinity": "TEXT",
             "notNull": true
           },
           {
@@ -629,7 +641,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '492ceb9a11b0eaf235e960fe78ce6c61')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a85fcdc85514ea087e33a3a820f1a499')"
     ]
   }
 }

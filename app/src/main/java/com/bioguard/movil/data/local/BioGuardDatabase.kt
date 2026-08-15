@@ -178,7 +178,8 @@ abstract class BioGuardDatabase : RoomDatabase() {
             }
         }
 
-        // v11 -> v12: GSR (sudoracionGsr) reemplazado por Estrés/HRV % (estresPct)
+        // v11 -> v12: GSR (sudoracionGsr) reemplazado por Estrés/HRV % (estresPct);
+        // cached_readings además persiste probabilidadPico y nivelRiesgo para la card de Riesgo IA.
         val MIGRATION_11_12 = object : Migration(11, 12) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
@@ -225,6 +226,8 @@ abstract class BioGuardDatabase : RoomDatabase() {
                         "`masaMuscularKg` REAL NOT NULL DEFAULT 0.0, " +
                         "`faseSueno` TEXT NOT NULL DEFAULT 'Sueño Profundo', " +
                         "`glucosaEstimadaMgDl` REAL NOT NULL DEFAULT 0.0, " +
+                        "`probabilidadPico` REAL NOT NULL DEFAULT 0.0, " +
+                        "`nivelRiesgo` TEXT NOT NULL DEFAULT '', " +
                         "`fechaHora` TEXT NOT NULL, " +
                         "`timestamp` INTEGER NOT NULL)"
                 )

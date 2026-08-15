@@ -221,6 +221,8 @@ class BioGuardMonitoringService : Service() {
                                 masaMuscularKg = request.masaMuscularKg ?: 0.0,
                                 faseSueno = request.faseSueno ?: "",
                                 glucosaEstimadaMgDl = finalGlucose,
+                                probabilidadPico = (assessment.score / 100.0).coerceIn(0.0, 1.0),
+                                nivelRiesgo = assessment.level.name,
                                 fechaHora = request.timestamp
                             )
                         )

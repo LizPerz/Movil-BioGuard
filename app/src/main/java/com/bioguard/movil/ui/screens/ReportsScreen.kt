@@ -66,7 +66,9 @@ fun ReportsScreen(
             context = context,
             reporte = reporte,
             eventos = uiState.eventos,
-            pacienteNombre = userName ?: "Paciente"
+            lecturas = uiState.lecturas,
+            pacienteNombre = userName ?: "Paciente",
+            pacienteId = uiState.pacienteId
         )
         val uri = androidx.core.content.FileProvider.getUriForFile(
             context,

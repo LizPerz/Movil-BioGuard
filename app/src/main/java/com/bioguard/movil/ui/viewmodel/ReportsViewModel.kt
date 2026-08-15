@@ -9,6 +9,7 @@ import com.bioguard.movil.data.repository.ReporteRepository
 import com.bioguard.movil.data.repository.SensorRepository
 import com.bioguard.movil.datastore.UserPreferences
 import com.bioguard.movil.network.EventoMetabolicoResponse
+import com.bioguard.movil.network.LecturaSensorResponse
 import com.bioguard.movil.network.ReporteResumenResponse
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -22,6 +23,8 @@ data class ReportsUiState(
     val isLoading: Boolean = false,
     val reporte: ReporteResumenResponse? = null,
     val eventos: List<EventoMetabolicoResponse> = emptyList(),
+    val lecturas: List<LecturaSensorResponse> = emptyList(),
+    val pacienteId: String? = null,
     val error: String? = null
 )
 
@@ -43,8 +46,9 @@ class ReportsViewModel @Inject constructor(
         this.includeHistory = includeHistory
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
-            val pacienteId = pacienteRepository.resolvePatientId(prefs)
+            val pacienteId = pacienteRepository.resolveEffectivePatientId(prefs)
                 ?: return@launch _uiState.update { it.copy(isLoading = false, error = "No se encontro un paciente vinculado") }
+            _uiState.update { it.copy(pacienteId = pacienteId) }
             when (val result = repository.getReporteResumen(pacienteId)) {
                 is Resource.Success -> _uiState.update {
                     it.copy(reporte = result.data)
@@ -64,8 +68,15 @@ class ReportsViewModel @Inject constructor(
                     }
                     is Resource.Loading -> {}
                 }
+                when (val result = sensorRepository.getLecturas(pacienteId, 20)) {
+                    is Resource.Success -> _uiState.update {
+                        it.copy(lecturas = result.data)
+                    }
+                    is Resource.Error -> {}
+                    is Resource.Loading -> {}
+                }
             } else {
-                _uiState.update { it.copy(eventos = emptyList(), isLoading = false) }
+                _uiState.update { it.copy(eventos = emptyList(), lecturas = emptyList(), isLoading = false) }
             }
         }
     }

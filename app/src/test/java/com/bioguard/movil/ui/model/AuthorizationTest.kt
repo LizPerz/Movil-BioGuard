@@ -25,12 +25,12 @@ class AuthorizationTest {
     }
 
     @Test
-    fun `caregiver fallback is alert only`() {
+    fun `caregiver fallback includes health access`() {
         val access = EffectiveAccess.restricted(UserRole.CUIDADOR, "patient-1")
 
         assertTrue(access.allows(AppPermission.ALERT_READ))
-        assertFalse(access.allows(AppPermission.HEALTH_SUMMARY))
-        assertFalse(access.allows(AppPermission.HEALTH_HISTORY))
+        assertTrue(access.allows(AppPermission.HEALTH_SUMMARY))
+        assertTrue(access.allows(AppPermission.HEALTH_HISTORY))
         assertFalse(access.allows(AppPermission.MEDICATION_READ))
     }
 

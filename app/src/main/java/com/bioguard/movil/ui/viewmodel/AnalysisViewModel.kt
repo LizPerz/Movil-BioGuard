@@ -53,7 +53,7 @@ class AnalysisViewModel @Inject constructor(
         cacheJob?.cancel()
         cacheJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
-            val pacienteId = pacienteRepository.resolvePatientId(prefs)
+            val pacienteId = pacienteRepository.resolveEffectivePatientId(prefs)
                 ?: return@launch _uiState.update { it.copy(isLoading = false, error = "No se encontro un paciente vinculado") }
 
             // Fuente primaria: caché local filtrada por paciente. Se actualiza en tiempo real
@@ -68,7 +68,7 @@ class AnalysisViewModel @Inject constructor(
 
         // Respaldo remoto: backfill del historial para no quedarse sin datos al reinstalar.
         viewModelScope.launch {
-            val pacienteId = pacienteRepository.resolvePatientId(prefs) ?: return@launch
+            val pacienteId = pacienteRepository.resolveEffectivePatientId(prefs) ?: return@launch
             when (val result = sensorRepository.getLecturas(pacienteId, 200)) {
                 is Resource.Success -> {
                     if (result.data.isNotEmpty()) {

@@ -65,7 +65,8 @@ data class EffectiveAccess(
                 )
                 UserRole.CUIDADOR -> setOf(
                     AppPermission.ACCOUNT_PROFILE, AppPermission.ACCOUNT_SESSIONS,
-                    AppPermission.ALERT_READ, AppPermission.ALERT_ACKNOWLEDGE
+                    AppPermission.ALERT_READ, AppPermission.ALERT_ACKNOWLEDGE,
+                    AppPermission.HEALTH_SUMMARY, AppPermission.HEALTH_HISTORY
                 )
                 UserRole.UNKNOWN -> emptySet()
             }

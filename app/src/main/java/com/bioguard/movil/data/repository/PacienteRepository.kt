@@ -34,12 +34,29 @@ class PacienteRepository @Inject constructor(
     }
 
     /**
-     * Resolución del paciente para el CUIDADOR. A diferencia de [resolvePatientId]
-     * (que usa /mi-paciente, pensado para dueños/pacientes), el cuidador no tiene
-     * paciente propio: el vínculo se resuelve vía /mi-acceso, que devuelve el
-     * PacienteId asignado por el QR. Devuelve null si el cuidador aún no tiene
-     * paciente vinculado.
+     * Resolución del paciente efectivo para cualquier rol (dueño, paciente o
+     * cuidador). Primero usa la caché de preferencias; si está vacía, intenta
+     * /mi-acceso (funciona para cuidador vía QR y para dueño/paciente) y como
+     * último recurso /mi-paciente.
      */
+    suspend fun resolveEffectivePatientId(prefs: UserPreferences): String? {
+        val cached = prefs.patientId.first()
+        if (!cached.isNullOrBlank()) return cached
+
+        try {
+            val acceso = api.getMiAcceso()
+            val pacienteId = acceso.pacienteId
+            if (!pacienteId.isNullOrBlank()) {
+                prefs.savePatientId(pacienteId)
+                return pacienteId
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("PacienteRepository", "No se pudo resolver paciente via /mi-acceso: ${e.message}")
+        }
+
+        return resolvePatientId(prefs)
+    }
+
     suspend fun resolveCaregiverPatientId(prefs: UserPreferences): String? {
         val cached = prefs.patientId.first()
         if (!cached.isNullOrBlank()) return cached

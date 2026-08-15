@@ -232,6 +232,37 @@ class BioGuardMonitoringService : Service() {
                         request = request,
                         assessment = assessment
                     )
+                    // Tiempo real: cada lectura del reloj se sube INMEDIATAMENTE al backend
+                    // para que el hub SignalR avise al cuidador (LecturaActualizada) y su
+                    // vista se pinte de forma simultánea. Si falla (sin red), la lectura
+                    // permanece en la cola de batch y se reenvía en el siguiente ciclo.
+                    if (patientId != null && patientId != "paciente-local" && prefs.isSyncEnabled.first()) {
+                        serviceScope.launch {
+                            try {
+                                api.sendLectura(
+                                    LecturaSensorRequest(
+                                        pacienteId = patientId,
+                                        pulsoBpm = request.pulsoBpm,
+                                        temperaturaC = request.temperaturaC,
+                                        estresPct = request.estresPct,
+                                        hrv = request.hrv,
+                                        spo2 = request.spo2,
+                                        pasos = request.pasos,
+                                        glucosaEstimadaMgDl = request.glucosaEstimadaMgDl?.takeIf { it > 0.0 },
+                                        probabilidadPico = (assessment.score / 100.0).coerceIn(0.0, 1.0),
+                                        timestamp = request.timestamp,
+                                        sourceMessageId = sourceMessageId
+                                    )
+                                )
+                                // Envío confirmado: se descarta la copia encolada para que
+                                // el batch de los 5 minutos no la reenvíe (duplicado).
+                                database.pendingDataDao().deleteReadings(listOf(insertedId))
+                                Log.d(TAG, "Lectura en vivo enviada al backend ($patientId)")
+                            } catch (e: Exception) {
+                                Log.d(TAG, "Lectura en vivo diferida (quedara en cola batch): ${e.message}")
+                            }
+                        }
+                    }
                     Log.d(TAG, "Lectura del reloj persistida en base de datos local")
                     true
                 } catch (e: Exception) {

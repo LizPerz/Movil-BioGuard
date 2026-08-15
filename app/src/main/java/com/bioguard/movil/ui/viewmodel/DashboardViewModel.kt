@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 data class DashboardUiState(
@@ -75,6 +76,16 @@ class DashboardViewModel @Inject constructor(
             }
         }
         loadDashboard()
+        // Cuidador: además de los eventos SignalR, se hace un polling ligero para no
+        // depender 100% de que el hub esté activo y pintar siempre la última lectura.
+        viewModelScope.launch {
+            while (true) {
+                delay(CUIDADOR_POLL_INTERVAL_MS)
+                if (UserRole.from(prefs.userRole.first()) == UserRole.CUIDADOR) {
+                    loadDashboard()
+                }
+            }
+        }
         // Programar sincronización automática en background
         PredictionMlSyncWorker.scheduleAutoSync(application)
     }
@@ -95,7 +106,22 @@ class DashboardViewModel @Inject constructor(
             // del paciente); su pantalla se alimenta de las lecturas REALES que el backend
             // ya tiene sincronizadas para el paciente asignado.
             if (UserRole.from(prefs.userRole.first()) == UserRole.CUIDADOR) {
-                when (val result = sensorRepository.getLecturas(patientId, 100)) {
+                // El pacienteId no viene en el claim del token del cuidador: se resuelve
+                // vía /mi-acceso (PacienteId vinculado por QR). Si aún no hay vínculo,
+                // se muestra un error claro en lugar de fallar con 403 en el backend.
+                val cuidadorPatientId = pacienteRepository.resolveCaregiverPatientId(prefs)
+                if (cuidadorPatientId.isNullOrBlank()) {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            pacienteId = null,
+                            error = "No tienes un paciente asignado. Pide un código QR de acceso a la familia del paciente."
+                        )
+                    }
+                    return@launch
+                }
+                _uiState.update { it.copy(pacienteId = cuidadorPatientId) }
+                when (val result = sensorRepository.getLecturas(cuidadorPatientId, 100)) {
                     is Resource.Success -> pintarLecturas(
                         responses = result.data,
                         predictor = predictor,
@@ -345,5 +371,9 @@ class DashboardViewModel @Inject constructor(
             probabilidadPico = probabilidadPico?.takeIf { it > 0.0 },
             nivelRiesgo = nivelRiesgo?.takeIf { it.isNotBlank() }
         )
+    }
+
+    private companion object {
+        const val CUIDADOR_POLL_INTERVAL_MS = 30_000L
     }
 }

@@ -12,9 +12,15 @@ import com.microsoft.signalr.HubConnectionBuilder
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.launch
 
 /**
  * Cliente SignalR único para la app. Se conecta a /hubs/bioguard con el token
@@ -22,23 +28,55 @@ import kotlinx.coroutines.flow.asSharedFlow
  * recibidos (foto/perfil/cuidadores/lectura/alerta/ubicación) para que los
  * ViewModels se actualicen en tiempo real sin necesidad de refrescar la pantalla.
  * Las alertas remotas se muestran además como notificación local.
+ *
+ * Si la conexión se pierde (caída de red, backend reiniciado), se reconecta
+ * automáticamente con backoff exponencial y vuelve a unirse al grupo del
+ * paciente, para que el cuidador nunca pierda el tiempo real de forma silenciosa.
  */
 @Singleton
 class RealtimeHubClient @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
 
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var connection: HubConnection? = null
     private var currentPacienteId: String? = null
+    private var token: String? = null
+    private var reconnectJob: Job? = null
+    private var reconnectAttempts = 0
     private val notifier: LocalAlertNotifier by lazy { LocalAlertNotifier(context) }
 
     private val _events = MutableSharedFlow<String>(extraBufferCapacity = 8)
     val events: SharedFlow<String> = _events.asSharedFlow()
 
     fun connect(token: String, pacienteId: String) {
-        if (pacienteId.isBlank() || currentPacienteId == pacienteId) return
-        stop()
-        currentPacienteId = pacienteId
+        if (pacienteId.isBlank()) return
+        if (connection != null && currentPacienteId == pacienteId) return
+        reconnectJob?.cancel()
+        teardown()
+        this.token = token
+        this.currentPacienteId = pacienteId
+        establishConnection()
+    }
+
+    fun stop() {
+        reconnectJob?.cancel()
+        teardown()
+        token = null
+        currentPacienteId = null
+    }
+
+    private fun teardown() {
+        try {
+            connection?.stop()
+        } catch (_: Exception) {
+        }
+        connection = null
+    }
+
+    private fun establishConnection() {
+        val token = token ?: return
+        val pacienteId = currentPacienteId ?: return
         try {
             val url = Constants.BASE_URL + "hubs/bioguard?access_token=" + Uri.encode(token)
             val conn = HubConnectionBuilder.create(url).build()
@@ -65,32 +103,38 @@ class RealtimeHubClient @Inject constructor(
             }, String::class.java, java.lang.Double::class.java, String::class.java)
             conn.on("UbicacionActualizada", { _events.tryEmit(EventUbicacion) })
             conn.onClosed { error ->
-                currentPacienteId = null
                 connection = null
                 Log.w(TAG, "Conexión SignalR cerrada: ${error?.message}")
+                scheduleReconnect()
             }
             conn.start().blockingAwait()
             conn.invoke("JoinPacienteGroup", pacienteId).blockingAwait()
             connection = conn
+            reconnectAttempts = 0
             Log.i(TAG, "Conectado al hub, unido al grupo paciente_$pacienteId")
         } catch (e: Exception) {
-            currentPacienteId = null
             connection = null
             Log.w(TAG, "No se pudo conectar al hub SignalR: ${e.message}")
+            scheduleReconnect()
         }
     }
 
-    fun stop() {
-        try {
-            connection?.stop()
-        } catch (_: Exception) {
+    private fun scheduleReconnect() {
+        if (token == null || currentPacienteId == null) return
+        reconnectJob?.cancel()
+        reconnectJob = scope.launch {
+            val backoffMs =
+                RECONNECT_BASE_DELAY_MS * (1L shl reconnectAttempts.coerceAtMost(RECONNECT_MAX_BACKOFF_STEPS))
+            delay(backoffMs)
+            reconnectAttempts++
+            establishConnection()
         }
-        connection = null
-        currentPacienteId = null
     }
 
     companion object {
         private const val TAG = "RealtimeHub"
+        private const val RECONNECT_BASE_DELAY_MS = 5_000L
+        private const val RECONNECT_MAX_BACKOFF_STEPS = 4
         const val EventFoto = "foto"
         const val EventPerfil = "perfil"
         const val EventCuidadores = "cuidadores"

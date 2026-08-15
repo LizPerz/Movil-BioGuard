@@ -33,6 +33,30 @@ class PacienteRepository @Inject constructor(
         }
     }
 
+    /**
+     * Resolución del paciente para el CUIDADOR. A diferencia de [resolvePatientId]
+     * (que usa /mi-paciente, pensado para dueños/pacientes), el cuidador no tiene
+     * paciente propio: el vínculo se resuelve vía /mi-acceso, que devuelve el
+     * PacienteId asignado por el QR. Devuelve null si el cuidador aún no tiene
+     * paciente vinculado.
+     */
+    suspend fun resolveCaregiverPatientId(prefs: UserPreferences): String? {
+        val cached = prefs.patientId.first()
+        if (!cached.isNullOrBlank()) return cached
+
+        return try {
+            val acceso = api.getMiAcceso()
+            val pacienteId = acceso.pacienteId
+            if (!pacienteId.isNullOrBlank()) {
+                prefs.savePatientId(pacienteId)
+            }
+            pacienteId
+        } catch (e: Exception) {
+            android.util.Log.w("PacienteRepository", "No se pudo resolver el paciente del cuidador: ${e.message}")
+            null
+        }
+    }
+
     suspend fun getBiometria(pacienteId: String): Resource<com.bioguard.movil.network.BiometriaResponse> {
         return try {
             Resource.Success(api.getBiometria(pacienteId))

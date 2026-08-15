@@ -162,6 +162,31 @@ class LocalAlertNotifier(private val context: Context) {
         }
     }
 
+    /**
+     * Alerta remota recibida por SignalR (backend → cuidador/paciente).
+     * Se muestra como notificación local sin depender de FCM.
+     */
+    fun notifyRealtimeAlerta(titulo: String, mensaje: String, critical: Boolean) {
+        if (!canPostNotifications()) return
+        val channel = if (critical) CHANNEL_CRITICAL else CHANNEL_PREVENTIVE
+        val notification = NotificationCompat.Builder(context, channel)
+            .setContentTitle(titulo)
+            .setContentText(mensaje)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(mensaje))
+            .setSmallIcon(R.drawable.ic_notification)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(if (critical) NotificationCompat.CATEGORY_ALARM else NotificationCompat.CATEGORY_RECOMMENDATION)
+            .setAutoCancel(true)
+            .setContentIntent(mainPendingIntent(openAlert = true))
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setPublicVersion(publicNotification())
+            .build()
+
+        try {
+            manager.notify((System.currentTimeMillis() % 10000).toInt() + 2000, notification)
+        } catch (_: SecurityException) { }
+    }
+
     fun notifyEmergencySos(description: String) {
         if (!canPostNotifications()) return
         val title = "[SOS] SOLICITUD DE AUXILIO"

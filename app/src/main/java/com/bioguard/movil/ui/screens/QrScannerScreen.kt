@@ -190,6 +190,7 @@ private fun QrScannerScreenContent(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val cameraErrorMessage = stringResource(R.string.qr_camera_error)
+    val permissionDeniedMessage = stringResource(R.string.qr_permission_denied)
 
     var hasPermission by remember { mutableStateOf(false) }
     var cameraError by remember { mutableStateOf<String?>(null) }
@@ -214,7 +215,7 @@ private fun QrScannerScreenContent(
     ) { granted ->
         hasPermission = granted
         if (!granted) {
-            cameraError = context.getString(R.string.qr_permission_denied)
+            cameraError = permissionDeniedMessage
         }
     }
 

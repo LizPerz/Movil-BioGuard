@@ -376,6 +376,22 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
+    fun deleteFotoPerfil() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            when (val result = repository.deleteFotoPerfil()) {
+                is Resource.Success -> {
+                    _uiState.update { it.copy(isLoading = false, successMessage = "Foto de perfil eliminada") }
+                    loadProfile()
+                }
+                is Resource.Error -> _uiState.update {
+                    it.copy(isLoading = false, error = result.message)
+                }
+                is Resource.Loading -> {}
+            }
+        }
+    }
+
     fun clearMessages() {
         _uiState.update { it.copy(error = null, successMessage = null) }
     }

@@ -31,6 +31,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.Person
@@ -120,6 +121,8 @@ fun ProfileScreen(
     var successDialogMessage by remember { mutableStateOf<String?>(null) }
     var showLogoutConfirm by remember { mutableStateOf(false) }
     var showEditBiometriaModal by remember { mutableStateOf(false) }
+    var showEditPerfilModal by remember { mutableStateOf(false) }
+    var showRemovePhotoConfirm by remember { mutableStateOf(false) }
     var uploadingPhoto by remember { mutableStateOf(false) }
 
     val galleryLauncher = rememberLauncherForActivityResult(
@@ -155,32 +158,6 @@ fun ProfileScreen(
 
     val canManageBiometria = access.allows(AppPermission.PATIENT_MANAGE) ||
         (access.role == UserRole.CUIDADOR && access.patientId != null)
-
-    if (showEditBiometriaModal && canManageBiometria) {
-        PerfilBiometricoEditOverlay(
-            bio = uiState.biometria,
-            photo = uiState.perfil?.fotoPerfil?.takeIf { it.isNotBlank() }
-                ?: (if (access.role == UserRole.PACIENTE) localPhoto else null),
-            onDismiss = { showEditBiometriaModal = false },
-            onSave = { data ->
-                showEditBiometriaModal = false
-                profileViewModel.updateBiometriaPaciente(
-                    fechaNacimiento = data.birthDateIso,
-                    sexo = data.sexCode,
-                    pesoKg = data.weightKg,
-                    estaturaCm = data.heightCm,
-                    esDiabetico = data.isDiabetic,
-                    familiaresDiabetes = data.familyDiabetes,
-                    actividadFisica = data.activity
-                )
-                val currentPhoto = uiState.perfil?.fotoPerfil?.takeIf { it.isNotBlank() }
-                    ?: (if (access.role == UserRole.PACIENTE) localPhoto else null)
-                if (data.photoBase64 != null && data.photoBase64 != currentPhoto) {
-                    profileViewModel.updateFotoPerfil(data.photoBase64)
-                }
-            }
-        )
-    }
 
     if (uiState.isLoading) {
         Box(
@@ -291,6 +268,20 @@ fun ProfileScreen(
                             }
                         }
 
+                        if (fotoBase64?.isNotBlank() == true && !uploadingPhoto) {
+                            IconButton(
+                                onClick = { showRemovePhotoConfirm = true },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Delete,
+                                    contentDescription = "Quitar foto",
+                                    tint = p.textSecondary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+
                         Spacer(modifier = Modifier.height(8.dp))
 
                         val fullUser = uiState.perfil
@@ -298,12 +289,26 @@ fun ProfileScreen(
                             ?: userName?.takeIf { it.isNotBlank() }
                             ?: "Usuario BioGuard"
 
-                        Text(
-                            text = displayName,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = p.textPrimary
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = displayName,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = p.textPrimary
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            IconButton(
+                                onClick = { showEditPerfilModal = true },
+                                modifier = Modifier.size(26.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Edit,
+                                    contentDescription = "Editar perfil",
+                                    tint = p.accent,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        }
 
                         Text(
                             text = fullUser?.correo ?: "Sin correo registrado",
@@ -316,7 +321,7 @@ fun ProfileScreen(
                 Spacer(modifier = Modifier.height(20.dp))
 
                 // ── PERFIL BIOMÉTRICO Y MÉDICO DEL PACIENTE ──
-                if (canManageBiometria) {
+                if (canManageBiometria && access.role != UserRole.CUIDADOR) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -551,7 +556,177 @@ fun ProfileScreen(
                 onCancel = { showLogoutConfirm = false }
             )
         }
+
+        if (showRemovePhotoConfirm) {
+            ConfirmDialog(
+                title = "Quitar foto",
+                message = "¿Seguro que quieres eliminar tu foto de perfil?",
+                confirmText = "Eliminar",
+                cancelText = stringResource(R.string.register_cancel),
+                onConfirm = {
+                    showRemovePhotoConfirm = false
+                    profileViewModel.deleteFotoPerfil()
+                },
+                onCancel = { showRemovePhotoConfirm = false }
+            )
+        }
+
+        if (showEditPerfilModal) {
+            EditPerfilDialog(
+                currentNombre = uiState.perfil?.nombre.orEmpty(),
+                currentApellidoPaterno = uiState.perfil?.apellidoPaterno.orEmpty(),
+                currentApellidoMaterno = uiState.perfil?.apellidoMaterno.orEmpty(),
+                onDismiss = { showEditPerfilModal = false },
+                onSave = { nombre, apellidoPaterno, apellidoMaterno ->
+                    showEditPerfilModal = false
+                    profileViewModel.updatePerfil(nombre, apellidoPaterno, apellidoMaterno)
+                }
+            )
+        }
+
+        if (showEditBiometriaModal && canManageBiometria) {
+            PerfilBiometricoEditOverlay(
+                bio = uiState.biometria,
+                photo = uiState.perfil?.fotoPerfil?.takeIf { it.isNotBlank() }
+                    ?: (if (access.role == UserRole.PACIENTE) localPhoto else null),
+                onDismiss = { showEditBiometriaModal = false },
+                onSave = { data ->
+                    showEditBiometriaModal = false
+                    profileViewModel.updateBiometriaPaciente(
+                        fechaNacimiento = data.birthDateIso,
+                        sexo = data.sexCode,
+                        pesoKg = data.weightKg,
+                        estaturaCm = data.heightCm,
+                        esDiabetico = data.isDiabetic,
+                        familiaresDiabetes = data.familyDiabetes,
+                        actividadFisica = data.activity
+                    )
+                    val currentPhoto = uiState.perfil?.fotoPerfil?.takeIf { it.isNotBlank() }
+                        ?: (if (access.role == UserRole.PACIENTE) localPhoto else null)
+                    if (data.photoBase64 != null && data.photoBase64 != currentPhoto) {
+                        profileViewModel.updateFotoPerfil(data.photoBase64)
+                    }
+                }
+            )
+        }
     }
+}
+
+@Composable
+fun EditPerfilDialog(
+    currentNombre: String,
+    currentApellidoPaterno: String,
+    currentApellidoMaterno: String,
+    onDismiss: () -> Unit,
+    onSave: (nombre: String, apellidoPaterno: String, apellidoMaterno: String) -> Unit
+) {
+    val p = LocalThemeState.current.colorPalette()
+
+    var nombre by remember(currentNombre) { mutableStateOf(currentNombre) }
+    var apellidoPaterno by remember(currentApellidoPaterno) { mutableStateOf(currentApellidoPaterno) }
+    var apellidoMaterno by remember(currentApellidoMaterno) { mutableStateOf(currentApellidoMaterno) }
+    var validationError by remember { mutableStateOf<String?>(null) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Filled.Edit,
+                    contentDescription = null,
+                    tint = p.accent,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(text = "Editar Perfil", color = p.accent, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                if (validationError != null) {
+                    Text(
+                        text = validationError ?: "",
+                        color = RedNeon,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                OutlinedTextField(
+                    value = nombre,
+                    onValueChange = {
+                        nombre = it
+                        validationError = null
+                    },
+                    label = { Text("Nombre", fontSize = 11.sp) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = p.accent, unfocusedBorderColor = p.border)
+                )
+
+                OutlinedTextField(
+                    value = apellidoPaterno,
+                    onValueChange = {
+                        apellidoPaterno = it
+                        validationError = null
+                    },
+                    label = { Text("Apellido paterno", fontSize = 11.sp) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = p.accent, unfocusedBorderColor = p.border)
+                )
+
+                OutlinedTextField(
+                    value = apellidoMaterno,
+                    onValueChange = {
+                        apellidoMaterno = it
+                        validationError = null
+                    },
+                    label = { Text("Apellido materno", fontSize = 11.sp) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = p.accent, unfocusedBorderColor = p.border)
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (nombre.isBlank()) {
+                        validationError = "Ingresa tu nombre"
+                        return@Button
+                    }
+                    if (apellidoPaterno.isBlank()) {
+                        validationError = "Ingresa tu apellido paterno"
+                        return@Button
+                    }
+                    if (apellidoMaterno.isBlank()) {
+                        validationError = "Ingresa tu apellido materno"
+                        return@Button
+                    }
+                    onSave(
+                        nombre.trim(),
+                        apellidoPaterno.trim(),
+                        apellidoMaterno.trim()
+                    )
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = p.accent)
+            ) {
+                Text(text = "Guardar", color = p.background, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = "Cancelar", color = p.textSecondary)
+            }
+        },
+        containerColor = p.surface
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

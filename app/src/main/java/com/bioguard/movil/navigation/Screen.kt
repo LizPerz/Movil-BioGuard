@@ -11,6 +11,7 @@ object Screen {
     const val REPORTS = "reports"
     const val DEVICE = "device"
     const val PROFILE = "profile"
+    const val LOCATION = "location"
     const val ALERT = "alert"
     const val HISTORY = "history"
     const val QR_SCANNER = "qr_scanner"
@@ -23,5 +24,5 @@ object Screen {
     const val SUPPORT = "support"
     const val SETTINGS = "settings"
 
-    val bottomBarRoutes = listOf(DASHBOARD, ANALYSIS, REPORTS, DEVICE, PROFILE)
+    val bottomBarRoutes = listOf(DASHBOARD, ANALYSIS, REPORTS, DEVICE, PROFILE, LOCATION)
 }

@@ -163,6 +163,8 @@ data class TrackingGpsRequest(
 data class UsuarioWebResponse(
     @SerializedName("id") val id: String,
     @SerializedName("nombre") val nombre: String,
+    @SerializedName("apellidoPaterno") val apellidoPaterno: String? = null,
+    @SerializedName("apellidoMaterno") val apellidoMaterno: String? = null,
     @SerializedName("correo") val correo: String,
     @SerializedName("fechaRegistro") val fechaRegistro: String,
     @SerializedName("planId") val planId: String? = null,
@@ -609,6 +611,9 @@ interface ApiService {
 
     @PUT("api/UsuariosWeb/mi-perfil/foto")
     suspend fun updateFotoPerfil(@Body request: UpdateFotoRequest): MessageResponse
+
+    @DELETE("api/UsuariosWeb/mi-perfil/foto")
+    suspend fun deleteFotoPerfil(): MessageResponse
 
     @POST("api/Pagos/cancelar")
     suspend fun cancelarSuscripcion(): MessageResponse

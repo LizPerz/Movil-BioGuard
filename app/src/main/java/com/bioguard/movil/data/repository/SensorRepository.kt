@@ -80,9 +80,33 @@ class SensorRepository @Inject constructor(
         }
     }
 
+    suspend fun sendTrackingBatch(requests: List<TrackingGpsRequest>): Resource<String> {
+        return try {
+            val response = api.sendTrackingBatch(requests)
+            Resource.Success(response.message)
+        } catch (e: Exception) {
+            Resource.Error(e.toUserMessage("Error al enviar tracking en lote"))
+        }
+    }
+
     suspend fun getTrackingActual(pacienteId: String): Resource<TrackingResponse> {
         return try {
             Resource.Success(api.getTrackingActual(pacienteId))
+        } catch (e: Exception) {
+            Resource.Error(e.toUserMessage("Error al obtener ubicacion"))
+        }
+    }
+
+    /**
+     * Devuelve Success(null) cuando aun no existe registro de tracking (HTTP 404),
+     * para distinguir "aun sin ubicacion" de un error real de red/servidor.
+     */
+    suspend fun getTrackingActualOrNull(pacienteId: String): Resource<TrackingResponse?> {
+        return try {
+            Resource.Success(api.getTrackingActual(pacienteId))
+        } catch (e: retrofit2.HttpException) {
+            if (e.code() == 404) Resource.Success(null)
+            else Resource.Error(e.toUserMessage("Error al obtener ubicacion"))
         } catch (e: Exception) {
             Resource.Error(e.toUserMessage("Error al obtener ubicacion"))
         }

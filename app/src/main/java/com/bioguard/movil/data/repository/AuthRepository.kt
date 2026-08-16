@@ -195,6 +195,7 @@ class AuthRepository @Inject constructor(
                 caregiverAccessLevel = response.nivelAccesoCuidador,
                 caregiverWithinPlan = response.cuidadorDentroDelPlan,
                 planName = response.plan?.nombre,
+                planGpsActivo = response.plan?.gpsActivo ?: false,
                 permissions = response.permisos.mapNotNull { AppPermission.fromCode(it) }.toSet()
             )
             switchPatientIfNeeded(access.patientId)
@@ -202,7 +203,8 @@ class AuthRepository @Inject constructor(
                 patientId = access.patientId,
                 caregiverAccessLevel = access.caregiverAccessLevel,
                 planName = access.planName,
-                permissionCodes = access.permissions.map { it.code }.toSet()
+                permissionCodes = access.permissions.map { it.code }.toSet(),
+                planGpsActivo = access.planGpsActivo
             )
             access
         } catch (_: Exception) {
@@ -214,6 +216,7 @@ class AuthRepository @Inject constructor(
                     caregiverAccessLevel = prefs.caregiverAccessLevel.first(),
                     caregiverWithinPlan = true,
                     planName = prefs.planName.first(),
+                    planGpsActivo = prefs.planGpsActivo.first(),
                     permissions = cachedCodes.mapNotNull { AppPermission.fromCode(it) }.toSet()
                 )
             } else {

@@ -18,7 +18,6 @@ import com.bioguard.movil.network.GuardarPrediccionRequest
 import com.bioguard.movil.network.LecturaSensorResponse
 import com.bioguard.movil.network.PrediccionResponse
 import com.bioguard.movil.realtime.RealtimeHubClient
-import com.bioguard.movil.service.PredictionMlSyncWorker
 import com.bioguard.movil.service.WearableConnectionState
 import com.bioguard.movil.ui.model.UserRole
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -86,8 +85,6 @@ class DashboardViewModel @Inject constructor(
                 }
             }
         }
-        // Programar sincronización automática en background
-        PredictionMlSyncWorker.scheduleAutoSync(application)
     }
 
     fun loadDashboard() {

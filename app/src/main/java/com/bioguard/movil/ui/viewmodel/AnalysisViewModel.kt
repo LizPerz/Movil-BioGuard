@@ -11,6 +11,7 @@ import com.bioguard.movil.data.repository.PacienteRepository
 import com.bioguard.movil.data.repository.SensorRepository
 import com.bioguard.movil.datastore.UserPreferences
 import com.bioguard.movil.network.LecturaSensorResponse
+import com.bioguard.movil.realtime.RealtimeHubClient
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,7 +37,8 @@ class AnalysisViewModel @Inject constructor(
     private val sensorRepository: SensorRepository,
     private val pacienteRepository: PacienteRepository,
     private val cachedDataDao: CachedDataDao,
-    private val prefs: UserPreferences
+    private val prefs: UserPreferences,
+    private val realtimeHubClient: RealtimeHubClient
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(AnalysisUiState())
@@ -46,6 +48,14 @@ class AnalysisViewModel @Inject constructor(
     private var cacheJob: Job? = null
 
     init {
+        // Tiempo real: nueva lectura del paciente → refrescar análisis
+        viewModelScope.launch {
+            realtimeHubClient.events.collect { event ->
+                if (event == RealtimeHubClient.EventLectura) {
+                    loadLecturas()
+                }
+            }
+        }
         loadLecturas()
     }
 

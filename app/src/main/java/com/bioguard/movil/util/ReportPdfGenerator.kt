@@ -488,8 +488,8 @@ object ReportPdfGenerator {
                 val iconBg: Int
             )
 
-            val avgTemp = lecturas.map { it.temperaturaC }.averageOrNull()
-            val avgEstres = lecturas.map { it.estresPct }.averageOrNull()
+            val avgTemp = lecturas.map { it.temperaturaC }.average().takeIf { !it.isNaN() }
+            val avgEstres = lecturas.map { it.estresPct }.average().takeIf { !it.isNaN() }
             val maxRiesgo = lecturas.mapNotNull { it.nivelRiesgo }
                 .let { niveles ->
                     when {
@@ -508,11 +508,13 @@ object ReportPdfGenerator {
                 else -> "\u2014"
             }
             val avgPulso = reporte.promedioPulso?.let { "%.0f".format(it) } ?: "\u2014"
+            val tempStr = if (avgTemp != null) "%.1f".format(avgTemp) else "\u2014"
+            val estresStr = if (avgEstres != null) "%.0f".format(avgEstres) else "\u2014"
 
             val kpis = listOf(
                 Kpi("PULSO PROMEDIO", avgPulso, "BPM", Icon.HEART, red, redIconBg),
-                Kpi("TEMPERATURA PROMEDIO", avgTemp?.let { "%.1f".format(it) } ?: "\u2014", "\u00b0C", Icon.THERMOMETER, orange, orangeIconBg),
-                Kpi("ESTRES PROMEDIO", avgEstres?.let { "%.0f".format(it) } ?: "\u2014", "%", Icon.BOLT, orange, yellowIconBg),
+                Kpi("TEMPERATURA PROMEDIO", tempStr, "\u00b0C", Icon.THERMOMETER, orange, orangeIconBg),
+                Kpi("ESTRES PROMEDIO", estresStr, "%", Icon.BOLT, orange, yellowIconBg),
                 Kpi("LECTURAS", "${reporte.totalLecturas}", "", Icon.CHART, red, pinkIconBg),
                 Kpi("RIESGO MAXIMO", maxRiesgoLabel, "", Icon.SHIELD, red, redIconBg),
                 Kpi("EVENTOS", "${reporte.totalEventos}", "sin criticos", Icon.BELL, blue, blueIconBg)

@@ -49,7 +49,7 @@ object ReportPdfGenerator {
 
         w.drawPatientCard()
         w.sectionTitle("Indicadores del periodo")
-        w.drawKpis(reporte)
+        w.drawKpis(reporte, lecturas)
 
         w.spacing(12f)
         w.sectionTitle("Ultimas lecturas")
@@ -425,38 +425,44 @@ object ReportPdfGenerator {
             y += 24f
         }
 
-        // ---- Card de Paciente ----
-        fun drawPatientCard() {
-            val cardTop = y
-            val cardHeight = 64f
-            val cardBottom = cardTop + cardHeight
-            ensureSpace(cardHeight + 14f)
+        fun drawKpis(reporte: ReporteResumenResponse, lecturas: List<LecturaSensorResponse>) {
+            data class Kpi(
+                val label: String,
+                val value: String,
+                val subValue: String,
+                val icon: Icon,
+                val iconColor: Int,
+                val iconBg: Int
+            )
 
-            roundedRect(MARGIN, cardTop, PAGE_WIDTH - MARGIN, cardBottom, 10f)
+            val avgTemp = lecturas.map { it.temperaturaC }.averageOrNull()
+            val avgEstres = lecturas.map { it.estresPct }.averageOrNull()
+            val maxRiesgo = lecturas.mapNotNull { it.nivelRiesgo }
+                .let { niveles ->
+                    when {
+                        niveles.any { it.equals("Critico", ignoreCase = true) } -> "Critico"
+                        niveles.any { it.equals("Alta", ignoreCase = true) } -> "Alta"
+                        niveles.any { it.equals("Pre-Pico", ignoreCase = true) || it.equals("Media", ignoreCase = true) } -> "Moderado"
+                        niveles.any { it.equals("Normal", ignoreCase = true) } -> "Normal"
+                        else -> null
+                    }
+                }
+            val maxRiesgoLabel = when (maxRiesgo) {
+                "Critico" -> "Critico"
+                "Alta" -> "Alta"
+                "Moderado" -> "Atencion"
+                "Normal" -> "Estable"
+                else -> "\u2014"
+            }
+            val avgPulso = reporte.promedioPulso?.let { "%.0f".format(it) } ?: "\u2014"
 
-            // Izquierda: avatar + datos
-            val avatarCx = MARGIN + 24f
-            val avatarCy = cardTop + 30f
-            val avatarR = 17f
-            canvas.drawCircle(avatarCx, avatarCy, avatarR, fillPaint(avatarBg))
-            drawIcon(Icon.PERSON, avatarCx, avatarCy, avatarR * 1.5f, gray)
-
-            val infoLeft = MARGIN + 52f
-            canvas.drawText("PACIENTE", infoLeft, cardTop + 15f, cardLabelGreen)
-            val nombre = pacienteNombre.ifBlank { "Sin nombre" }
-            val nombreCorto = if (nombre.length > 30) nombre.take(27) + "..." else nombre
-            canvas.drawText(nombreCorto, infoLeft, cardTop + 33f, patientName)
-            val idMeta = pacienteId?.let { "ID: $it" } ?: "Sin ID"
-            canvas.drawText(idMeta, infoLeft, cardTop + 48f, patientMeta)
-
-            // Derecha: Periodo / Generado en 2 columnas con margen X de separacion
-            val valueRight = PAGE_WIDTH - MARGIN - 14f
-            val periodo = periodoTexto()
-            val generado = fechaHora
-            val maxValW = maxOf(fieldValue.measureText(periodo), fieldValue.measureText(generado))
-            val labelRight = valueRight - maxValW - 10f
-
-            canvas.drawText("PERIODO", labelRight - cardLabelGreen.measureText("PERIODO"), cardTop + 20f, cardLabelGreen)
+            val kpis = listOf(
+                Kpi("PULSO PROMEDIO", avgPulso, "BPM", Icon.HEART, red, redIconBg),
+                Kpi("TEMPERATURA PROMEDIO", avgTemp?.let { "%.1f".format(it) } ?: "\u2014", "\u00b0C", Icon.THERMOMETER, orange, orangeIconBg),
+                Kpi("ESTRES PROMEDIO", avgEstres?.let { "%.0f".format(it) } ?: "\u2014", "%", Icon.BOLT, orange, yellowIconBg),
+                Kpi("LECTURAS", "${reporte.totalLecturas}", "", Icon.CHART, red, pinkIconBg),
+                Kpi("RIESGO MAXIMO", maxRiesgoLabel, "", Icon.SHIELD, red, redIconBg),
+                Kpi("EVENTOS", "${reporte.totalEventos}", "sin criticos", Icon.BELL, blue, blueIconBg)
             canvas.drawText(periodo, valueRight - fieldValue.measureText(periodo), cardTop + 20f, fieldValue)
 
             canvas.drawText("GENERADO", labelRight - cardLabelGreen.measureText("GENERADO"), cardTop + 40f, cardLabelGreen)
@@ -477,78 +483,6 @@ object ReportPdfGenerator {
             val a = runCatching { fmt.format(fechas.first()) }.getOrElse { "-" }
             val b = runCatching { fmt.format(fechas.last()) }.getOrElse { "-" }
             return if (a == b) a else "$a - $b"
-        }
-
-        // ---- Grid de KPIs (3x2) ----
-        fun drawKpis(reporte: ReporteResumenResponse) {
-            data class Kpi(
-                val label: String,
-                val value: String,
-                val subValue: String,
-                val icon: Icon,
-                val iconColor: Int,
-                val iconBg: Int
-            )
-
-            val avgPulso = reporte.promedioPulso?.let { "%.0f".format(it) } ?: "\u2014"
-
-            val kpis = listOf(
-                Kpi("PULSO PROMEDIO", avgPulso, "BPM", Icon.HEART, red, redIconBg),
-                Kpi("TEMPERATURA PROMEDIO", "\u2014", "\u00b0C", Icon.THERMOMETER, orange, orangeIconBg),
-                Kpi("ESTRES PROMEDIO", "\u2014", "%", Icon.BOLT, orange, yellowIconBg),
-                Kpi("LECTURAS", "${reporte.totalLecturas}", "", Icon.CHART, red, pinkIconBg),
-                Kpi("RIESGO MAXIMO", "\u2014", "", Icon.SHIELD, red, redIconBg),
-                Kpi("EVENTOS", "${reporte.totalEventos}", "sin criticos", Icon.BELL, blue, blueIconBg)
-            )
-
-            val gap = 10f
-            val cardW = (CONTENT_WIDTH - 2 * gap) / 3f
-            val cardH = 100f
-
-            kpis.chunked(3).forEach { row ->
-                ensureSpace(cardH + gap)
-                row.forEachIndexed { i, kpi ->
-                    val left = MARGIN + i * (cardW + gap)
-                    val top = y
-                    val right = left + cardW
-                    val bottom = top + cardH
-
-                    // Card
-                    roundedRect(left, top, right, bottom, 8f)
-
-                    // Circulo de icono
-                    val iconCx = left + 22f
-                    val iconCy = top + 21f
-                    val iconR = 13f
-                    canvas.drawCircle(iconCx, iconCy, iconR, fillPaint(kpi.iconBg))
-                    drawIcon(kpi.icon, iconCx, iconCy, 16f, kpi.iconColor)
-
-                    // Linea 1: Label
-                    canvas.drawText(kpi.label, left + 13f, top + 47f, cardLabel)
-
-                    // Linea 2: Valor + unidad
-                    canvas.drawText(kpi.value, left + 13f, top + 63f, cardValue)
-                    if (kpi.subValue.isNotBlank()) {
-                        val vw = cardValue.measureText(kpi.value)
-                        canvas.drawText(kpi.subValue, left + 13f + vw + 6f, top + 63f, cardSubValue)
-                    }
-
-                    // Linea 3: Badge (12px debajo del valor, sin tocarlo)
-                    val badgeText = if (kpi.label == "EVENTOS") "SIN EVENTOS" else "SIN DATOS"
-                    val badgeH = 13f
-                    val badgeW = badgePaint.measureText(badgeText) + 12f
-                    val badgeLeft = left + 13f
-                    val badgeTop = bottom - badgeH - 8f
-                    canvas.drawRoundRect(
-                        badgeLeft, badgeTop, badgeLeft + badgeW, badgeTop + badgeH,
-                        4f, 4f, fillPaint(bgLight)
-                    )
-                    badgePaint.color = gray
-                    canvas.drawText(badgeText, badgeLeft + 6f, badgeTop + 9.5f, badgePaint)
-                }
-                y += cardH + gap
-            }
-            y += 4f
         }
 
         // ---- Tablas ----

@@ -55,6 +55,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bioguard.movil.R
+import kotlin.math.max
+import kotlin.math.min
 import com.bioguard.movil.ml.GlycemicPrediction
 import com.bioguard.movil.ui.components.BioHealthChart
 import com.bioguard.movil.ui.components.ChartPoint
@@ -149,8 +151,27 @@ fun DashboardScreen(
     val formattedTemp = lastTemp?.let { String.format(java.util.Locale.US, "%.1f", it) } ?: "--"
     val formattedStress = lastStress?.let { String.format(java.util.Locale.US, "%.0f", it) } ?: "--"
 
-    val lastGlucose = ultimaLectura?.glucosaEstimadaMgDl?.takeIf { it > 0.0 }
-    val formattedGlucose = lastGlucose?.let { String.format(java.util.Locale.US, "%.0f", it) } ?: "--"
+    fun estimarGlucosa(lectura: com.bioguard.movil.network.LecturaSensorResponse): Double {
+        val baseline = 90.0
+        val hr = lectura.pulsoBpm
+        val temp = lectura.temperaturaC
+        val estres = lectura.estresPct
+        val hrDelta = when {
+            hr > 120 -> (hr - 120) * 0.15
+            hr > 100 -> (hr - 100) * 0.10
+            hr < 55 -> (hr - 60) * 0.10
+            else -> 0.0
+        }
+        val tempDelta = when {
+            temp > 38.0 -> (temp - 38.0) * 3.0
+            else -> 0.0
+        }
+        val estresDelta = if (estres > 60.0) (estres - 60.0) * 0.15 else 0.0
+        return max(50.0, min(220.0, baseline + hrDelta + tempDelta + estresDelta))
+    }
+    val lastGlucoseRaw = ultimaLectura?.let { estimarGlucosa(it) }
+    val lastGlucose = lastGlucoseRaw
+    val formattedGlucose = lastGlucoseRaw?.let { String.format(java.util.Locale.US, "%.0f", it) } ?: "--"
     val glucoseStatus = when {
         lastGlucose == null -> "Sin datos de glucosa"
         lastGlucose > 140.0 -> "Pico Elevado (>140 mg/dL)"
@@ -276,26 +297,24 @@ fun DashboardScreen(
         )
     }
 
-    val glucoseChartPoints = sortedReadings
-        .filter { (it.glucosaEstimadaMgDl ?: 0.0) > 0.0 }
-        .map {
-            val tsMs = runCatching { java.time.Instant.parse(it.timestamp).toEpochMilli() }.getOrDefault(0L)
-            val (labelStr, timeStr) = try {
-                val instant = java.time.Instant.parse(it.timestamp)
-                val zdt = instant.atZone(java.time.ZoneId.systemDefault())
-                val lbl = zdt.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
-                val full = zdt.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"))
-                lbl to full
-            } catch (_: Exception) {
-                it.timestamp.substringAfter("T", "").take(5) to it.timestamp.substringAfter("T", "").take(8)
-            }
-            ChartPoint(
-                label = labelStr,
-                value = (it.glucosaEstimadaMgDl ?: 0.0).toFloat(),
-                time = timeStr,
-                timestampMs = tsMs
-            )
+    val glucoseChartPoints = sortedReadings.map {
+        val tsMs = runCatching { java.time.Instant.parse(it.timestamp).toEpochMilli() }.getOrDefault(0L)
+        val (labelStr, timeStr) = try {
+            val instant = java.time.Instant.parse(it.timestamp)
+            val zdt = instant.atZone(java.time.ZoneId.systemDefault())
+            val lbl = zdt.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+            val full = zdt.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"))
+            lbl to full
+        } catch (_: Exception) {
+            it.timestamp.substringAfter("T", "").take(5) to it.timestamp.substringAfter("T", "").take(8)
         }
+        ChartPoint(
+            label = labelStr,
+            value = estimarGlucosa(it).toFloat(),
+            time = timeStr,
+            timestampMs = tsMs
+        )
+    }
 
     val probabilidadChartPoints = sortedReadings.mapNotNull { reading ->
         val prob = reading.probabilidadPico ?: return@mapNotNull null

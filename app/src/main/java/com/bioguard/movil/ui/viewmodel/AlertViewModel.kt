@@ -54,7 +54,7 @@ class AlertViewModel @Inject constructor(
     fun loadAlertas() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
-            val pacienteId = pacienteRepository.resolvePatientId(prefs)
+            val pacienteId = pacienteRepository.resolveEffectivePatientId(prefs)
                 ?: return@launch _uiState.update { it.copy(isLoading = false, error = "No se encontro un paciente vinculado") }
             when (val result = repository.getAlertas(pacienteId)) {
                 is Resource.Success -> {

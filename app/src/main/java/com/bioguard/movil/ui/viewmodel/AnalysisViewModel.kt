@@ -11,6 +11,8 @@ import com.bioguard.movil.data.repository.PacienteRepository
 import com.bioguard.movil.data.repository.SensorRepository
 import com.bioguard.movil.datastore.UserPreferences
 import com.bioguard.movil.network.LecturaSensorResponse
+import com.bioguard.movil.realtime.RealtimeHubClient
+import com.bioguard.movil.ui.model.UserRole
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,9 +46,23 @@ class AnalysisViewModel @Inject constructor(
 
     private var allLecturas: List<LecturaSensorResponse> = emptyList()
     private var cacheJob: Job? = null
+    private var pollingJob: Job? = null
+
+    private val role = prefs.userRole.value
 
     init {
         loadLecturas()
+        if (role == UserRole.CUIDADOR) startCuidadorPolling()
+    }
+
+    private fun startCuidadorPolling() {
+        pollingJob?.cancel()
+        pollingJob = viewModelScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(CUIDADOR_POLL_INTERVAL_MS)
+                loadLecturas()
+            }
+        }
     }
 
     fun loadLecturas() {
@@ -117,6 +133,11 @@ class AnalysisViewModel @Inject constructor(
         }
     }
 
+    override fun onCleared() {
+        super.onCleared()
+        pollingJob?.cancel()
+    }
+
     private fun CachedReadingEntity.toResponse(): LecturaSensorResponse {
         return LecturaSensorResponse(
             id = id,
@@ -129,5 +150,9 @@ class AnalysisViewModel @Inject constructor(
             probabilidadPico = null,
             nivelRiesgo = null
         )
+    }
+
+    companion object {
+        private const val CUIDADOR_POLL_INTERVAL_MS = 30_000L
     }
 }

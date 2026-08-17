@@ -44,7 +44,7 @@ object ReportPdfGenerator {
         w.start()
 
         w.sectionTitle("Resumen del periodo")
-        w.drawKpis(reporte)
+        w.drawKpis(reporte, lecturas)
 
         w.spacing(14f)
         w.sectionTitle("Ultimas lecturas")
@@ -251,8 +251,28 @@ object ReportPdfGenerator {
             y += 24f
         }
 
-        fun drawKpis(reporte: ReporteResumenResponse) {
+        fun drawKpis(reporte: ReporteResumenResponse, lecturas: List<LecturaSensorResponse>) {
             data class Kpi(val label: String, val value: String)
+
+            val avgTemp = lecturas.map { it.temperaturaC }.averageOrNull()
+            val avgEstres = lecturas.map { it.estresPct }.averageOrNull()
+            val maxRiesgo = lecturas.mapNotNull { it.nivelRiesgo }
+                .let { niveles ->
+                    when {
+                        niveles.any { it.equals("Critico", ignoreCase = true) } -> "Critico"
+                        niveles.any { it.equals("Alta", ignoreCase = true) } -> "Alta"
+                        niveles.any { it.equals("Pre-Pico", ignoreCase = true) || it.equals("Media", ignoreCase = true) } -> "Moderado"
+                        niveles.any { it.equals("Normal", ignoreCase = true) } -> "Normal"
+                        else -> null
+                    }
+                }
+            val maxRiesgoLabel = when (maxRiesgo) {
+                "Critico" -> "Critico"
+                "Alta" -> "Alta"
+                "Moderado" -> "Atencion"
+                "Normal" -> "Estable"
+                else -> "Sin datos"
+            }
 
             val kpis = listOf(
                 Kpi("Lecturas registradas", "${reporte.totalLecturas}"),
@@ -260,7 +280,10 @@ object ReportPdfGenerator {
                 Kpi("Alertas", "${reporte.totalAlertas}"),
                 Kpi("Eventos criticos", "${reporte.eventosCriticos}"),
                 Kpi("Alertas pendientes", "${reporte.alertasPendientes}"),
-                Kpi("Pulso promedio", reporte.promedioPulso?.let { "%.0f BPM".format(it) } ?: "-")
+                Kpi("Pulso promedio", reporte.promedioPulso?.let { "%.0f BPM".format(it) } ?: "-"),
+                Kpi("Temperatura promedio", avgTemp?.let { "%.1f\u00b0C".format(it) } ?: "-"),
+                Kpi("Estres promedio", avgEstres?.let { "%.0f%%".format(it) } ?: "-"),
+                Kpi("Riesgo maximo", maxRiesgoLabel)
             )
 
             val gap = 12f

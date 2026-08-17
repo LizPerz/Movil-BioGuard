@@ -141,7 +141,7 @@ fun AnalysisScreen(analysisViewModel: AnalysisViewModel) {
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = if (uiState.lecturas.isNotEmpty()) "EN VIVO \u00B7 actualizado con el reloj" else "SIN DATOS DEL RELOJ A\u00DAN",
+                            text = if (uiState.lecturas.isNotEmpty()) "EN VIVO \u00B7 datos actualizados" else "SIN DATOS DEL RELOJ A\u00DAN",
                             fontSize = 10.sp,
                             color = if (uiState.lecturas.isNotEmpty()) GreenNeon else p.textSecondary,
                             letterSpacing = 1.sp

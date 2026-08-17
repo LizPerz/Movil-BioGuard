@@ -254,16 +254,9 @@ class AuthRepository @Inject constructor(
     }
 
     suspend fun logout() {
-        try {
-            api.logout()
-        } catch (e: Exception) {
-            // Local session is cleared regardless of server response
-        }
         RetrofitClient.setToken(null)
         tokenStorage.clear()
-        // Pairing identity and UI preferences belong to this installation, not to the cloud session.
         prefs.clearSession()
-        // Purga la cola offline para no dejar datos del usuario anterior
         pendingDataDao.clearReadings()
         pendingDataDao.clearGps()
         pendingDataDao.clearEvents()
@@ -271,5 +264,10 @@ class AuthRepository @Inject constructor(
         cachedDataDao.clearAllReadings()
         cachedDataDao.clearAllEvents()
         cachedDataDao.clearAllAlerts()
+        try {
+            api.logout()
+        } catch (e: Exception) {
+            // Local session is already cleared
+        }
     }
 }

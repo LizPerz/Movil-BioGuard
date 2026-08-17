@@ -71,6 +71,26 @@ class AuthViewModel @Inject constructor(
 
     private suspend fun hasBiometria(): Boolean = !prefs.patientBirthDate.first().isNullOrBlank()
 
+    private suspend fun syncBiometriaFromServerIfMissing() {
+        if (hasBiometria()) return
+        val patientId = pacienteRepository.resolveEffectivePatientId(prefs) ?: return
+        when (val result = pacienteRepository.getBiometria(patientId)) {
+            is Resource.Success -> {
+                val bio = result.data
+                if (!bio.fechaNacimiento.isNullOrBlank() || bio.pesoKg != null) {
+                    prefs.savePatientBiometrics(
+                        birthDate = bio.fechaNacimiento ?: "",
+                        sex = bio.sexo ?: "",
+                        weight = bio.pesoKg?.toString() ?: "",
+                        height = bio.estaturaCm?.toString() ?: ""
+                    )
+                }
+            }
+            is Resource.Error -> { }
+            is Resource.Loading -> { }
+        }
+    }
+
     private suspend fun hasSeenOnboarding(): Boolean = prefs.hasSeenOnboarding.first()
 
     fun markOnboardingCompleted() {
@@ -86,6 +106,7 @@ class AuthViewModel @Inject constructor(
             when (val result = repository.loginWithCode(codigoAcceso)) {
                 is Resource.Success -> {
                     val access = repository.getEffectiveAccess(UserRole.from(result.data.rol))
+                    syncBiometriaFromServerIfMissing()
                     _uiState.update { it.copy(isLoading = false, isAuthenticated = true, role = access.role, access = access, userName = result.data.nombre, biometriaCompletada = hasBiometria(), hasSeenOnboarding = hasSeenOnboarding()) }
                     connectRealtime(access)
                 }
@@ -103,6 +124,7 @@ class AuthViewModel @Inject constructor(
             when (val result = repository.login(email, password)) {
                 is Resource.Success -> {
                     val access = repository.getEffectiveAccess(UserRole.from(result.data.rol))
+                    syncBiometriaFromServerIfMissing()
                     _uiState.update { it.copy(isLoading = false, isAuthenticated = true, role = access.role, access = access, userName = result.data.nombre, biometriaCompletada = hasBiometria(), hasSeenOnboarding = hasSeenOnboarding()) }
                     connectRealtime(access)
                 }

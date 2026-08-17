@@ -88,7 +88,7 @@ fun BioGuardApp(
             if (access.allows(AppPermission.ACCOUNT_PROFILE)) {
                 add(BottomNavItem("Perfil", Icons.Filled.Person, Screen.PROFILE))
             }
-        }
+        }.take(5)
     }
     val navRoutes = bottomNavItems.map { it.route }
     val showBottomBar = currentRoute in navRoutes

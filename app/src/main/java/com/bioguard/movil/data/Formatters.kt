@@ -8,6 +8,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.ResolverStyle
 
@@ -149,6 +150,15 @@ object Formatters {
             .getOrElse {
                 runCatching { Instant.parse(if (timestamp.endsWith("Z")) timestamp else "${timestamp}Z") }.getOrNull()
             }
+
+    /**
+     * Formatea un instante como "HH:mm:ss  dd/MM/yyyy" en la zona indicada
+     * (por defecto la zona del dispositivo).
+     */
+    fun formatInstant(instant: Instant, zone: ZoneId = ZoneId.systemDefault()): String =
+        DateTimeFormatter.ofPattern("HH:mm:ss  dd/MM/yyyy")
+            .withZone(zone)
+            .format(instant)
 
     private val ISO_DATE: DateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE
     private val DISPLAY_DATE: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/uuuu")

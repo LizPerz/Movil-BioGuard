@@ -65,3 +65,11 @@
 -keep class com.microsoft.signalr.** { *; }
 -keep class org.reactivestreams.** { *; }
 -dontwarn com.microsoft.signalr.**
+
+# osmdroid (OpenStreetMap)
+-keep class org.osmdroid.** { *; }
+-dontwarn org.osmdroid.**
+-dontwarn org.apache.commons.**
+-dontwarn org.slf4j.**
+-dontwarn org.json.**
+

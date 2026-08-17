@@ -49,10 +49,7 @@ class AnalysisViewModel @Inject constructor(
     private var cacheJob: Job? = null
     private var pollingJob: Job? = null
 
-    private val role = prefs.userRole.value
-
     init {
-        // Tiempo real: nueva lectura del paciente → refrescar análisis
         viewModelScope.launch {
             realtimeHubClient.events.collect { event ->
                 if (event == RealtimeHubClient.EventLectura) {
@@ -61,7 +58,10 @@ class AnalysisViewModel @Inject constructor(
             }
         }
         loadLecturas()
-        if (role == UserRole.CUIDADOR) startCuidadorPolling()
+        viewModelScope.launch {
+            val role = UserRole.from(prefs.userRole.first())
+            if (role == UserRole.CUIDADOR) startCuidadorPolling()
+        }
     }
 
     private fun startCuidadorPolling() {

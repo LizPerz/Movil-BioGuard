@@ -425,6 +425,59 @@ object ReportPdfGenerator {
             y += 24f
         }
 
+        // ---- Card de Paciente ----
+        fun drawPatientCard() {
+            val cardTop = y
+            val cardHeight = 64f
+            val cardBottom = cardTop + cardHeight
+            ensureSpace(cardHeight + 14f)
+
+            roundedRect(MARGIN, cardTop, PAGE_WIDTH - MARGIN, cardBottom, 10f)
+
+            val avatarCx = MARGIN + 24f
+            val avatarCy = cardTop + 30f
+            val avatarR = 17f
+            canvas.drawCircle(avatarCx, avatarCy, avatarR, fillPaint(avatarBg))
+            drawIcon(Icon.PERSON, avatarCx, avatarCy, avatarR * 1.5f, gray)
+
+            val infoLeft = MARGIN + 52f
+            canvas.drawText("PACIENTE", infoLeft, cardTop + 15f, cardLabelGreen)
+            val nombre = pacienteNombre.ifBlank { "Sin nombre" }
+            val nombreCorto = if (nombre.length > 30) nombre.take(27) + "..." else nombre
+            canvas.drawText(nombreCorto, infoLeft, cardTop + 33f, patientName)
+            val idMeta = pacienteId?.let { "ID: $it" } ?: "Sin ID"
+            canvas.drawText(idMeta, infoLeft, cardTop + 48f, patientMeta)
+
+            val valueRight = PAGE_WIDTH - MARGIN - 14f
+            val periodo = periodoTexto()
+            val generado = fechaHora
+            val maxValW = maxOf(fieldValue.measureText(periodo), fieldValue.measureText(generado))
+            val labelRight = valueRight - maxValW - 10f
+
+            canvas.drawText("PERIODO", labelRight - cardLabelGreen.measureText("PERIODO"), cardTop + 20f, cardLabelGreen)
+            canvas.drawText(periodo, valueRight - fieldValue.measureText(periodo), cardTop + 20f, fieldValue)
+
+            canvas.drawText("GENERADO", labelRight - cardLabelGreen.measureText("GENERADO"), cardTop + 40f, cardLabelGreen)
+            canvas.drawText(generado, valueRight - fieldValue.measureText(generado), cardTop + 40f, fieldValue)
+
+            y = cardBottom + 12f
+        }
+
+        private fun periodoTexto(): String {
+            val fechas = lecturas.mapNotNull { l ->
+                runCatching {
+                    SimpleDateFormat("yyyy-MM-dd'T'HH:mm", Locale.US)
+                        .parse((l.timestamp.substringBefore("T") + "T" + l.timestamp.substringAfter("T").take(5)))
+                }.getOrNull()
+            }
+            if (fechas.isEmpty()) return "Sin lecturas"
+            val fmt = SimpleDateFormat("d MMM yyyy", Locale("es", "MX"))
+            val a = runCatching { fmt.format(fechas.first()) }.getOrElse { "-" }
+            val b = runCatching { fmt.format(fechas.last()) }.getOrElse { "-" }
+            return if (a == b) a else "$a - $b"
+        }
+
+        // ---- Grid de KPIs (3x2) ----
         fun drawKpis(reporte: ReporteResumenResponse, lecturas: List<LecturaSensorResponse>) {
             data class Kpi(
                 val label: String,
@@ -463,26 +516,51 @@ object ReportPdfGenerator {
                 Kpi("LECTURAS", "${reporte.totalLecturas}", "", Icon.CHART, red, pinkIconBg),
                 Kpi("RIESGO MAXIMO", maxRiesgoLabel, "", Icon.SHIELD, red, redIconBg),
                 Kpi("EVENTOS", "${reporte.totalEventos}", "sin criticos", Icon.BELL, blue, blueIconBg)
-            canvas.drawText(periodo, valueRight - fieldValue.measureText(periodo), cardTop + 20f, fieldValue)
+            )
 
-            canvas.drawText("GENERADO", labelRight - cardLabelGreen.measureText("GENERADO"), cardTop + 40f, cardLabelGreen)
-            canvas.drawText(generado, valueRight - fieldValue.measureText(generado), cardTop + 40f, fieldValue)
+            val gap = 10f
+            val cardW = (CONTENT_WIDTH - 2 * gap) / 3f
+            val cardH = 100f
 
-            y = cardBottom + 12f
-        }
+            kpis.chunked(3).forEach { row ->
+                ensureSpace(cardH + gap)
+                row.forEachIndexed { i, kpi ->
+                    val left = MARGIN + i * (cardW + gap)
+                    val top = y
+                    val right = left + cardW
+                    val bottom = top + cardH
 
-        private fun periodoTexto(): String {
-            val fechas = lecturas.mapNotNull { l ->
-                runCatching {
-                    SimpleDateFormat("yyyy-MM-dd'T'HH:mm", Locale.US)
-                        .parse((l.timestamp.substringBefore("T") + "T" + l.timestamp.substringAfter("T").take(5)))
-                }.getOrNull()
+                    roundedRect(left, top, right, bottom, 8f)
+
+                    val iconCx = left + 22f
+                    val iconCy = top + 21f
+                    val iconR = 13f
+                    canvas.drawCircle(iconCx, iconCy, iconR, fillPaint(kpi.iconBg))
+                    drawIcon(kpi.icon, iconCx, iconCy, 16f, kpi.iconColor)
+
+                    canvas.drawText(kpi.label, left + 13f, top + 47f, cardLabel)
+
+                    canvas.drawText(kpi.value, left + 13f, top + 63f, cardValue)
+                    if (kpi.subValue.isNotBlank()) {
+                        val vw = cardValue.measureText(kpi.value)
+                        canvas.drawText(kpi.subValue, left + 13f + vw + 6f, top + 63f, cardSubValue)
+                    }
+
+                    val badgeText = if (kpi.label == "EVENTOS") "SIN EVENTOS" else "SIN DATOS"
+                    val badgeH = 13f
+                    val badgeW = badgePaint.measureText(badgeText) + 12f
+                    val badgeLeft = left + 13f
+                    val badgeTop = bottom - badgeH - 8f
+                    canvas.drawRoundRect(
+                        badgeLeft, badgeTop, badgeLeft + badgeW, badgeTop + badgeH,
+                        4f, 4f, fillPaint(bgLight)
+                    )
+                    badgePaint.color = gray
+                    canvas.drawText(badgeText, badgeLeft + 6f, badgeTop + 9.5f, badgePaint)
+                }
+                y += cardH + gap
             }
-            if (fechas.isEmpty()) return "Sin lecturas"
-            val fmt = SimpleDateFormat("d MMM yyyy", Locale("es", "MX"))
-            val a = runCatching { fmt.format(fechas.first()) }.getOrElse { "-" }
-            val b = runCatching { fmt.format(fechas.last()) }.getOrElse { "-" }
-            return if (a == b) a else "$a - $b"
+            y += 4f
         }
 
         // ---- Tablas ----

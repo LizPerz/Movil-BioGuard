@@ -82,7 +82,10 @@ class AuthViewModel @Inject constructor(
                         birthDate = bio.fechaNacimiento ?: "",
                         sex = bio.sexo ?: "",
                         weight = bio.pesoKg?.toString() ?: "",
-                        height = bio.estaturaCm?.toString() ?: ""
+                        height = bio.estaturaCm?.toString() ?: "",
+                        isDiabetic = bio.esDiabetico,
+                        familyDiabetes = bio.familiaresDiabetes,
+                        activityLevel = bio.actividadFisica ?: ""
                     )
                 }
             }

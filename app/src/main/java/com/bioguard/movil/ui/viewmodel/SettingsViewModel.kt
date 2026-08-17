@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.bioguard.movil.datastore.UserPreferences
 import com.bioguard.movil.data.local.PendingDataDao
+import com.bioguard.movil.data.repository.PredictionMlSyncRepository
 import com.bioguard.movil.service.BioGuardMonitoringService
 import com.bioguard.movil.service.CloudSyncPhase
 import com.bioguard.movil.service.CloudSyncStatusStore
@@ -39,7 +40,8 @@ data class SettingsUiState(
 class SettingsViewModel @Inject constructor(
     application: Application,
     private val prefs: UserPreferences,
-    private val pendingDataDao: PendingDataDao
+    private val pendingDataDao: PendingDataDao,
+    private val syncRepository: PredictionMlSyncRepository
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -99,6 +101,11 @@ class SettingsViewModel @Inject constructor(
 
     fun syncNow() {
         BioGuardMonitoringService.requestCloudSync(getApplication())
+        viewModelScope.launch {
+            try {
+                syncRepository.sincronizarLote()
+            } catch (_: Exception) { }
+        }
     }
 
     private fun observeCloudSync() {

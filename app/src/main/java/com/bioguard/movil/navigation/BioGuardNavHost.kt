@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Watch
 import androidx.compose.material3.Scaffold
@@ -49,7 +50,7 @@ fun BioGuardApp(
 
     val context = LocalContext.current
     val navigateAfterAuth: () -> Unit = {
-        val route = if (!authState.hasSeenOnboarding) {
+        val route = if (!authState.hasSeenOnboarding && access.role != UserRole.CUIDADOR) {
             Screen.ONBOARDING
         } else if (access.role == UserRole.PACIENTE && !authState.biometriaCompletada) {
             Screen.WELCOME
@@ -84,6 +85,9 @@ fun BioGuardApp(
             }
             if (access.allowsAny(AppPermission.DEVICE_READ, AppPermission.DEVICE_PAIR)) {
                 add(BottomNavItem("Dispositivo", Icons.Filled.Watch, Screen.DEVICE))
+            }
+            if (access.permiteVerUbicacion()) {
+                add(BottomNavItem("Ubicación", Icons.Filled.LocationOn, Screen.LOCATION))
             }
             if (access.allows(AppPermission.ACCOUNT_PROFILE)) {
                 add(BottomNavItem("Perfil", Icons.Filled.Person, Screen.PROFILE))
@@ -147,7 +151,7 @@ fun BioGuardApp(
                         isAuthenticated = authState.isAuthenticated,
                         onFinished = { authenticated ->
                             if (authenticated) {
-                                val route = if (!authState.hasSeenOnboarding) {
+                                val route = if (!authState.hasSeenOnboarding && access.role != UserRole.CUIDADOR) {
                                     Screen.ONBOARDING
                                 } else if (access.role == UserRole.PACIENTE && !authState.biometriaCompletada) {
                                     Screen.WELCOME
@@ -282,6 +286,24 @@ fun BioGuardApp(
                                 if (access.allows(AppPermission.DEVICE_PAIR)) navController.navigate(Screen.WEARABLE_QR_SCANNER)
                             }
                         )
+                    }
+                }
+
+                // ── Ubicación en tiempo real ──
+                composable(
+                    route = Screen.LOCATION,
+                    deepLinks = listOf(
+                        navDeepLink { uriPattern = "bioguard://open/location" },
+                        navDeepLink { uriPattern = "https://bioguard.app/location" }
+                    )
+                ) {
+                    if (access.permiteVerUbicacion()) {
+                        val locationViewModel: LocationViewModel = hiltViewModel()
+                        LocationScreen(locationViewModel = locationViewModel)
+                    } else {
+                        LaunchedEffect(Unit) {
+                            navController.navigate(access.homeRoute()) { launchSingleTop = true }
+                        }
                     }
                 }
 

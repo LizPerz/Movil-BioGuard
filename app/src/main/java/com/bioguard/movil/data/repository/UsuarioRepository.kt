@@ -100,6 +100,15 @@ class UsuarioRepository @Inject constructor(
         }
     }
 
+    suspend fun deleteFotoPerfil(): Resource<String> {
+        return try {
+            val response = api.deleteFotoPerfil()
+            Resource.Success(response.message)
+        } catch (e: Exception) {
+            Resource.Error(e.toUserMessage("Error al eliminar foto de perfil"))
+        }
+    }
+
     suspend fun cancelarPlan(): Resource<String> {
         return try {
             val response = api.cancelarSuscripcion()

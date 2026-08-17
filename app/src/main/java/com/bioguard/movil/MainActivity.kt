@@ -93,6 +93,11 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun requestBluetoothEnabled() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
         try {
             val adapter = BluetoothAdapter.getDefaultAdapter() ?: return
             if (!adapter.isEnabled) {

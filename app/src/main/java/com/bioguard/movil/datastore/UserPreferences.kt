@@ -23,6 +23,7 @@ class UserPreferences(private val context: Context) {
         val ACCESS_PERMISSIONS = stringPreferencesKey("access_permissions")
         val CAREGIVER_ACCESS_LEVEL = stringPreferencesKey("caregiver_access_level")
         val PLAN_NAME = stringPreferencesKey("plan_name")
+        val PLAN_GPS_ACTIVO = booleanPreferencesKey("plan_gps_activo")
         val THEME = stringPreferencesKey("theme")
         val IS_DARK_MODE = booleanPreferencesKey("is_dark_mode")
         
@@ -71,6 +72,7 @@ class UserPreferences(private val context: Context) {
     }
     val caregiverAccessLevel: Flow<String?> = context.dataStore.data.map { it[Keys.CAREGIVER_ACCESS_LEVEL] }
     val planName: Flow<String?> = context.dataStore.data.map { it[Keys.PLAN_NAME] }
+    val planGpsActivo: Flow<Boolean> = context.dataStore.data.map { it[Keys.PLAN_GPS_ACTIVO] ?: false }
     val theme: Flow<String?> = context.dataStore.data.map { it[Keys.THEME] }
     val isDarkMode: Flow<Boolean> = context.dataStore.data.map { it[Keys.IS_DARK_MODE] ?: true }
 
@@ -171,7 +173,8 @@ class UserPreferences(private val context: Context) {
         patientId: String?,
         caregiverAccessLevel: String?,
         planName: String?,
-        permissionCodes: Set<String>
+        permissionCodes: Set<String>,
+        planGpsActivo: Boolean = false
     ) {
         context.dataStore.edit { prefs ->
             if (patientId.isNullOrBlank()) prefs.remove(Keys.PATIENT_ID)
@@ -181,6 +184,7 @@ class UserPreferences(private val context: Context) {
             if (planName.isNullOrBlank()) prefs.remove(Keys.PLAN_NAME)
             else prefs[Keys.PLAN_NAME] = planName
             prefs[Keys.ACCESS_PERMISSIONS] = permissionCodes.sorted().joinToString(",")
+            prefs[Keys.PLAN_GPS_ACTIVO] = planGpsActivo
         }
     }
 
@@ -262,6 +266,7 @@ class UserPreferences(private val context: Context) {
             prefs.remove(Keys.ACCESS_PERMISSIONS)
             prefs.remove(Keys.CAREGIVER_ACCESS_LEVEL)
             prefs.remove(Keys.PLAN_NAME)
+            prefs.remove(Keys.PLAN_GPS_ACTIVO)
             // La biometría del paciente se conserva para que al volver a iniciar sesión
             // no se repita el formulario (el usuario es el mismo en este dispositivo).
         }

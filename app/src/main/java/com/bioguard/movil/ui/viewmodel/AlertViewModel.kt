@@ -8,6 +8,7 @@ import com.bioguard.movil.data.repository.AlertaRepository
 import com.bioguard.movil.data.repository.PacienteRepository
 import com.bioguard.movil.datastore.UserPreferences
 import com.bioguard.movil.network.AlertaResponse
+import com.bioguard.movil.realtime.RealtimeHubClient
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,13 +32,22 @@ class AlertViewModel @Inject constructor(
     application: Application,
     private val repository: AlertaRepository,
     private val pacienteRepository: PacienteRepository,
-    private val prefs: UserPreferences
+    private val prefs: UserPreferences,
+    private val realtimeHubClient: RealtimeHubClient
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(AlertUiState())
     val uiState: StateFlow<AlertUiState> = _uiState.asStateFlow()
 
     init {
+        // Tiempo real: nueva alerta del paciente → refrescar lista
+        viewModelScope.launch {
+            realtimeHubClient.events.collect { event ->
+                if (event == RealtimeHubClient.EventAlerta) {
+                    loadAlertas()
+                }
+            }
+        }
         loadAlertas()
     }
 

@@ -34,9 +34,18 @@ data class EffectiveAccess(
     val caregiverAccessLevel: String? = null,
     val caregiverWithinPlan: Boolean = false,
     val planName: String? = null,
+    val planGpsActivo: Boolean = false,
     val permissions: Set<AppPermission> = emptySet()
 ) {
     fun allows(permission: AppPermission): Boolean = permission in permissions
+
+    val esCuidador: Boolean get() = role == UserRole.CUIDADOR
+
+    /**
+     * El acceso a la ubicación en tiempo real del paciente está disponible para el
+     * cuidador (por la concepción de su rol) y para el dueño cuando su plan lo incluye.
+     */
+    fun permiteVerUbicacion(): Boolean = esCuidador || (role == UserRole.DUEÑO && planGpsActivo)
 
     companion object {
         fun restricted(role: UserRole, patientId: String? = null): EffectiveAccess {

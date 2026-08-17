@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.DeviceThermostat
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -60,11 +61,10 @@ fun AnalysisScreen(analysisViewModel: AnalysisViewModel) {
 
     val timeFilters = listOf("1h", "4h", "Hoy", "7 d\u00edas")
     val metrics = listOf(
-        MetricOption("Pulso", p.accent, Icons.Filled.Favorite),
+        MetricOption("Pulso", RedNeon, Icons.Filled.Favorite),
         MetricOption("Temperatura", p.accentSecondary, Icons.Filled.DeviceThermostat),
         MetricOption("Estrés", YellowNeon, Icons.Filled.Bolt)
     )
-    val metricEmojis = mapOf("Pulso" to "\u2764\uFE0F", "Temperatura" to "\uD83C\uDF21\uFE0F", "Estrés" to "\u26A1")
 
     val chartPoints = uiState.lecturas.map { it ->
         val valFloat = when (uiState.selectedMetric) {
@@ -159,7 +159,12 @@ fun AnalysisScreen(analysisViewModel: AnalysisViewModel) {
                             .padding(horizontal = 10.dp, vertical = 6.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(text = "\uD83D\uDD04", fontSize = 14.sp)
+                        Icon(
+                            imageVector = Icons.Filled.Refresh,
+                            contentDescription = "Recargar lecturas",
+                            tint = p.accent,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 }
 
@@ -185,7 +190,7 @@ fun AnalysisScreen(analysisViewModel: AnalysisViewModel) {
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "Las lecturas aparecer\u00E1n aqu\u00ED en tiempo real. Toca \uD83D\uDD04 para recargar.",
+                                text = "Las lecturas aparecer\u00E1n aqu\u00ED en tiempo real. Toca el bot\u00F3n de recargar para actualizar.",
                                 fontSize = 12.sp,
                                 color = p.textSecondary,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -249,16 +254,12 @@ fun AnalysisScreen(analysisViewModel: AnalysisViewModel) {
                                 },
                             contentAlignment = Alignment.Center
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = metric.icon,
-                                    contentDescription = metric.name,
-                                    tint = metric.color,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(text = metricEmojis[metric.name] ?: "", fontSize = 12.sp)
-                            }
+                            Icon(
+                                imageVector = metric.icon,
+                                contentDescription = metric.name,
+                                tint = metric.color,
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
                     }
                 }
@@ -270,7 +271,7 @@ fun AnalysisScreen(analysisViewModel: AnalysisViewModel) {
                     points = chartPoints,
                     lineColor = chartColor,
                     unit = unit,
-                    title = "${metricEmojis[uiState.selectedMetric] ?: ""} Tendencia (${uiState.selectedMetric.uppercase()})"
+                    title = "Tendencia (${uiState.selectedMetric.uppercase()})"
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))

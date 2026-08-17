@@ -1,12 +1,17 @@
 package com.bioguard.movil.util
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import android.util.Log
+import com.bioguard.movil.R
 import com.bioguard.movil.network.EventoMetabolicoResponse
 import com.bioguard.movil.network.LecturaSensorResponse
 import com.bioguard.movil.network.ReporteResumenResponse
@@ -20,7 +25,6 @@ object ReportPdfGenerator {
 
     private const val TAG = "ReportPdfGenerator"
 
-    // A4 en puntos
     private const val PAGE_WIDTH = 595f
     private const val PAGE_HEIGHT = 842f
     private const val MARGIN = 40f
@@ -40,17 +44,18 @@ object ReportPdfGenerator {
         val file = File(dir, "BioGuard_Reporte_$stamp.pdf")
 
         val doc = PdfDocument()
-        val w = PageManager(doc, pacienteNombre, pacienteId)
+        val w = PageManager(doc, context, pacienteNombre, pacienteId, lecturas)
         w.start()
 
-        w.sectionTitle("Resumen del periodo")
+        w.drawPatientCard()
+        w.sectionTitle("Indicadores del periodo")
         w.drawKpis(reporte, lecturas)
 
-        w.spacing(14f)
+        w.spacing(12f)
         w.sectionTitle("Ultimas lecturas")
         w.drawLecturas(lecturas)
 
-        w.spacing(14f)
+        w.spacing(12f)
         w.sectionTitle("Eventos metabolicos")
         w.drawEventos(eventos)
 
@@ -63,23 +68,35 @@ object ReportPdfGenerator {
         return file
     }
 
-    private enum class Align { LEFT, RIGHT }
+    private enum class Align { LEFT, RIGHT, CENTER }
 
     private class TableColumn(val title: String, val width: Float, val align: Align = Align.LEFT)
 
+    private enum class Icon { HEART, THERMOMETER, BOLT, CHART, SHIELD, BELL, DOC, PERSON }
+
     private class PageManager(
         private val doc: PdfDocument,
+        private val context: Context,
         private val pacienteNombre: String,
-        private val pacienteId: String?
+        private val pacienteId: String?,
+        private val lecturas: List<LecturaSensorResponse>
     ) {
         private val brandGreen = Color.rgb(0, 204, 158)
         private val ink = Color.rgb(34, 40, 49)
         private val gray = Color.rgb(120, 130, 140)
-        private val borderGray = Color.rgb(220, 226, 232)
+        private val borderGray = Color.rgb(230, 235, 240)
+        private val bgLight = Color.rgb(245, 247, 250)
         private val headerFill = Color.rgb(240, 245, 243)
         private val red = Color.rgb(239, 68, 68)
         private val orange = Color.rgb(245, 158, 11)
         private val greenOk = Color.rgb(34, 197, 94)
+        private val blue = Color.rgb(59, 130, 246)
+        private val blueIconBg = Color.rgb(219, 234, 254)
+        private val redIconBg = Color.rgb(254, 226, 226)
+        private val orangeIconBg = Color.rgb(255, 237, 213)
+        private val yellowIconBg = Color.rgb(254, 249, 195)
+        private val pinkIconBg = Color.rgb(252, 231, 243)
+        private val avatarBg = Color.rgb(224, 232, 240)
 
         private var page: PdfDocument.Page? = null
         private val canvas: Canvas get() = page!!.canvas
@@ -92,61 +109,87 @@ object ReportPdfGenerator {
 
         private val bottomLimit: Float get() = PAGE_HEIGHT - FOOTER_HEIGHT - 8f
 
-        // ---- Paints (reutilizables entre páginas) ----
+        // ---- Paints (letterSpacing en 0f para evitar texto separado) ----
         private val brandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = brandGreen; textSize = 26f
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            color = brandGreen; textSize = 24f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD); letterSpacing = 0f
         }
-        private val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = ink; textSize = 15f
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        private val headerTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = ink; textSize = 13f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD); letterSpacing = 0f
+        }
+        private val headerDatePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = gray; textSize = 9f; letterSpacing = 0f
+        }
+        private val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            isAntiAlias = true
+            isFilterBitmap = true
         }
         private val accentLine = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = brandGreen; strokeWidth = 3f
-        }
-        private val metaLabel = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = gray; textSize = 10f
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        }
-        private val metaValue = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = ink; textSize = 10f
+            color = brandGreen; strokeWidth = 2.5f
         }
         private val sectionTitle = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = ink; textSize = 14f
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            color = ink; textSize = 13f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD); letterSpacing = 0f
         }
         private val sectionBar = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = brandGreen }
         private val cardFill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE; style = Paint.Style.FILL
         }
         private val cardBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = borderGray; style = Paint.Style.STROKE; strokeWidth = 1.2f
+            color = borderGray; style = Paint.Style.STROKE; strokeWidth = 0.8f
         }
         private val cardLabel = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = gray; textSize = 9f
+            color = gray; textSize = 8f; letterSpacing = 0f
+        }
+        private val cardLabelGreen = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = brandGreen; textSize = 7f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD); letterSpacing = 0f
         }
         private val cardValue = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = ink; textSize = 17f
+            color = ink; textSize = 16f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD); letterSpacing = 0f
+        }
+        private val cardSubValue = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = gray; textSize = 8f; letterSpacing = 0f
+        }
+        private val patientName = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = ink; textSize = 14f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD); letterSpacing = 0f
+        }
+        private val patientMeta = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = gray; textSize = 9f; letterSpacing = 0f
+        }
+        private val fieldValue = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = ink; textSize = 10f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD); letterSpacing = 0f
+        }
+        private val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = 6.5f; letterSpacing = 0f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         }
         private val tableHeader = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = ink; textSize = 9f
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD); letterSpacing = 0f
         }
-        private val rowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = ink; textSize = 9.5f }
-        private val rowPaintGray = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = gray; textSize = 9.5f }
+        private val rowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = ink; textSize = 9.5f; letterSpacing = 0f
+        }
+        private val rowPaintGray = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = gray; textSize = 9.5f; letterSpacing = 0f
+        }
         private val tableHeaderLine = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = brandGreen; strokeWidth = 1.5f
         }
         private val separator = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = borderGray; strokeWidth = 0.8f
+            color = borderGray; strokeWidth = 0.6f
         }
         private val footerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = gray; textSize = 8.5f
+            color = gray; textSize = 8f; letterSpacing = 0f
         }
         private val compactHeader = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = gray; textSize = 10f
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD); letterSpacing = 0f
         }
 
         private val riskPaints: Map<String?, Paint> = mapOf(
@@ -160,7 +203,104 @@ object ReportPdfGenerator {
 
         private fun boldPaint(color: Int) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             this.color = color; textSize = 9.5f
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD); letterSpacing = 0f
+        }
+
+        private fun roundedRect(left: Float, top: Float, right: Float, bottom: Float, radius: Float) {
+            canvas.drawRoundRect(left, top, right, bottom, radius, radius, cardFill)
+            canvas.drawRoundRect(left, top, right, bottom, radius, radius, cardBorder)
+        }
+
+        private fun fillPaint(color: Int) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = color; style = Paint.Style.FILL
+        }
+
+        // ---- Iconos vectoriales dibujados en el Canvas (sin emojis) ----
+        private fun drawIcon(icon: Icon, cx: Float, cy: Float, size: Float, iconColor: Int) {
+            val fill = fillPaint(iconColor)
+            when (icon) {
+                Icon.HEART -> {
+                    val r = size * 0.26f
+                    canvas.drawCircle(cx - r, cy - r * 0.4f, r, fill)
+                    canvas.drawCircle(cx + r, cy - r * 0.4f, r, fill)
+                    val tri = Path()
+                    tri.moveTo(cx - r * 1.9f, cy - r * 0.15f)
+                    tri.lineTo(cx + r * 1.9f, cy - r * 0.15f)
+                    tri.lineTo(cx, cy + r * 1.5f)
+                    tri.close()
+                    canvas.drawPath(tri, fill)
+                }
+                Icon.THERMOMETER -> {
+                    canvas.drawRoundRect(
+                        cx - size * 0.08f, cy - size * 0.42f,
+                        cx + size * 0.08f, cy + size * 0.12f, size * 0.08f, size * 0.08f, fill
+                    )
+                    canvas.drawCircle(cx, cy + size * 0.28f, size * 0.2f, fill)
+                }
+                Icon.BOLT -> {
+                    val bolt = Path()
+                    bolt.moveTo(cx + size * 0.12f, cy - size * 0.42f)
+                    bolt.lineTo(cx - size * 0.2f, cy + size * 0.06f)
+                    bolt.lineTo(cx, cy + size * 0.06f)
+                    bolt.lineTo(cx - size * 0.12f, cy + size * 0.42f)
+                    bolt.lineTo(cx + size * 0.2f, cy - size * 0.06f)
+                    bolt.lineTo(cx, cy - size * 0.06f)
+                    bolt.close()
+                    canvas.drawPath(bolt, fill)
+                }
+                Icon.CHART -> {
+                    val bw = size * 0.12f
+                    val baseY = cy + size * 0.42f
+                    canvas.drawRoundRect(cx - size * 0.36f, baseY - size * 0.45f, cx - size * 0.36f + bw, baseY, 2f, 2f, fill)
+                    canvas.drawRoundRect(cx - bw / 2f, baseY - size * 0.8f, cx + bw / 2f, baseY, 2f, 2f, fill)
+                    canvas.drawRoundRect(cx + size * 0.36f - bw, baseY - size * 0.6f, cx + size * 0.36f, baseY, 2f, 2f, fill)
+                }
+                Icon.SHIELD -> {
+                    val sh = Path()
+                    sh.moveTo(cx, cy - size * 0.42f)
+                    sh.lineTo(cx + size * 0.32f, cy - size * 0.34f)
+                    sh.lineTo(cx + size * 0.32f, cy + size * 0.05f)
+                    sh.lineTo(cx, cy + size * 0.42f)
+                    sh.lineTo(cx - size * 0.32f, cy + size * 0.05f)
+                    sh.lineTo(cx - size * 0.32f, cy - size * 0.34f)
+                    sh.close()
+                    canvas.drawPath(sh, fill)
+                }
+                Icon.BELL -> {
+                    val bell = Path()
+                    bell.addArc(RectF(cx - size * 0.3f, cy - size * 0.32f, cx + size * 0.3f, cy + size * 0.3f), 190f, 160f)
+                    bell.lineTo(cx + size * 0.22f, cy + size * 0.28f)
+                    bell.lineTo(cx - size * 0.22f, cy + size * 0.28f)
+                    bell.close()
+                    canvas.drawPath(bell, fill)
+                    canvas.drawCircle(cx, cy + size * 0.38f, size * 0.09f, fill)
+                    canvas.drawCircle(cx, cy - size * 0.4f, size * 0.05f, fill)
+                }
+                Icon.DOC -> {
+                    val r = RectF(cx - size * 0.3f, cy - size * 0.36f, cx + size * 0.3f, cy + size * 0.36f)
+                    canvas.drawRoundRect(r, size * 0.06f, size * 0.06f, fill)
+                    val fold = Path()
+                    fold.moveTo(cx + size * 0.3f, cy - size * 0.16f)
+                    fold.lineTo(cx + size * 0.18f, cy - size * 0.36f)
+                    fold.lineTo(cx + size * 0.3f, cy - size * 0.36f)
+                    fold.close()
+                    canvas.drawPath(fold, fillPaint(Color.WHITE))
+                    val line = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = Color.WHITE; strokeWidth = size * 0.07f
+                        strokeCap = Paint.Cap.ROUND
+                    }
+                    canvas.drawLine(cx - size * 0.18f, cy - size * 0.2f, cx + size * 0.1f, cy - size * 0.2f, line)
+                    canvas.drawLine(cx - size * 0.18f, cy - size * 0.05f, cx + size * 0.12f, cy - size * 0.05f, line)
+                    canvas.drawLine(cx - size * 0.18f, cy + size * 0.1f, cx + size * 0.05f, cy + size * 0.1f, line)
+                }
+                Icon.PERSON -> {
+                    canvas.drawCircle(cx, cy - size * 0.12f, size * 0.16f, fill)
+                    val body = Path()
+                    body.addArc(RectF(cx - size * 0.32f, cy - size * 0.08f, cx + size * 0.32f, cy + size * 0.45f), 0f, 180f)
+                    body.close()
+                    canvas.drawPath(body, fill)
+                }
+            }
         }
 
         // ---- Gestión de página ----
@@ -196,33 +336,67 @@ object ReportPdfGenerator {
 
         // ---- Header / footer ----
         private fun drawHeader() {
-            val nombre = pacienteNombre.ifBlank { "Sin nombre" }
-            val nombreLimpio = if (nombre.length > 48) nombre.take(45) + "..." else nombre
-
-            canvas.drawText("BioGuard", MARGIN, y, brandPaint)
-            y += 21f
-            canvas.drawText("Reporte de salud", MARGIN, y, titlePaint)
-            y += 10f
-            canvas.drawLine(MARGIN, y, PAGE_WIDTH - MARGIN, y, accentLine)
-
-            y += 24f
-            canvas.drawText("Paciente: ", MARGIN, y, metaLabel)
-            var x = MARGIN + metaLabel.measureText("Paciente: ")
-            canvas.drawText(nombreLimpio, x, y, metaValue)
-            x += metaValue.measureText(nombreLimpio) + 24f
-            if (!pacienteId.isNullOrBlank()) {
-                canvas.drawText("ID: ", x, y, metaLabel)
-                val idLabel = pacienteId.let { id -> if (id.length > 24) id.take(21) + "..." else id }
-                canvas.drawText(idLabel, x + metaLabel.measureText("ID: "), y, metaValue)
+            // Logo + marca (izquierda)
+            val logoBitmap = logoBitmap()
+            val logoH = 32f
+            val logoW = if (logoBitmap != null) logoH * logoBitmap.width / logoBitmap.height.toFloat() else 0f
+            if (logoBitmap != null) {
+                canvas.drawBitmap(logoBitmap, MARGIN, y - 4f, bitmapPaint)
             }
-            y += 17f
-            canvas.drawText("Generado: ", MARGIN, y, metaLabel)
-            canvas.drawText(fechaHora, MARGIN + metaLabel.measureText("Generado: "), y, metaValue)
-            y += 26f
+            val textLeft = MARGIN + logoW + 10f
+            canvas.drawText("BioGuard", textLeft, y + 26f, brandPaint)
+
+            // Titulo + fecha (derecha, alineados a la derecha)
+            val rightX = PAGE_WIDTH - MARGIN
+            canvas.drawText("Reporte de salud", rightX - headerTitlePaint.measureText("Reporte de salud"), y + 14f, headerTitlePaint)
+            canvas.drawText(fechaHora, rightX - headerDatePaint.measureText(fechaHora), y + 32f, headerDatePaint)
+
+            // Linea de acento verde
+            y += 42f
+            canvas.drawLine(MARGIN, y, PAGE_WIDTH - MARGIN, y, accentLine)
+            y += 14f
+        }
+
+        private fun logoBitmap(): Bitmap? {
+            val full = runCatching {
+                BitmapFactory.decodeResource(context.resources, R.drawable.bio_guard)
+            }.getOrNull() ?: return null
+            val cropped = cropLogoBitmap(full)
+            val dstH = 34f
+            val dstW = dstH * cropped.width / cropped.height.toFloat()
+            return Bitmap.createScaledBitmap(cropped, dstW.toInt(), dstH.toInt(), true)
+        }
+
+        private fun cropLogoBitmap(bitmap: Bitmap): Bitmap {
+            val w = bitmap.width
+            val h = bitmap.height
+            val pixels = IntArray(w * h)
+            bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
+            var minX = w; var minY = h; var maxX = -1; var maxY = -1
+            var i = 0
+            for (yy in 0 until h) {
+                for (xx in 0 until w) {
+                    val alpha = pixels[i] ushr 24
+                    if (alpha > 100) {
+                        if (xx < minX) minX = xx
+                        if (xx > maxX) maxX = xx
+                        if (yy < minY) minY = yy
+                        if (yy > maxY) maxY = yy
+                    }
+                    i++
+                }
+            }
+            if (maxX <= minX || maxY <= minY) return bitmap
+            val pad = 4
+            val left = maxOf(0, minX - pad)
+            val top = maxOf(0, minY - pad)
+            val right = minOf(w, maxX + 1 + pad)
+            val bottom = minOf(h, maxY + 1 + pad)
+            return Bitmap.createBitmap(bitmap, left, top, right - left, bottom - top)
         }
 
         private fun drawCompactHeader() {
-            canvas.drawText("BioGuard · Reporte de salud", MARGIN, y, compactHeader)
+            canvas.drawText("BioGuard \u00b7 Reporte de salud", MARGIN, y, compactHeader)
             canvas.drawLine(MARGIN, y + 6f, PAGE_WIDTH - MARGIN, y + 6f, tableHeaderLine)
             y += 24f
         }
@@ -232,7 +406,7 @@ object ReportPdfGenerator {
             val textY = PAGE_HEIGHT - 26f
             canvas.drawLine(MARGIN, lineY, PAGE_WIDTH - MARGIN, lineY, separator)
             canvas.drawText(
-                "Generado por BioGuard · Documento informativo de monitoreo, no sustituye un diagnostico medico.",
+                "Generado por BioGuard \u00b7 Documento informativo de monitoreo, no sustituye un diagnostico medico.",
                 MARGIN, textY, footerPaint
             )
             val pageTxt = "Pagina $pageNumber"
@@ -252,7 +426,14 @@ object ReportPdfGenerator {
         }
 
         fun drawKpis(reporte: ReporteResumenResponse, lecturas: List<LecturaSensorResponse>) {
-            data class Kpi(val label: String, val value: String)
+            data class Kpi(
+                val label: String,
+                val value: String,
+                val subValue: String,
+                val icon: Icon,
+                val iconColor: Int,
+                val iconBg: Int
+            )
 
             val avgTemp = lecturas.map { it.temperaturaC }.averageOrNull()
             val avgEstres = lecturas.map { it.estresPct }.averageOrNull()
@@ -271,42 +452,40 @@ object ReportPdfGenerator {
                 "Alta" -> "Alta"
                 "Moderado" -> "Atencion"
                 "Normal" -> "Estable"
-                else -> "Sin datos"
+                else -> "\u2014"
             }
+            val avgPulso = reporte.promedioPulso?.let { "%.0f".format(it) } ?: "\u2014"
 
             val kpis = listOf(
-                Kpi("Lecturas registradas", "${reporte.totalLecturas}"),
-                Kpi("Eventos metabolicos", "${reporte.totalEventos}"),
-                Kpi("Alertas", "${reporte.totalAlertas}"),
-                Kpi("Eventos criticos", "${reporte.eventosCriticos}"),
-                Kpi("Alertas pendientes", "${reporte.alertasPendientes}"),
-                Kpi("Pulso promedio", reporte.promedioPulso?.let { "%.0f BPM".format(it) } ?: "-"),
-                Kpi("Temperatura promedio", avgTemp?.let { "%.1f\u00b0C".format(it) } ?: "-"),
-                Kpi("Estres promedio", avgEstres?.let { "%.0f%%".format(it) } ?: "-"),
-                Kpi("Riesgo maximo", maxRiesgoLabel)
-            )
+                Kpi("PULSO PROMEDIO", avgPulso, "BPM", Icon.HEART, red, redIconBg),
+                Kpi("TEMPERATURA PROMEDIO", avgTemp?.let { "%.1f".format(it) } ?: "\u2014", "\u00b0C", Icon.THERMOMETER, orange, orangeIconBg),
+                Kpi("ESTRES PROMEDIO", avgEstres?.let { "%.0f".format(it) } ?: "\u2014", "%", Icon.BOLT, orange, yellowIconBg),
+                Kpi("LECTURAS", "${reporte.totalLecturas}", "", Icon.CHART, red, pinkIconBg),
+                Kpi("RIESGO MAXIMO", maxRiesgoLabel, "", Icon.SHIELD, red, redIconBg),
+                Kpi("EVENTOS", "${reporte.totalEventos}", "sin criticos", Icon.BELL, blue, blueIconBg)
+            canvas.drawText(periodo, valueRight - fieldValue.measureText(periodo), cardTop + 20f, fieldValue)
 
-            val gap = 12f
-            val cardW = (CONTENT_WIDTH - 2 * gap) / 3f
-            val cardH = 54f
+            canvas.drawText("GENERADO", labelRight - cardLabelGreen.measureText("GENERADO"), cardTop + 40f, cardLabelGreen)
+            canvas.drawText(generado, valueRight - fieldValue.measureText(generado), cardTop + 40f, fieldValue)
 
-            kpis.chunked(3).forEach { row ->
-                ensureSpace(cardH + gap)
-                row.forEachIndexed { i, kpi ->
-                    val left = MARGIN + i * (cardW + gap)
-                    val top = y
-                    val right = left + cardW
-                    val bottom = top + cardH
-                    canvas.drawRoundRect(left, top, right, bottom, 8f, 8f, cardFill)
-                    canvas.drawRoundRect(left, top, right, bottom, 8f, 8f, cardBorder)
-                    canvas.drawText(kpi.label, left + 12f, top + 18f, cardLabel)
-                    canvas.drawText(kpi.value, left + 12f, top + 40f, cardValue)
-                }
-                y += cardH + gap
-            }
-            y += 2f
+            y = cardBottom + 12f
         }
 
+        private fun periodoTexto(): String {
+            val fechas = lecturas.mapNotNull { l ->
+                runCatching {
+                    SimpleDateFormat("yyyy-MM-dd'T'HH:mm", Locale.US)
+                        .parse((l.timestamp.substringBefore("T") + "T" + l.timestamp.substringAfter("T").take(5)))
+                }.getOrNull()
+            }
+            if (fechas.isEmpty()) return "Sin lecturas"
+            val fmt = SimpleDateFormat("d MMM yyyy", Locale("es", "MX"))
+            val a = runCatching { fmt.format(fechas.first()) }.getOrElse { "-" }
+            val b = runCatching { fmt.format(fechas.last()) }.getOrElse { "-" }
+            return if (a == b) a else "$a - $b"
+        }
+
+        // ---- Tablas ----
         fun drawLecturas(lecturas: List<LecturaSensorResponse>) {
             val cols = listOf(
                 TableColumn("Fecha / hora", 138f),
@@ -329,7 +508,7 @@ object ReportPdfGenerator {
                 val fecha = (l.timestamp.substringBefore("T") + " " + l.timestamp.substringAfter("T").take(5)).trim()
                 canvas.drawText(fecha, colLeft(cols, 0) + 4f, base, rowPaint)
                 canvas.drawText("%.0f".format(l.pulsoBpm), rightEdge(cols, 1) - rowPaint.measureText("%.0f".format(l.pulsoBpm)), base, rowPaint)
-                canvas.drawText("%.1f°C".format(l.temperaturaC), rightEdge(cols, 2) - rowPaint.measureText("%.1f°C".format(l.temperaturaC)), base, rowPaint)
+                canvas.drawText("%.1f\u00b0C".format(l.temperaturaC), rightEdge(cols, 2) - rowPaint.measureText("%.1f\u00b0C".format(l.temperaturaC)), base, rowPaint)
                 canvas.drawText("%.0f%%".format(l.estresPct), rightEdge(cols, 3) - rowPaint.measureText("%.0f%%".format(l.estresPct)), base, rowPaint)
                 canvas.drawText(l.nivelRiesgo ?: "-", colLeft(cols, 4) + 4f, base, riskPaints[l.nivelRiesgo] ?: rowPaint)
                 y += rowH
@@ -357,7 +536,9 @@ object ReportPdfGenerator {
                 ensureSpace(rowH + 1f)
                 val base = y
                 canvas.drawText((e.fechaEvento ?: "-").substringBefore("T"), colLeft(cols, 0) + 4f, base, rowPaint)
-                canvas.drawText(e.nivelRiesgo ?: "-", colLeft(cols, 1) + 4f, base, riskPaints[e.nivelRiesgo] ?: rowPaint)
+                val nivel = e.nivelRiesgo ?: "-"
+                val nivelPaint = fitPaint(riskPaints[e.nivelRiesgo] ?: rowPaint, nivel, cols[1].width - 8f)
+                canvas.drawText(nivel, colLeft(cols, 1) + 4f, base, nivelPaint)
                 val prob = "%.0f%%".format(e.probabilidadMl * 100)
                 canvas.drawText(prob, rightEdge(cols, 2) - rowPaint.measureText(prob), base, rowPaint)
                 val estado = if (e.atendida) "Atendido" else "Pendiente"
@@ -373,10 +554,10 @@ object ReportPdfGenerator {
             ensureSpace(28f)
             canvas.drawRect(MARGIN, y, PAGE_WIDTH - MARGIN, y + 17f, headerFillPaint())
             cols.forEachIndexed { i, col ->
-                val x = if (col.align == Align.RIGHT) {
-                    rightEdge(cols, i) - tableHeader.measureText(col.title)
-                } else {
-                    colLeft(cols, i) + 4f
+                val x = when (col.align) {
+                    Align.RIGHT -> rightEdge(cols, i) - tableHeader.measureText(col.title)
+                    Align.CENTER -> colLeft(cols, i) + (cols[i].width - tableHeader.measureText(col.title)) / 2f
+                    else -> colLeft(cols, i) + 4f
                 }
                 canvas.drawText(col.title, x, y + 12f, tableHeader)
             }
@@ -397,5 +578,13 @@ object ReportPdfGenerator {
 
         private fun rightEdge(cols: List<TableColumn>, index: Int): Float =
             colLeft(cols, index) + cols[index].width - 4f
+
+        private fun fitPaint(base: Paint, text: String, maxWidth: Float): Paint {
+            val p = Paint(base)
+            while (p.measureText(text) > maxWidth && p.textSize > 6f) {
+                p.textSize -= 0.5f
+            }
+            return p
+        }
     }
 }

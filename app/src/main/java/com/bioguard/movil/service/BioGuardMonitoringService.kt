@@ -449,6 +449,17 @@ class BioGuardMonitoringService : Service() {
             }
         }
 
+        // Loop: GPS continuo (ubicación en tiempo real del paciente).
+        // Cada 30s se toma la ubicación del teléfono y se sube de inmediato al backend
+        // para que la pantalla "Ubicación en tiempo real" del dueño/cuidador se actualice.
+        // Si no hay red, el punto se encola y el batch de sincronización lo reenvía.
+        serviceScope.launch {
+            while (true) {
+                delay(30_000L)
+                enviarUbicacionContinuo()
+            }
+        }
+
         // Loop: Reconnect wearable + resend thresholds if needed
         serviceScope.launch {
             while (true) {
@@ -469,15 +480,7 @@ class BioGuardMonitoringService : Service() {
     }
 
     private suspend fun enviarUbicacionReal() {
-        val tienePermiso = ContextCompat.checkSelfPermission(
-            this, Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(
-            this, Manifest.permission.ACCESS_COARSE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-        if (!tienePermiso) {
-            Log.d(TAG, "Sin permiso de ubicación; se omite registro GPS")
-            return
-        }
+        if (!tienePermisoDeUbicacion()) return
         try {
             val cts = CancellationTokenSource()
             val location = fusedLocation.getCurrentLocation(
@@ -520,6 +523,55 @@ class BioGuardMonitoringService : Service() {
             Log.w(TAG, "Error obteniendo ubicación", e)
         }
     }
+
+    /**
+     * Ubicación en tiempo real: toma la posición del teléfono (que está con el
+     * paciente) y la sube al backend de inmediato. Si el envío falla o no hay red,
+     * el punto se encola para que el lote de sincronización lo reenvíe después.
+     */
+    private suspend fun enviarUbicacionContinuo() {
+        val patientId = prefs.patientId.first() ?: return
+        if (!tienePermisoDeUbicacion()) return
+        try {
+            val cts = CancellationTokenSource()
+            val location = fusedLocation.getCurrentLocation(
+                Priority.PRIORITY_BALANCED_POWER_ACCURACY, cts.token
+            ).await() ?: return
+            ultimaLatitud = location.latitude
+            ultimaLongitud = location.longitude
+            val gpsRequest = TrackingGpsRequest(
+                pacienteId = patientId,
+                latitud = location.latitude,
+                longitud = location.longitude,
+                esEmergencia = false
+            )
+            if (hasValidatedInternet()) {
+                try {
+                    api.sendTracking(gpsRequest)
+                    Log.d(TAG, "Tracking en tiempo real enviado ($patientId)")
+                    return
+                } catch (e: Exception) {
+                    Log.d(TAG, "Tracking en vivo falló, se encola para batch: ${e.message}")
+                }
+            }
+            database.pendingDataDao().insertGps(
+                PendingGpsEntity(
+                    latitud = gpsRequest.latitud,
+                    longitud = gpsRequest.longitud,
+                    esEmergencia = gpsRequest.esEmergencia,
+                    timestamp = Instant.now().toString()
+                )
+            )
+        } catch (e: SecurityException) {
+            Log.w(TAG, "Permiso de ubicación revocado", e)
+        } catch (e: Exception) {
+            Log.w(TAG, "Error obteniendo ubicación en tiempo real", e)
+        }
+    }
+
+    private fun tienePermisoDeUbicacion(): Boolean =
+        ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
     private fun hasValidatedInternet(): Boolean {
         val manager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager

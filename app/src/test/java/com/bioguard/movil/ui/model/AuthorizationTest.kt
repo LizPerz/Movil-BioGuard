@@ -43,4 +43,38 @@ class AuthorizationTest {
         assertFalse(owner.allows(AppPermission.GPS_CONTINUOUS))
         assertFalse(owner.allows(AppPermission.AI_CONSOLE))
     }
+
+    @Test
+    fun `caregiver can always view realtime location`() {
+        val access = EffectiveAccess(
+            role = UserRole.CUIDADOR,
+            patientId = "patient-1",
+            planGpsActivo = false
+        )
+
+        assertTrue(access.permiteVerUbicacion())
+    }
+
+    @Test
+    fun `owner can view realtime location only with gps in plan`() {
+        val sinGps = EffectiveAccess(role = UserRole.DUEÑO, patientId = "patient-1", planGpsActivo = false)
+        val conGps = EffectiveAccess(role = UserRole.DUEÑO, patientId = "patient-1", planGpsActivo = true)
+
+        assertFalse(sinGps.permiteVerUbicacion())
+        assertTrue(conGps.permiteVerUbicacion())
+    }
+
+    @Test
+    fun `patient cannot view realtime location`() {
+        val access = EffectiveAccess(role = UserRole.PACIENTE, patientId = "patient-1", planGpsActivo = true)
+
+        assertFalse(access.permiteVerUbicacion())
+    }
+
+    @Test
+    fun `unknown role cannot view realtime location`() {
+        val access = EffectiveAccess(role = UserRole.UNKNOWN)
+
+        assertFalse(access.permiteVerUbicacion())
+    }
 }

@@ -23,29 +23,16 @@ object RetrofitClient {
     private val refreshLock = Any()
     private const val PROACTIVE_REFRESH_MARGIN_MS = 5 * 60 * 1000L
 
-    private fun jwtExpirationMillis(token: String): Long? {
-        return try {
-            val parts = token.split('.')
-            if (parts.size < 2) return null
-            val payload = parts[1].let { base64 ->
-                val padded = base64 + "=".repeat((4 - base64.length % 4) % 4)
-                android.util.Base64.decode(padded, android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP)
-            }
-            val json = org.json.JSONObject(String(payload, java.nio.charset.StandardCharsets.UTF_8))
-            json.optLong("exp", 0L).takeIf { it > 0L }?.times(1000L)
-        } catch (_: Exception) { null }
-    }
-
     private val proactiveRefreshInterceptor = Interceptor { chain ->
         val token = authToken
         if (token != null) {
-            val expiresAt = jwtExpirationMillis(token)
+            val expiresAt = JwtToken.expirationMillis(token)
             val nowMs = System.currentTimeMillis()
             if (expiresAt != null && expiresAt - nowMs < PROACTIVE_REFRESH_MARGIN_MS) {
                 val refreshToken = refreshTokenProvider()
                 if (refreshToken != null) {
                     synchronized(refreshLock) {
-                        val currentExp = jwtExpirationMillis(authToken ?: "") ?: 0L
+                        val currentExp = JwtToken.expirationMillis(authToken ?: "") ?: 0L
                         if (currentExp - System.currentTimeMillis() < PROACTIVE_REFRESH_MARGIN_MS) {
                             try {
                                 val jsonBody = gson.toJson(RefreshTokenRequest(authToken!!, refreshToken))

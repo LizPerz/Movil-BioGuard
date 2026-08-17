@@ -46,7 +46,7 @@ class HistoryViewModel @Inject constructor(
     fun loadHistory() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
-            val pacienteId = pacienteRepository.resolvePatientId(prefs)
+            val pacienteId = pacienteRepository.resolveEffectivePatientId(prefs)
             if (pacienteId == null) {
                 _uiState.update { it.copy(isLoading = false, error = "No se encontro un paciente vinculado") }
                 return@launch

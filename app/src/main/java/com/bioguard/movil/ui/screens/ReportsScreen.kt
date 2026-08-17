@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bioguard.movil.ui.components.ErrorRetryBox
@@ -154,22 +155,22 @@ fun ReportsScreen(
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                ReportStatItem(stringResource(R.string.reports_lecturas), "${reporte.totalLecturas}", p.accent)
-                                ReportStatItem(stringResource(R.string.reports_eventos), "${reporte.totalEventos}", YellowNeon)
-                                ReportStatItem(stringResource(R.string.reports_alertas), "${reporte.totalAlertas}", RedNeon)
+                                ReportStatItem(stringResource(R.string.reports_lecturas), "${reporte.totalLecturas}", p.accent, modifier = Modifier.weight(1f))
+                                ReportStatItem(stringResource(R.string.reports_eventos), "${reporte.totalEventos}", YellowNeon, modifier = Modifier.weight(1f))
+                                ReportStatItem(stringResource(R.string.reports_alertas), "${reporte.totalAlertas}", RedNeon, modifier = Modifier.weight(1f))
                             }
 
                             Spacer(modifier = Modifier.height(8.dp))
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                ReportStatItem(stringResource(R.string.reports_criticos), "${reporte.eventosCriticos}", RedNeon)
-                                ReportStatItem(stringResource(R.string.reports_pendientes), "${reporte.alertasPendientes}", YellowNeon)
-                                Spacer(modifier = Modifier.width(0.dp)) // Para mantener el layout balanceado
+                                ReportStatItem(stringResource(R.string.reports_criticos), "${reporte.eventosCriticos}", RedNeon, modifier = Modifier.weight(1f))
+                                ReportStatItem(stringResource(R.string.reports_pendientes), "${reporte.alertasPendientes}", YellowNeon, modifier = Modifier.weight(1f))
+                                Spacer(modifier = Modifier.weight(1f))
                             }
                         }
                     }
@@ -226,12 +227,12 @@ fun ReportsScreen(
                             item {
                                 Row(
                                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    Text(text = stringResource(R.string.reports_date), fontSize = 9.sp, color = p.textSecondary, letterSpacing = 2.sp, modifier = Modifier.weight(1f))
-                                    Text(text = stringResource(R.string.reports_risk), fontSize = 9.sp, color = p.textSecondary, letterSpacing = 2.sp, modifier = Modifier.weight(1f))
-                                    Text(text = stringResource(R.string.reports_prob), fontSize = 9.sp, color = p.textSecondary, letterSpacing = 2.sp, modifier = Modifier.weight(1f))
-                                    Text(text = stringResource(R.string.reports_status), fontSize = 9.sp, color = p.textSecondary, letterSpacing = 2.sp, modifier = Modifier.weight(1f))
+                                    Text(text = stringResource(R.string.reports_date), fontSize = 10.sp, color = p.textSecondary, letterSpacing = 2.sp, textAlign = TextAlign.Start, modifier = Modifier.weight(1f))
+                                    Text(text = stringResource(R.string.reports_risk), fontSize = 10.sp, color = p.textSecondary, letterSpacing = 2.sp, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+                                    Text(text = stringResource(R.string.reports_prob), fontSize = 10.sp, color = p.textSecondary, letterSpacing = 2.sp, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+                                    Text(text = stringResource(R.string.reports_status), fontSize = 10.sp, color = p.textSecondary, letterSpacing = 2.sp, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
                                 }
                             }
 
@@ -243,28 +244,36 @@ fun ReportsScreen(
                                 }
                                 Row(
                                     modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(text = (evento.fechaEvento ?: "").substringBefore("T"), fontSize = 11.sp, color = p.textPrimary, modifier = Modifier.weight(1f))
                                     Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(4.dp))
-                                            .background(intensityColor.copy(alpha = 0.1f))
-                                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                                            .weight(1f)
+                                        modifier = Modifier.weight(1f),
+                                        contentAlignment = Alignment.Center
                                     ) {
-                                        Text(text = evento.nivelRiesgo ?: "-", fontSize = 9.sp, color = intensityColor, fontWeight = FontWeight.Bold)
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(4.dp))
+                                                .background(intensityColor.copy(alpha = 0.1f))
+                                                .padding(horizontal = 6.dp, vertical = 4.dp)
+                                        ) {
+                                            Text(text = evento.nivelRiesgo ?: "-", fontSize = 9.sp, color = intensityColor, fontWeight = FontWeight.Bold)
+                                        }
                                     }
-                                    Text(text = "%.0f%%".format(evento.probabilidadMl * 100), fontSize = 11.sp, color = p.textPrimary, modifier = Modifier.weight(1f))
+                                    Text(text = "%.0f%%".format(evento.probabilidadMl * 100), fontSize = 11.sp, color = p.textPrimary, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
                                     Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(4.dp))
-                                            .background(if (evento.atendida) GreenNeon.copy(alpha = 0.1f) else YellowNeon.copy(alpha = 0.1f))
-                                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                                            .weight(1f)
+                                        modifier = Modifier.weight(1f),
+                                        contentAlignment = Alignment.Center
                                     ) {
-                                        Text(text = if (evento.atendida) stringResource(R.string.reports_attended) else stringResource(R.string.reports_pending), fontSize = 9.sp, color = if (evento.atendida) GreenNeon else YellowNeon, fontWeight = FontWeight.Bold)
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(4.dp))
+                                                .background(if (evento.atendida) GreenNeon.copy(alpha = 0.1f) else YellowNeon.copy(alpha = 0.1f))
+                                                .padding(horizontal = 6.dp, vertical = 4.dp)
+                                        ) {
+                                            Text(text = if (evento.atendida) stringResource(R.string.reports_attended) else stringResource(R.string.reports_pending), fontSize = 9.sp, color = if (evento.atendida) GreenNeon else YellowNeon, fontWeight = FontWeight.Bold)
+                                        }
                                     }
                                 }
                                 Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(p.border.copy(alpha = 0.3f)))
@@ -312,11 +321,19 @@ fun ReportsScreen(
 }
 
 @Composable
-fun ReportStatItem(label: String, value: String, color: androidx.compose.ui.graphics.Color) {
+fun ReportStatItem(
+    label: String,
+    value: String,
+    color: androidx.compose.ui.graphics.Color,
+    modifier: Modifier = Modifier
+) {
     val p = LocalThemeState.current.colorPalette()
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(p.background).padding(8.dp)
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(p.background)
+            .padding(8.dp)
     ) {
         Text(text = value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = color)
         Text(text = label, fontSize = 8.sp, color = p.textSecondary, letterSpacing = 1.sp)

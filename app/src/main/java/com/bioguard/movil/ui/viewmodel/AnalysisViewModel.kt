@@ -38,7 +38,8 @@ class AnalysisViewModel @Inject constructor(
     private val sensorRepository: SensorRepository,
     private val pacienteRepository: PacienteRepository,
     private val cachedDataDao: CachedDataDao,
-    private val prefs: UserPreferences
+    private val prefs: UserPreferences,
+    private val realtimeHubClient: RealtimeHubClient
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(AnalysisUiState())
@@ -51,6 +52,14 @@ class AnalysisViewModel @Inject constructor(
     private val role = prefs.userRole.value
 
     init {
+        // Tiempo real: nueva lectura del paciente → refrescar análisis
+        viewModelScope.launch {
+            realtimeHubClient.events.collect { event ->
+                if (event == RealtimeHubClient.EventLectura) {
+                    loadLecturas()
+                }
+            }
+        }
         loadLecturas()
         if (role == UserRole.CUIDADOR) startCuidadorPolling()
     }
